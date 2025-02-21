@@ -1,57 +1,67 @@
 const express = require('express');
 const router = express.Router();
-const bcrypt = require('bcrypt');
 const Room = require('../models/Room');
-
-// Admin middleware
-const adminAuth = (req, res, next) => {
-    if (req.session.isAdmin) {
-        next();
-    } else {
-        res.redirect('/admin/login');
-    }
-};
+const { 
+    authenticateAdmin, 
+    validateAdminCredentials, 
+    rateLimitLogin,
+    clearLoginAttempts 
+} = require('../middleware/auth');
 
 // Admin login page
-router.get('/login', (req, res) => {
-    res.render('admin/login');
+router.get('/', (req, res) => {
+    if (req.session.isAdmin) {
+        res.redirect('/admin/dashboard');
+    } else {
+        res.render('admin/login');
+    }
 });
 
 // Admin login handler
-router.post('/login', async (req, res) => {
+router.post('/', rateLimitLogin, async (req, res) => {
     const { username, password } = req.body;
     
-    // In production, these should be stored securely
-    const adminUsername = process.env.ADMIN_USERNAME || 'admin';
-    const adminPassword = process.env.ADMIN_PASSWORD || 'admin';
-
-    if (username === adminUsername && await bcrypt.compare(password, adminPassword)) {
-        req.session.isAdmin = true;
-        res.redirect('/admin/dashboard');
-    } else {
-        res.render('admin/login', { error: 'Invalid credentials' });
+    try {
+        const isValid = await validateAdminCredentials(username, password);
+        if (isValid) {
+            req.session.isAdmin = true;
+            clearLoginAttempts(req.ip);
+            res.redirect('/admin/dashboard');
+        } else {
+            res.render('admin/login', { error: 'Invalid credentials' });
+        }
+    } catch (error) {
+        res.render('admin/login', { error: error.message });
     }
 });
 
 // Admin dashboard
-router.get('/dashboard', adminAuth, async (req, res) => {
+router.get('/dashboard', authenticateAdmin, async (req, res) => {
     const rooms = await Room.find().sort('-createdAt');
     res.render('admin/dashboard', { rooms });
 });
 
 // Create new room
-router.post('/rooms', adminAuth, async (req, res) => {
+router.post('/rooms', authenticateAdmin, async (req, res) => {
     try {
         const { customLink } = req.body;
-        const room = await Room.createRoom(customLink);
-        res.json(room);
+        // Generate a unique identifier if no custom link provided
+        const roomId = customLink || Math.random().toString(36).substring(2, 10);
+        const room = await Room.createRoom(roomId);
+        
+        // Include the full room URL in the response
+        const roomUrl = `https://colourstream.johnrogerscolour.co.uk/${room.roomId}`;
+        res.json({ 
+            ...room.toJSON(),
+            roomUrl
+        });
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
 });
 
 // Delete room
-router.delete('/rooms/:id', adminAuth, async (req, res) => {
+router.delete('/rooms/:id', authenticateAdmin, async (req, res) => {
     try {
         const room = await Room.findById(req.params.id);
         if (!room) {
@@ -68,7 +78,7 @@ router.delete('/rooms/:id', adminAuth, async (req, res) => {
 // Logout
 router.get('/logout', (req, res) => {
     req.session.destroy();
-    res.redirect('/admin/login');
+    res.redirect('/admin');
 });
 
 module.exports = router;

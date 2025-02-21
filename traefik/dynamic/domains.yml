@@ -1,0 +1,23 @@
+http:
+  routers:
+    main:
+      rule: "Host(`colourstream.johnrogerscolour.co.uk`)"
+      service: colourstream-app
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+
+    admin:
+      rule: "Host(`admin.colourstream.johnrogerscolour.co.uk`)"
+      service: colourstream-app
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+
+  services:
+    colourstream-app:
+      loadBalancer:
+        servers:
+          - url: "http://colourstream-app:3000"

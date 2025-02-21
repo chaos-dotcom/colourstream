@@ -1,42 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const bcrypt = require('bcrypt');
 const Room = require('../models/Room');
-
-// Authentication middleware
-const auth = (req, res, next) => {
-    if (req.session.authenticated) {
-        next();
-    } else {
-        res.redirect('/login');
-    }
-};
-
-// Login page
-router.get('/login', (req, res) => {
-    res.render('login');
-});
-
-// Login handler
-router.post('/login', async (req, res) => {
-    const { password } = req.body;
-    
-    // In production, this should be stored securely
-    const correctPassword = process.env.ACCESS_PASSWORD || 'password123';
-
-    if (await bcrypt.compare(password, correctPassword)) {
-        req.session.authenticated = true;
-        // Redirect to the originally requested room or home
-        const redirectTo = req.session.returnTo || '/';
-        delete req.session.returnTo;
-        res.redirect(redirectTo);
-    } else {
-        res.render('login', { error: 'Invalid password' });
-    }
-});
-
-// Room access
-router.get('/:identifier', auth, async (req, res) => {
+// Room access - no authentication required, just valid room link
+router.get('/:identifier', async (req, res) => {
     try {
         const room = await Room.findByLinkOrId(req.params.identifier);
         
@@ -58,19 +24,9 @@ router.get('/:identifier', auth, async (req, res) => {
     }
 });
 
-// Home page redirect to login if not authenticated
+// Home page shows error
 router.get('/', (req, res) => {
-    if (req.session.authenticated) {
-        res.render('home');
-    } else {
-        res.redirect('/login');
-    }
-});
-
-// Logout
-router.get('/logout', (req, res) => {
-    req.session.destroy();
-    res.redirect('/login');
+    res.status(404).render('error', { error: 'Page not found' });
 });
 
 module.exports = router;

@@ -29,8 +29,10 @@ app.use(session({
     resave: false,
     saveUninitialized: false,
     cookie: {
-        secure: process.env.NODE_ENV === 'production',
+        secure: true,
         httpOnly: true,
+        domain: '.johnrogerscolour.co.uk',
+        sameSite: 'lax',
         maxAge: 24 * 60 * 60 * 1000 // 24 hours
     }
 }));
@@ -52,27 +54,23 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/colourstr
     console.error('MongoDB connection error:', err);
 });
 
-// Authentication middleware
-const auth = (req, res, next) => {
-    if (req.session.authenticated) {
-        next();
-    } else {
-        res.redirect('/login');
-    }
-};
 
 // Admin authentication middleware
 const adminAuth = (req, res, next) => {
     if (req.session.isAdmin) {
         next();
     } else {
-        res.redirect('/admin/login');
+        res.redirect('/admin');
     }
 };
 
+// Import routes
+const adminRouter = require('./routes/admin');
+const mainRouter = require('./routes/main');
+
 // Routes
-app.use('/admin', require('./routes/admin'));
-app.use('/', require('./routes/main'));
+app.use('/admin', adminRouter);
+app.use('/', mainRouter);
 
 // Error handling
 app.use((err, req, res, next) => {
