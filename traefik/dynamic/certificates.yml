@@ -1,6 +1,0 @@
-tls:
-  certificates:
-    - certFile: "/ssl/live/live.colourstream.johnrogerscolour.co.uk/cert.pem"
-      keyFile: "/ssl/live/live.colourstream.johnrogerscolour.co.uk/privkey.pem"
-      stores:
-        - default

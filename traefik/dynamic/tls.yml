@@ -1,11 +1,5 @@
 tls:
-  stores:
+  options:
     default:
-      defaultCertificate:
-        certFile: /ssl/live/live.colourstream.johnrogerscolour.co.uk/cert.pem
-        keyFile: /ssl/live/live.colourstream.johnrogerscolour.co.uk/privkey.pem
-  certificates:
-    - certFile: /ssl/live/live.colourstream.johnrogerscolour.co.uk/cert.pem
-      keyFile: /ssl/live/live.colourstream.johnrogerscolour.co.uk/privkey.pem
-      stores:
-        - default
+      minVersion: VersionTLS12
+      sniStrict: true
