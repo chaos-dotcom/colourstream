@@ -1,7 +1,9 @@
-# Certificates and security
-certs/*
-certs/certs/*
-certs/private/*
+# Certificates and security - allow specific needed files
+certs/acme.json
+certs/private/*.key
+certs/certs/*.key
+*.key
+*.pem
 /letsencrypt/*
 
 # Environment variables and secrets

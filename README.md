@@ -1,4 +1,4 @@
-# Colourstream Docker Infrastructure
+# ColourStream Docker Infrastructure
 
 This repository contains a Docker-based infrastructure for running a streaming media platform with video conferencing capabilities. The system uses Traefik as a reverse proxy for SSL/TLS termination and routing for Mirotalk, while OvenMediaEngine handles streaming directly through its ports.
 
