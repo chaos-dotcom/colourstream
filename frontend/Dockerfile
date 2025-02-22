@@ -1,18 +1,35 @@
-FROM node:22-alpine
+# Build stage
+FROM node:20-alpine as build
 
 WORKDIR /app
 
+# Copy package files
 COPY package*.json ./
 
-RUN npm install
-RUN apk add --no-cache curl
+# Install dependencies with clean slate
+RUN npm ci --legacy-peer-deps
 
-# Create a directory for the app source code
-RUN mkdir -p /app/src
+# Copy source code
+COPY . .
 
-# Create a volume mount point for node_modules
-VOLUME /app/node_modules
+# Set environment variables for build
+ENV NODE_ENV=production
+ENV VITE_API_URL=https://live.colourstream.johnrogerscolour.co.uk/api
 
+# Build the app
+RUN npm run build
+
+# Production stage
+FROM nginx:alpine
+
+# Copy built assets from build stage
+COPY --from=build /app/build /usr/share/nginx/html
+
+# Copy nginx configuration
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Expose port
 EXPOSE 3000
 
-CMD ["npm", "start"]
+# Start nginx
+CMD ["nginx", "-g", "daemon off;"]

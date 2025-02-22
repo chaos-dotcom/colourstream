@@ -5,13 +5,12 @@ import { authenticateToken } from '../middleware/auth';
 import prisma from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { logger } from '../utils/logger';
+import crypto from 'crypto';
 
 const router = express.Router();
 
 interface CreateRoomBody {
   name: string;
-  mirotalkRoomId: string;
-  streamKey: string;
   password: string;
   expiryDays: number;
 }
@@ -19,6 +18,16 @@ interface CreateRoomBody {
 interface ValidateRoomBody {
   password: string;
 }
+
+// Utility function to generate random IDs
+const generateRandomId = (length: number = 12): string => {
+  return crypto.randomBytes(length).toString('hex');
+};
+
+// Utility function to generate stream key
+const generateStreamKey = (): string => {
+  return crypto.randomBytes(16).toString('hex');
+};
 
 // Middleware to validate room ID
 const validateRoomId = [
@@ -28,8 +37,6 @@ const validateRoomId = [
 // Middleware to validate room creation/update
 const validateRoom = [
   body('name').notEmpty().trim().withMessage('Name is required'),
-  body('mirotalkRoomId').notEmpty().withMessage('Mirotalk Room ID is required'),
-  body('streamKey').notEmpty().withMessage('Stream Key is required'),
   body('password').notEmpty().withMessage('Password is required'),
   body('expiryDays').isInt({ min: 1 }).withMessage('Expiry days must be a positive number'),
 ];
@@ -46,7 +53,11 @@ router.post(
         throw new AppError(400, 'Validation error');
       }
 
-      const { name, mirotalkRoomId, streamKey, password, expiryDays } = req.body;
+      const { name, password, expiryDays } = req.body;
+
+      // Generate random IDs
+      const mirotalkRoomId = generateRandomId();
+      const streamKey = generateStreamKey();
 
       // Hash the password
       const salt = await bcrypt.genSalt(10);
@@ -58,6 +69,7 @@ router.post(
           mirotalkRoomId,
           streamKey,
           password: hashedPassword,
+          displayPassword: password,
           expiryDate: new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000),
           link: `${process.env.FRONTEND_URL}/room/${Math.random().toString(36).substr(2, 9)}`,
         },
@@ -66,6 +78,9 @@ router.post(
           name: true,
           link: true,
           expiryDate: true,
+          mirotalkRoomId: true,
+          streamKey: true,
+          displayPassword: true,
         },
       });
 
@@ -91,6 +106,9 @@ router.get(
           name: true,
           link: true,
           expiryDate: true,
+          mirotalkRoomId: true,
+          streamKey: true,
+          displayPassword: true,
         },
       });
 

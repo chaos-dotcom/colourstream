@@ -16,7 +16,17 @@ model Room {
   mirotalkRoomId String  @unique
   streamKey     String
   password      String
+  displayPassword String
   expiryDate    DateTime
   link          String   @unique
   createdAt     DateTime @default(now())
+}
+
+model ObsSettings {
+  id            String   @id @default("default")
+  host          String   @default("localhost")
+  port          Int      @default(4455)
+  password      String?
+  enabled       Boolean  @default(false)
+  updatedAt     DateTime @updatedAt
 } 

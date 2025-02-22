@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -18,7 +18,6 @@ interface RoomViewProps {
 
 const RoomView: React.FC<RoomViewProps> = ({ isPasswordProtected = false }) => {
   const { roomId } = useParams<{ roomId: string }>();
-  const navigate = useNavigate();
   const [userName, setUserName] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [isNameSubmitted, setIsNameSubmitted] = useState<boolean>(false);
@@ -34,21 +33,31 @@ const RoomView: React.FC<RoomViewProps> = ({ isPasswordProtected = false }) => {
     if (savedName) {
       setUserName(savedName);
     }
+
+    // Check for password in URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlPassword = urlParams.get('password');
+    if (urlPassword) {
+      setPassword(urlPassword);
+      // If we have both username and password, auto-submit
+      if (savedName && isPasswordProtected) {
+        handleAutoSubmit(savedName, urlPassword);
+      }
+    }
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAutoSubmit = async (name: string, pass: string) => {
     setError('');
     setLoading(true);
 
     try {
       if (roomId && isPasswordProtected) {
-        const config = await validateRoomAccess(roomId, password);
+        const config = await validateRoomAccess(roomId, pass);
         setRoomConfig(config);
       }
 
-      if (userName.trim()) {
-        Cookies.set('userName', userName.trim(), { expires: 31 });
+      if (name.trim()) {
+        Cookies.set('userName', name.trim(), { expires: 31 });
         setIsNameSubmitted(true);
       }
     } catch (error: any) {
@@ -59,28 +68,39 @@ const RoomView: React.FC<RoomViewProps> = ({ isPasswordProtected = false }) => {
     }
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await handleAutoSubmit(userName, password);
+  };
+
   useEffect(() => {
     if (!scriptRef.current && isNameSubmitted) {
-      scriptRef.current = document.createElement('script');
-      scriptRef.current.src = 'https://cdn.jsdelivr.net/npm/ovenplayer/dist/ovenplayer.js';
-      scriptRef.current.async = true;
-      scriptRef.current.onload = () => {
-        // @ts-ignore
-        window.OvenPlayer.create('player_id', {
-          autoStart: true,
-          mute: true,
-          sources: [
-            {
-              label: 'Secure Live Stream',
-              type: 'webrtc',
-              file: roomConfig?.streamKey
-                ? `wss://live.colourstream.johnrogerscolour.co.uk:3334/app/${roomConfig.streamKey}`
-                : 'wss://live.colourstream.johnrogerscolour.co.uk:3334/app/stream',
-            }
-          ]
-        });
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/ovenplayer/dist/ovenplayer.js';
+      script.async = true;
+      script.onload = () => {
+        const player = (window as any).OvenPlayer;
+        if (player && player.create) {
+          player.create('player_id', {
+            autoStart: true,
+            mute: true,
+            sources: [
+              {
+                label: 'Secure Live Stream',
+                type: 'webrtc',
+                file: roomConfig?.streamKey
+                  ? `wss://live.colourstream.johnrogerscolour.co.uk:3334/app/${roomConfig.streamKey}`
+                  : 'wss://live.colourstream.johnrogerscolour.co.uk:3334/app/stream',
+              }
+            ]
+          });
+        }
       };
-      document.head.appendChild(scriptRef.current);
+      script.onerror = (error) => {
+        console.error('Failed to load OvenPlayer:', error);
+      };
+      scriptRef.current = script;
+      document.head.appendChild(script);
     }
 
     return () => {
