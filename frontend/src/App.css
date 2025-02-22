@@ -1,0 +1,15 @@
+/* Ensure SweetAlert2 popups appear above all elements */
+#swal2-title {
+  position: fixed !important;
+  z-index: 9999 !important;
+}
+
+/* Optional: Style the popup container as well */
+.swal2-popup {
+  z-index: 9999 !important;
+}
+
+/* Ensure the popup overlay covers everything */
+.swal2-container {
+  z-index: 9999 !important;
+}

@@ -1,0 +1,20 @@
+# Project Intelligence
+
+## Key Patterns
+
+*   Using Go + React (with Typescript) for full-stack development.
+*   Integrating Ovenplayer and Mirotalk for live streaming.
+*   Securing the application with Traefik and Let's Encrypt.
+
+## Tool Usage Patterns
+
+*   Using `write_to_file` to create and update memory bank files.
+*   Using `replace_in_file` to modify existing files (but it seems to be failing, so using `write_to_file` instead).
+
+## Challenges
+
+*   `replace_in_file` tool is not working as expected.
+
+## Decisions
+
+*   Using `write_to_file` as a workaround for `replace_in_file`.
