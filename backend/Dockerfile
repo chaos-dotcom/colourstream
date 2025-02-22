@@ -1,25 +1,15 @@
-FROM golang:1.24-alpine AS builder
+FROM node:18-alpine
 
 WORKDIR /app
 
-COPY go.mod ./
-COPY go.sum ./
-RUN go mod download
-COPY main.go ./
-RUN go mod tidy
-RUN apk add --no-cache sqlite gcc musl-dev
-RUN sqlite3 colourstream.db ".databases"
+COPY package*.json ./
 
-ENV CGO_ENABLED=1
-RUN go build -o main .
+RUN npm install
 
-FROM alpine:latest
+COPY . .
 
-WORKDIR /app
+RUN npm run build
 
-COPY --from=builder /app/main .
-COPY --from=builder /app/colourstream.db .
+EXPOSE 5000
 
-EXPOSE 8000
-
-CMD ["./main"]
+CMD ["npm", "start"] 
