@@ -1,7 +1,7 @@
 {
   "name": "colourstream-backend",
   "version": "1.0.0",
-  "description": "Backend API for Colourstream admin portal",
+  "description": "Backend API for ColourStream admin portal",
   "main": "dist/index.js",
   "scripts": {
     "start": "node dist/index.js",

@@ -8,6 +8,7 @@
     "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "^5.15.7",
     "@mui/material": "^5.15.7",
+    "@rollup/plugin-terser": "^0.4.4",
     "@testing-library/jest-dom": "^6.4.2",
     "@testing-library/react": "^14.2.1",
     "@testing-library/user-event": "^14.5.2",
@@ -16,10 +17,15 @@
     "@types/react": "^18.2.55",
     "@types/react-dom": "^18.2.19",
     "axios": "^1.6.7",
+    "css-select": "^5.1.0",
+    "cssnano": "^7.0.6",
     "js-cookie": "^3.0.5",
+    "nth-check": "^2.1.1",
+    "postcss": "^8.5.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.22.0",
+    "svgo": "^3.3.2",
     "typescript": "^5.3.3",
     "web-vitals": "^3.5.2"
   },
@@ -49,10 +55,10 @@
   },
   "devDependencies": {
     "@types/js-cookie": "^3.0.6",
-    "@vitejs/plugin-react": "^4.2.1",
-    "vite": "^5.0.12",
-    "vite-plugin-svgr": "^4.2.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^6.1.1",
+    "vite-plugin-svgr": "^0.0.1",
     "vite-tsconfig-paths": "^4.3.1",
-    "vitest": "^1.2.2"
+    "vitest": "^3.0.6"
   }
 }

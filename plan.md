@@ -1,4 +1,4 @@
-# Colourstream Project Plan
+# ColourStream Project Plan
 
 **Task:** Build a live page with Ovenplayer and Mirotalk, secured behind a password-protected admin portal, all integrated with Traefik.
 
