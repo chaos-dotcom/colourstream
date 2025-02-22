@@ -5,33 +5,16 @@ function App() {
   const scriptRef = useRef<HTMLScriptElement | null>(null);
   const [userName, setUserName] = useState<string>('');
   const [isNameSubmitted, setIsNameSubmitted] = useState<boolean>(false);
-  const [hasMediaPermissions, setHasMediaPermissions] = useState<boolean>(false);
-  const [permissionError, setPermissionError] = useState<string>('');
 
-  const requestMediaPermissions = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      setHasMediaPermissions(true);
-      // Stop the test stream immediately
-      stream.getTracks().forEach(track => track.stop());
-      setPermissionError('');
-    } catch (error) {
-      console.error('Permission error:', error);
-      setPermissionError('Please allow camera and microphone access to join the stream.');
-      setHasMediaPermissions(false);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (userName.trim()) {
-      await requestMediaPermissions();
       setIsNameSubmitted(true);
     }
   };
 
   useEffect(() => {
-    if (!scriptRef.current && isNameSubmitted && hasMediaPermissions) {
+    if (!scriptRef.current && isNameSubmitted) {
       scriptRef.current = document.createElement('script');
       scriptRef.current.src = 'https://cdn.jsdelivr.net/npm/ovenplayer/dist/ovenplayer.js';
       scriptRef.current.async = true;
@@ -56,9 +39,9 @@ function App() {
         scriptRef.current = null;
       }
     };
-  }, [isNameSubmitted, hasMediaPermissions]);
+  }, [isNameSubmitted]);
 
-  if (!isNameSubmitted || !hasMediaPermissions) {
+  if (!isNameSubmitted) {
     return (
       <div style={{
         height: '100vh',
@@ -81,18 +64,6 @@ function App() {
             gap: '1rem'
           }}>
             <h2 style={{ margin: '0 0 1rem 0', textAlign: 'center' }}>Enter Your Name</h2>
-            {permissionError && (
-              <div style={{
-                padding: '0.75rem',
-                backgroundColor: '#fff3f3',
-                color: '#dc3545',
-                borderRadius: '4px',
-                fontSize: '0.9rem',
-                textAlign: 'center'
-              }}>
-                {permissionError}
-              </div>
-            )}
             <input
               type="text"
               value={userName}
