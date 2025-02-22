@@ -1,0 +1,58 @@
+# Certificates and security
+certs/*
+certs/certs/*
+certs/private/*
+/letsencrypt/*
+
+# Environment variables and secrets
+.env
+.env.*
+*.env
+.env.local
+.env.*.local
+
+# Private keys and security files
+*.pem
+*.key
+*.cert
+*.crt
+*.csr
+*.p12
+*.pfx
+*.der
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# Build outputs
+/dist
+/build
+/.next
+/out
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Local configuration
+config.local.js
+config.*.local.js
+
+# API keys and credentials
+**/credentials.*
+**/service-account.*
+google-credentials.json
+aws-credentials.*
