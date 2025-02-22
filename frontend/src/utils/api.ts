@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://live.colourstream.johnrogerscolour.co.uk/api';
 
 interface ApiResponse<T> {
   status: 'success' | 'error';
@@ -38,8 +38,6 @@ api.interceptors.request.use((config) => {
 
 export interface CreateRoomData {
   name: string;
-  mirotalkRoomId: string;
-  streamKey: string;
   password: string;
   expiryDays: number;
 }
@@ -49,11 +47,21 @@ export interface Room {
   name: string;
   link: string;
   expiryDate: string;
+  mirotalkRoomId: string;
+  streamKey: string;
+  displayPassword: string;
 }
 
 export interface RoomConfig {
   mirotalkRoomId: string;
   streamKey: string;
+}
+
+export interface OBSSettings {
+  host: string;
+  port: number;
+  password?: string;
+  enabled: boolean;
 }
 
 export const adminLogin = async (password: string): Promise<ApiResponse<AuthResponse>> => {
@@ -63,6 +71,11 @@ export const adminLogin = async (password: string): Promise<ApiResponse<AuthResp
   localStorage.setItem('adminToken', token);
   localStorage.setItem('isAdminAuthenticated', 'true');
   return result;
+};
+
+export const changePassword = async (currentPassword: string, newPassword: string): Promise<ApiResponse<void>> => {
+  const response = await api.post('/auth/change-password', { currentPassword, newPassword });
+  return response.data as ApiResponse<void>;
 };
 
 export const createRoom = async (roomData: CreateRoomData): Promise<ApiResponse<{ room: Room }>> => {
@@ -90,4 +103,21 @@ export const validateRoomAccess = async (roomId: string, password: string): Prom
 export const cleanupExpiredRooms = async (): Promise<ApiResponse<CleanupResponse>> => {
   const response = await api.delete('/rooms/cleanup/expired');
   return response.data as ApiResponse<CleanupResponse>;
+};
+
+export const getOBSSettings = async (): Promise<OBSSettings> => {
+  const response = await api.get('/obs/settings');
+  const result = response.data as ApiResponse<{ settings: OBSSettings }>;
+  return result.data.settings;
+};
+
+export const updateOBSSettings = async (settings: OBSSettings): Promise<OBSSettings> => {
+  const response = await api.put('/obs/settings', settings);
+  const result = response.data as ApiResponse<{ settings: OBSSettings }>;
+  return result.data.settings;
+};
+
+export const setOBSStreamKey = async (streamKey: string): Promise<void> => {
+  const response = await api.post('/obs/set-stream-key', { streamKey });
+  return response.data;
 }; 
