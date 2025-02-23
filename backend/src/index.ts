@@ -2,9 +2,11 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { errorHandler } from './middleware/errorHandler';
+import { generalLimiter, ipBlocker } from './middleware/security';
 import authRoutes from './routes/auth';
 import roomRoutes from './routes/rooms';
 import obsRoutes from './routes/obs';
+import securityRoutes from './routes/security';
 import { logger } from './utils/logger';
 
 dotenv.config();
@@ -19,7 +21,11 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
-// Middleware
+// Security middleware
+app.use(ipBlocker);
+app.use(generalLimiter);
+
+// Standard middleware
 app.use(cors(corsOptions));
 app.use(express.json());
 
@@ -30,6 +36,7 @@ const basePath = process.env.BASE_PATH || '';
 app.use(`${basePath}/auth`, authRoutes);
 app.use(`${basePath}/rooms`, roomRoutes);
 app.use(`${basePath}/obs`, obsRoutes);
+app.use(`${basePath}/security`, securityRoutes);
 
 // Error handling
 app.use(errorHandler);

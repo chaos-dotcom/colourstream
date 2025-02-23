@@ -27,12 +27,10 @@ import {
   Tabs,
   IconButton,
   Tooltip,
-  Grid,
 } from '@mui/material';
 import { Visibility, VisibilityOff, ContentCopy, PlayArrow, OpenInNew, Videocam } from '@mui/icons-material';
 import { createRoom, getRooms, deleteRoom, cleanupExpiredRooms, Room, CreateRoomData, setOBSStreamKey } from '../utils/api';
-import ChangePassword from './ChangePassword';
-import OBSSettings from './OBSSettings';
+import { Settings } from './settings';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -51,7 +49,7 @@ function TabPanel(props: TabPanelProps) {
       aria-labelledby={`simple-tab-${index}`}
       {...other}
     >
-      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+      {value === index && <Box>{children}</Box>}
     </div>
   );
 }
@@ -68,7 +66,7 @@ const AdminDashboard: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [tabValue, setTabValue] = useState(0);
+  const [mainTabValue, setMainTabValue] = useState(0);
   const [visiblePasswords, setVisiblePasswords] = useState<{ [key: string]: boolean }>({});
   const [visibleMirotalkIds, setVisibleMirotalkIds] = useState<{ [key: string]: boolean }>({});
   const [visibleStreamKeys, setVisibleStreamKeys] = useState<{ [key: string]: boolean }>({});
@@ -78,8 +76,8 @@ const AdminDashboard: React.FC = () => {
     expiryDays: 30,
   });
 
-  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
-    setTabValue(newValue);
+  const handleMainTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+    setMainTabValue(newValue);
   };
 
   const togglePasswordVisibility = (roomId: string) => {
@@ -130,8 +128,14 @@ const AdminDashboard: React.FC = () => {
   }, []);
 
   const handleCreateRoom = async () => {
+    if (!newRoom.name || !newRoom.password) {
+      setError('Room name and password are required');
+      return;
+    }
+
     try {
       setLoading(true);
+      setError(null);
       await createRoom(newRoom);
       setSuccess('Room created successfully');
       setOpenDialog(false);
@@ -140,11 +144,25 @@ const AdminDashboard: React.FC = () => {
         password: '',
         expiryDays: 30,
       });
-      fetchRooms();
+      await fetchRooms(); // Wait for rooms to be fetched
     } catch (error: any) {
-      setError(error.response?.data?.message || 'Failed to create room');
+      console.error('Failed to create room:', error);
+      setError(error?.response?.data?.message || 'Failed to create room');
+      // Keep dialog open on error
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDialogClose = () => {
+    if (!loading) {
+      setOpenDialog(false);
+      setError(null);
+      setNewRoom({
+        name: '',
+        password: '',
+        expiryDays: 30,
+      });
     }
   };
 
@@ -201,13 +219,13 @@ const AdminDashboard: React.FC = () => {
         </Typography>
 
         <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-          <Tabs value={tabValue} onChange={handleTabChange} aria-label="admin dashboard tabs">
-            <Tab label="Rooms" />
-            <Tab label="Settings" />
+          <Tabs value={mainTabValue} onChange={handleMainTabChange} aria-label="admin dashboard tabs">
+            <Tab label="ROOMS" />
+            <Tab label="SETTINGS" />
           </Tabs>
         </Box>
 
-        <TabPanel value={tabValue} index={0}>
+        <TabPanel value={mainTabValue} index={0}>
           <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
             <Button
               variant="contained"
@@ -395,20 +413,18 @@ const AdminDashboard: React.FC = () => {
           </TableContainer>
         </TabPanel>
 
-        <TabPanel value={tabValue} index={1}>
-          <Grid container spacing={4}>
-            <Grid item xs={12} md={6}>
-              <ChangePassword />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <OBSSettings />
-            </Grid>
-          </Grid>
+        <TabPanel value={mainTabValue} index={1}>
+          <Settings />
         </TabPanel>
 
-        <Dialog open={openDialog} onClose={() => !loading && setOpenDialog(false)}>
+        <Dialog open={openDialog} onClose={handleDialogClose}>
           <DialogTitle>Create New Room</DialogTitle>
           <DialogContent>
+            {error && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {error}
+              </Alert>
+            )}
             <TextField
               autoFocus
               margin="dense"
@@ -417,6 +433,7 @@ const AdminDashboard: React.FC = () => {
               value={newRoom.name}
               onChange={(e) => setNewRoom({ ...newRoom, name: e.target.value })}
               disabled={loading}
+              required
             />
             <TextField
               margin="dense"
@@ -426,6 +443,7 @@ const AdminDashboard: React.FC = () => {
               value={newRoom.password}
               onChange={(e) => setNewRoom({ ...newRoom, password: e.target.value })}
               disabled={loading}
+              required
             />
             <FormControl fullWidth margin="dense">
               <InputLabel>Expiry Period</InputLabel>
@@ -442,10 +460,15 @@ const AdminDashboard: React.FC = () => {
             </FormControl>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setOpenDialog(false)} disabled={loading}>
+            <Button onClick={handleDialogClose} disabled={loading}>
               Cancel
             </Button>
-            <Button onClick={handleCreateRoom} variant="contained" color="primary" disabled={loading}>
+            <Button 
+              onClick={handleCreateRoom} 
+              variant="contained" 
+              color="primary" 
+              disabled={loading || !newRoom.name || !newRoom.password}
+            >
               {loading ? <CircularProgress size={24} /> : 'Create'}
             </Button>
           </DialogActions>
