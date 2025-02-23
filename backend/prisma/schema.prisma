@@ -23,12 +23,13 @@ model Room {
 }
 
 model obsSettings {
-  id        String   @id @default("default")
-  host      String   @default("localhost")
-  port      Int      @default(4455)
-  password  String?
-  enabled   Boolean  @default(false)
-  updatedAt DateTime @updatedAt
+  id          String   @id @default("default")
+  host        String   @default("localhost")
+  port        Int      @default(4455)
+  password    String?
+  enabled     Boolean  @default(false)
+  streamType  String   @default("rtmp")
+  updatedAt   DateTime @updatedAt
 }
 
 model blockedIP {

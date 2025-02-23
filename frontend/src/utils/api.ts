@@ -75,6 +75,7 @@ export interface OBSSettings {
   port: number;
   password?: string;
   enabled: boolean;
+  streamType: 'rtmp' | 'srt';
 }
 
 export const adminLogin = async (password: string): Promise<ApiResponse<AuthResponse>> => {
@@ -131,6 +132,11 @@ export const updateOBSSettings = async (settings: OBSSettings): Promise<OBSSetti
 };
 
 export const setOBSStreamKey = async (streamKey: string): Promise<void> => {
-  const response = await api.post('/obs/set-stream-key', { streamKey });
+  // First get the current settings to know which protocol to use
+  const settings = await getOBSSettings();
+  const response = await api.post('/obs/set-stream-key', { 
+    streamKey,
+    streamType: settings.streamType 
+  });
   return response.data;
 }; 
