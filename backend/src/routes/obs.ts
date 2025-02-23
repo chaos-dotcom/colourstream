@@ -56,6 +56,7 @@ router.post(
   authenticateToken,
   [
     body('streamKey').notEmpty().withMessage('Stream key is required'),
+    body('streamType').isIn(['rtmp', 'srt']).withMessage('Stream type must be either rtmp or srt'),
   ],
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -68,6 +69,12 @@ router.post(
       if (!settings?.enabled) {
         throw new AppError(400, 'OBS integration is not enabled');
       }
+
+      // Update the settings with the current stream type
+      await obsService.updateSettings({
+        ...settings,
+        streamType: req.body.streamType
+      });
 
       await obsService.connect(settings.host, settings.port, settings.password || undefined);
       await obsService.setStreamKey(req.body.streamKey);

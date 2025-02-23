@@ -10,6 +10,10 @@ import {
   CircularProgress,
   Switch,
   FormControlLabel,
+  RadioGroup,
+  Radio,
+  FormControl,
+  FormLabel,
 } from '@mui/material';
 import { getOBSSettings, updateOBSSettings, OBSSettings as OBSSettingsType } from '../../utils/api';
 
@@ -18,6 +22,7 @@ const defaultSettings: OBSSettingsType = {
   port: 4455,
   password: '',
   enabled: false,
+  streamType: 'rtmp',
 };
 
 export const OBSSettings: React.FC = () => {
@@ -99,6 +104,7 @@ export const OBSSettings: React.FC = () => {
             label="Enable OBS Integration"
             sx={{ mb: 2 }}
           />
+
           <TextField
             margin="normal"
             required
@@ -142,6 +148,46 @@ export const OBSSettings: React.FC = () => {
             }}
             disabled={loading || !settings.enabled}
           />
+          
+          <FormControl component="fieldset" sx={{ mb: 2, mt: 2, width: '100%' }}>
+            <FormLabel component="legend">Stream Protocol</FormLabel>
+            <RadioGroup
+              row
+              value={settings.streamType}
+              onChange={(e) => {
+                setSettings(prev => ({
+                  ...prev,
+                  streamType: e.target.value as 'rtmp' | 'srt'
+                }));
+              }}
+            >
+              <FormControlLabel 
+                value="rtmp" 
+                control={<Radio />} 
+                label="RTMP" 
+                disabled={loading || !settings.enabled}
+              />
+              <FormControlLabel 
+                value="srt" 
+                control={<Radio />} 
+                label="SRT" 
+                disabled={loading || !settings.enabled}
+              />
+            </RadioGroup>
+          </FormControl>
+
+          {settings.streamType === 'srt' && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              Using SRT URL format:
+              <br />
+              <code style={{ wordBreak: 'break-all' }}>
+                srt://live.colourstream.johnrogerscolour.co.uk:9999?streamid=[encoded-stream-id]&latency=2000000
+              </code>
+              <br />
+              <small>The stream-id will be automatically URL encoded and include the full path with your stream key. Leave the Stream Key field blank in OBS.</small>
+            </Alert>
+          )}
+          
           <Button
             type="submit"
             fullWidth
