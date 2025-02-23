@@ -1,6 +1,35 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://live.colourstream.johnrogerscolour.co.uk/api';
+const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+
+export const api = axios.create({
+  baseURL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Add request interceptor to include auth token
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('adminToken');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Add response interceptor to handle errors
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('adminToken');
+      localStorage.removeItem('isAdminAuthenticated');
+      window.location.href = '/admin/login';
+    }
+    return Promise.reject(error);
+  }
+);
 
 interface ApiResponse<T> {
   status: 'success' | 'error';
@@ -19,22 +48,6 @@ interface RoomsResponse {
 interface CleanupResponse {
   deletedCount: number;
 }
-
-const api = axios.create({
-  baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Add token to requests if it exists
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('adminToken');
-  if (token && config.headers) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
 
 export interface CreateRoomData {
   name: string;

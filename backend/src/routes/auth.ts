@@ -5,11 +5,14 @@ import { body, validationResult } from 'express-validator';
 import { AppError } from '../middleware/errorHandler';
 import { authenticateToken } from '../middleware/auth';
 import { updatePasswordHash } from '../utils/updateEnvFile';
+import { loginLimiter, trackLoginAttempts } from '../middleware/security';
 
 const router = express.Router();
 
 router.post(
   '/login',
+  loginLimiter,
+  trackLoginAttempts,
   [
     body('password')
       .notEmpty()

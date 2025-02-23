@@ -11,22 +11,33 @@ datasource db {
 }
 
 model Room {
-  id            String   @id @default(uuid())
-  name          String
-  mirotalkRoomId String  @unique
-  streamKey     String
-  password      String
+  id              String   @id @default(uuid())
+  name            String
+  mirotalkRoomId  String   @unique
+  streamKey       String
+  password        String
   displayPassword String
-  expiryDate    DateTime
-  link          String   @unique
-  createdAt     DateTime @default(now())
+  expiryDate      DateTime
+  link            String   @unique
+  createdAt       DateTime @default(now())
 }
 
-model ObsSettings {
-  id            String   @id @default("default")
-  host          String   @default("localhost")
-  port          Int      @default(4455)
-  password      String?
-  enabled       Boolean  @default(false)
-  updatedAt     DateTime @updatedAt
+model obsSettings {
+  id        String   @id @default("default")
+  host      String   @default("localhost")
+  port      Int      @default(4455)
+  password  String?
+  enabled   Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+}
+
+model blockedIP {
+  id             String    @id @default(uuid())
+  hashedIP       String    @unique
+  originalIP     String    // Store the original IP for display
+  reason         String
+  blockedAt      DateTime  @default(now())
+  unblockAt      DateTime?
+  failedAttempts Int       @default(0)
+  isActive       Boolean   @default(true)
 } 
