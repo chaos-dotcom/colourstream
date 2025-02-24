@@ -27,7 +27,8 @@ const defaultSettings: OBSSettingsType = {
   port: 4455,
   password: '',
   enabled: false,
-  streamType: 'rtmp',
+  streamType: 'rtmp_custom',
+  protocol: 'rtmp',
   useLocalNetwork: true,
   localNetworkMode: 'frontend',
   localNetworkHost: 'localhost',
@@ -99,7 +100,8 @@ export const OBSSettings: React.FC = () => {
         host: settings.localNetworkHost || 'localhost',
         port: settings.localNetworkPort || 4455,
         enabled: settings.enabled,
-        streamType: settings.streamType || 'rtmp',
+        streamType: 'rtmp_custom',  // Always rtmp_custom for OBS
+        protocol: settings.protocol || 'rtmp',  // Track actual protocol separately
         useLocalNetwork: true,
         localNetworkMode: settings.localNetworkMode || 'frontend',
         ...(settings.password ? { password: settings.password } : {}),
@@ -109,17 +111,26 @@ export const OBSSettings: React.FC = () => {
       };
 
       if (settings.localNetworkMode === 'frontend') {
-        // For frontend mode, test the connection locally first
+        // For frontend mode, just test if we can connect to OBS
         try {
           await testFrontendConnection(settingsToSubmit);
-          setSuccess('Successfully connected to OBS');
-          // Store settings locally
-          localStorage.setItem('obsSettings', JSON.stringify(settingsToSubmit));
+          setSuccess('Successfully connected to OBS. You can now control OBS directly from your browser.');
+          
+          // We still need to save the stream settings (RTMP/SRT) to the backend
+          await updateOBSSettings({
+            ...settingsToSubmit,
+            // For frontend mode, we don't send connection details to backend
+            host: 'localhost',
+            port: 4455,
+            password: '',
+            localNetworkHost: 'localhost',
+            localNetworkPort: 4455
+          });
         } catch (error: any) {
-          setError(error.message);
+          setError(`Failed to connect to OBS: ${error.message}`);
         }
       } else {
-        // For backend/custom modes, send to server
+        // For backend mode, send all settings to server
         console.log('Submitting OBS settings to backend:', settingsToSubmit);
         const updatedSettings = await updateOBSSettings(settingsToSubmit);
         setSettings(updatedSettings || settingsToSubmit);
@@ -258,11 +269,12 @@ export const OBSSettings: React.FC = () => {
             <FormLabel component="legend">Stream Protocol</FormLabel>
             <RadioGroup
               row
-              value={settings.streamType}
+              value={settings.protocol}
               onChange={(e) => {
                 setSettings(prev => ({
                   ...prev,
-                  streamType: e.target.value as 'rtmp' | 'srt'
+                  protocol: e.target.value as 'rtmp' | 'srt',
+                  streamType: 'rtmp_custom'  // Always rtmp_custom
                 }));
               }}
             >
@@ -281,7 +293,7 @@ export const OBSSettings: React.FC = () => {
             </RadioGroup>
           </FormControl>
 
-          {settings.streamType === 'srt' && (
+          {settings.protocol === 'srt' && (
             <Alert severity="info" sx={{ mb: 2 }}>
               Using SRT URL format:
               <br />

@@ -3,6 +3,7 @@ import { body, validationResult } from 'express-validator';
 import { authenticateToken } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { obsService } from '../services/obsService';
+import { logger } from '../utils/logger';
 
 const router = express.Router();
 
@@ -28,15 +29,29 @@ router.put(
   '/settings',
   authenticateToken,
   [
-    body('host').notEmpty().withMessage('Host is required'),
-    body('port').isInt({ min: 1 }).withMessage('Port must be a positive number'),
     body('enabled').isBoolean().withMessage('Enabled must be a boolean'),
+    body('streamType').equals('rtmp_custom').withMessage('Stream type must be rtmp_custom'),
+    body('protocol').isIn(['rtmp', 'srt']).withMessage('Protocol must be rtmp or srt'),
+    body('useLocalNetwork').isBoolean().withMessage('useLocalNetwork must be a boolean'),
+    body('localNetworkMode').isIn(['frontend', 'backend']).withMessage('localNetworkMode must be frontend or backend'),
+    // Host validation depends on mode
+    body().custom((body) => {
+      if (body.localNetworkMode === 'backend') {
+        if (!body.localNetworkHost) {
+          throw new Error('Host is required for backend mode');
+        }
+        if (!body.localNetworkPort || !Number.isInteger(body.localNetworkPort) || body.localNetworkPort < 1) {
+          throw new Error('Valid port is required for backend mode');
+        }
+      }
+      return true;
+    })
   ],
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        throw new AppError(400, 'Validation error');
+        throw new AppError(400, 'Validation error: ' + errors.array().map(err => err.msg).join(', '));
       }
 
       const settings = await obsService.updateSettings(req.body);
@@ -56,13 +71,13 @@ router.post(
   authenticateToken,
   [
     body('streamKey').notEmpty().withMessage('Stream key is required'),
-    body('streamType').isIn(['rtmp', 'srt']).withMessage('Stream type must be either rtmp or srt'),
+    body('protocol').isIn(['rtmp', 'srt']).withMessage('Protocol must be either rtmp or srt'),
   ],
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        throw new AppError(400, 'Validation error');
+        throw new AppError(400, 'Validation error: ' + errors.array().map(err => err.msg).join(', '));
       }
 
       const settings = await obsService.getSettings();
@@ -70,20 +85,42 @@ router.post(
         throw new AppError(400, 'OBS integration is not enabled');
       }
 
-      // Update the settings with the current stream type
+      logger.info('Setting stream key with settings:', {
+        protocol: req.body.protocol,
+        host: settings.host,
+        port: settings.port,
+        useLocalNetwork: settings.useLocalNetwork,
+        localNetworkMode: settings.localNetworkMode
+      });
+
+      // Update the settings with the current protocol
       await obsService.updateSettings({
         ...settings,
-        streamType: req.body.streamType
+        protocol: req.body.protocol
       });
 
-      await obsService.connect(settings.host, settings.port, settings.password || undefined);
-      await obsService.setStreamKey(req.body.streamKey);
-      await obsService.disconnect();
+      try {
+        await obsService.connect(settings.host, settings.port, settings.password || undefined);
+        await obsService.setStreamKey(req.body.streamKey);
+        await obsService.disconnect();
 
-      res.json({
-        status: 'success',
-        message: 'Stream key set successfully',
-      });
+        res.json({
+          status: 'success',
+          message: 'Stream key set successfully',
+        });
+      } catch (obsError: any) {
+        logger.error('Failed to set stream key:', {
+          error: obsError.message,
+          settings: {
+            protocol: req.body.protocol,
+            host: settings.host,
+            port: settings.port,
+            useLocalNetwork: settings.useLocalNetwork,
+            localNetworkMode: settings.localNetworkMode
+          }
+        });
+        throw new AppError(500, `Failed to set stream key: ${obsError.message}`);
+      }
     } catch (error) {
       next(error);
     }

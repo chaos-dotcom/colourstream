@@ -75,12 +75,13 @@ export interface OBSSettings {
   port: number;
   password?: string;
   enabled: boolean;
-  streamType: 'rtmp' | 'srt';
+  streamType: 'rtmp_custom';
   useLocalNetwork: boolean;
-  localNetworkMode: 'frontend' | 'backend' | 'custom';
+  localNetworkMode: 'frontend' | 'backend';
   localNetworkHost?: string;
   localNetworkPort?: number;
   srtUrl?: string;
+  protocol?: 'rtmp' | 'srt';
 }
 
 export const adminLogin = async (password: string): Promise<ApiResponse<AuthResponse>> => {
@@ -141,7 +142,7 @@ export const setOBSStreamKey = async (streamKey: string): Promise<void> => {
   const settings = await getOBSSettings();
   const response = await api.post('/obs/set-stream-key', { 
     streamKey,
-    streamType: settings.streamType 
+    protocol: settings.protocol || 'rtmp'  // Use protocol instead of streamType
   });
   return response.data;
 }; 

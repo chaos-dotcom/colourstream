@@ -7,7 +7,8 @@ interface OBSSettings {
   port: number;
   password?: string;
   enabled: boolean;
-  streamType: 'rtmp' | 'srt';
+  streamType: 'rtmp_custom';  // Always rtmp_custom for OBS
+  protocol: 'rtmp' | 'srt';   // Internal protocol tracking
   srtUrl?: string;
   useLocalNetwork: boolean;
   localNetworkMode: 'frontend' | 'backend' | 'custom';
@@ -61,20 +62,20 @@ class OBSService {
             host = 'localhost';
             port = 4455;
             break;
-          case 'custom':
-            // For custom mode, use the specified host/port
-            host = settings.localNetworkHost || host;
-            port = settings.localNetworkPort || port;
-            break;
         }
       }
 
-      logger.info(`Attempting to connect to OBS at ws://${host}:${port}`);
+      logger.info(`Connecting to OBS at ws://${host}:${port}`);
       await this.obs.connect(`ws://${host}:${port}`, password);
-      logger.info('Successfully connected to OBS WebSocket');
-    } catch (err: any) {
-      logger.error('Failed to connect to OBS:', err);
-      throw new Error(`Failed to connect to OBS: ${err.message}`);
+      this.isConnected = true;
+      logger.info('Successfully connected to OBS');
+    } catch (error: any) {
+      logger.error('Failed to connect to OBS:', {
+        error: error.message,
+        host,
+        port
+      });
+      throw new Error(`Failed to connect to OBS: ${error.message}`);
     }
   }
 
@@ -103,51 +104,44 @@ class OBSService {
 
       logger.info('Attempting to set stream settings in OBS');
       
-      if (settings.streamType === 'srt') {
+      // Always use rtmp_custom as the streamServiceType
+      const streamServiceSettings = {
+        streamServiceType: 'rtmp_custom',
+        streamServiceSettings: {
+          server: '',
+          key: '',
+          use_auth: false
+        }
+      };
+      
+      if (settings.protocol === 'srt') {
         logger.info('Using SRT protocol');
         const baseUrl = `srt://live.colourstream.johnrogerscolour.co.uk:9999`;
         const streamId = encodeURIComponent(`srt://live.colourstream.johnrogerscolour.co.uk:9999/app/${streamKey}`);
         const fullSrtUrl = `${baseUrl}?streamid=${streamId}&latency=2000000`;
         logger.info(`Setting SRT URL to: ${fullSrtUrl}`);
         
-        try {
-          await this.obs.call('SetStreamServiceSettings', {
-            streamServiceType: 'custom_streaming',
-            streamServiceSettings: {
-              server: fullSrtUrl,
-              key: '',
-              use_auth: false
-            }
-          });
-        } catch (obsError: any) {
-          logger.error('OBS Error Details:', {
-            error: obsError.message,
-            errorCode: obsError.code,
-            errorStack: obsError.stack,
-            requestedSettings: {
-              streamServiceType: 'custom_streaming',
-              streamServiceSettings: {
-                server: fullSrtUrl,
-                key: '',
-                use_auth: false
-              }
-            }
-          });
-          throw obsError;
-        }
+        streamServiceSettings.streamServiceSettings.server = fullSrtUrl;
+        streamServiceSettings.streamServiceSettings.key = '';
       } else {
         logger.info('Using RTMP protocol');
         logger.info(`Using RTMP server: ${this.rtmpServer}`);
-        await this.obs.call('SetStreamServiceSettings', {
-          streamServiceType: 'rtmp_custom',
-          streamServiceSettings: {
-            server: this.rtmpServer,
-            key: streamKey
-          }
-        });
+        streamServiceSettings.streamServiceSettings.server = this.rtmpServer;
+        streamServiceSettings.streamServiceSettings.key = streamKey;
       }
-      
-      logger.info('Stream settings updated successfully');
+
+      try {
+        await this.obs.call('SetStreamServiceSettings', streamServiceSettings);
+        logger.info('Stream settings updated successfully');
+      } catch (obsError: any) {
+        logger.error('OBS Error Details:', {
+          error: obsError.message,
+          errorCode: obsError.code,
+          errorStack: obsError.stack,
+          requestedSettings: streamServiceSettings
+        });
+        throw obsError;
+      }
       
       // Start streaming after setting the stream settings
       await this.startStream();
