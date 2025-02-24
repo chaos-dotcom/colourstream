@@ -87,4 +87,120 @@ The backend transforms OvenMediaEngine responses to match our API format:
         "stats": {...}  // or other data
     }
 }
-``` 
+```
+
+## Application Data Handling
+
+Applications can be returned in two formats from OvenMediaEngine. The frontend is designed to handle both formats automatically, ensuring consistent display and interaction in the UI.
+
+1. String format (simple name):
+```javascript
+// OvenMediaEngine Response
+{
+    "statusCode": 200,
+    "message": "OK",
+    "response": ["app", "live", "vod"]
+}
+
+// Backend Response to Frontend
+{
+    "status": "success",
+    "data": {
+        "applications": ["app", "live", "vod"]
+    }
+}
+
+// Frontend Transformation
+// Each string is automatically converted to an object with a default type
+[
+    { name: "app", type: "default" },
+    { name: "live", type: "default" },
+    { name: "vod", type: "default" }
+]
+
+// UI Display
+// app (default)
+// live (default)
+// vod (default)
+```
+
+2. Object format (with type):
+```javascript
+// OvenMediaEngine Response
+{
+    "statusCode": 200,
+    "message": "OK",
+    "response": [
+        { "name": "app", "type": "live" },
+        { "name": "vod", "type": "playback" }
+    ]
+}
+
+// Backend Response to Frontend
+{
+    "status": "success",
+    "data": {
+        "applications": [
+            { "name": "app", "type": "live" },
+            { "name": "vod", "type": "playback" }
+        ]
+    }
+}
+
+// UI Display
+// app (live)
+// vod (playback)
+```
+
+### Frontend Handling Details
+
+The frontend handles these formats through several layers:
+
+1. **API Layer** (`oven-api.ts`):
+   ```typescript
+   // Validates and transforms application data
+   async getApplications(vhost: string): Promise<Application[]> {
+       const response = await api.get(`/omen/vhosts/${encodedVhost}/apps`);
+       const applications = response.data.data.applications;
+       return applications.map((app: string | Application) => {
+           if (typeof app === 'string') {
+               return { name: app, type: 'default' };
+           }
+           return app;
+       });
+   }
+   ```
+
+2. **Component Layer** (`ApplicationList.tsx`):
+   ```typescript
+   // Further processes the data for display
+   const formattedApps = applications.map(app => ({
+       name: typeof app === 'string' ? app : app.name,
+       type: typeof app === 'string' ? 'default' : (app.type || 'default'),
+       loading: false
+   }));
+   ```
+
+### Implementation Notes
+
+1. **Type Safety**:
+   - The frontend uses TypeScript interfaces to ensure type safety
+   - `Application` interface defines the expected structure
+   - Runtime checks verify data format
+
+2. **Default Values**:
+   - String inputs automatically get `type: "default"`
+   - Missing type in object format falls back to `"default"`
+   - This ensures consistent UI display
+
+3. **Error Handling**:
+   - Invalid formats are caught and logged
+   - UI shows appropriate error messages
+   - Data validation at multiple levels
+
+4. **Display Consistency**:
+   - Applications always show name and type in UI
+   - Consistent formatting regardless of input format
+   - Loading states and error states handled uniformly
+
+This dual-format support allows flexibility in the API response while maintaining a consistent user experience. 
