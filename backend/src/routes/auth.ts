@@ -23,8 +23,8 @@ const rpName = 'ColourStream Admin';
 const rpID = process.env.WEBAUTHN_RP_ID || 'live.colourstream.johnrogerscolour.co.uk';
 const origin = process.env.WEBAUTHN_ORIGIN || `https://${rpID}`;
 
-// Add passkey-only mode flag
-const PASSKEY_ONLY_MODE = process.env.PASSKEY_ONLY_MODE === 'true';
+// Passkey-only mode is implicit when no password exists
+const isPasskeyOnlyMode = () => !process.env.ADMIN_PASSWORD;
 
 // Store challenge temporarily (in production, use Redis or similar)
 let currentChallenge: string | undefined;
@@ -222,7 +222,7 @@ router.post('/webauthn/authenticate/verify', async (req: Request, res: Response,
         }
       });
 
-      // Generate JWT token
+      // Generate JWT token - no need to check for password here
       const token = jwt.sign(
         { userId: 'admin' },
         process.env.JWT_SECRET!,
@@ -243,10 +243,7 @@ router.post('/webauthn/authenticate/verify', async (req: Request, res: Response,
   }
 });
 
-router.post(
-  '/login',
-  loginLimiter,
-  trackLoginAttempts,
+router.post('/login', loginLimiter, trackLoginAttempts,
   [
     body('password')
       .notEmpty()
@@ -262,8 +259,8 @@ router.post(
 
       const { password } = req.body;
       
-      // Check if passkey-only mode is enabled
-      if (PASSKEY_ONLY_MODE) {
+      // Check if we're in passkey-only mode
+      if (isPasskeyOnlyMode()) {
         logger.warn('Password login attempted while in passkey-only mode');
         throw new AppError(401, 'Password authentication is disabled. Please use a passkey to login.');
       }
@@ -271,15 +268,9 @@ router.post(
       // Get admin password from env
       const adminPassword = process.env.ADMIN_PASSWORD;
 
-      // If no password is set and not in passkey-only mode, this is a misconfiguration
-      if (!adminPassword) {
-        logger.error('No admin password set in environment');
-        throw new AppError(401, 'No password has been set. Please contact your administrator.');
-      }
-
       logger.info('Attempting password login', {
-        hasPassword: true,
-        passKeyOnlyMode: PASSKEY_ONLY_MODE
+        hasPassword: !!adminPassword,
+        passKeyOnlyMode: isPasskeyOnlyMode()
       });
 
       // Simple string comparison for password check
@@ -370,11 +361,10 @@ router.post(
 // Check if password authentication is enabled
 router.get('/has-password', authenticateToken, async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const adminPassword = process.env.ADMIN_PASSWORD;
     res.json({
       status: 'success',
       data: {
-        hasPassword: !!adminPassword && !PASSKEY_ONLY_MODE
+        hasPassword: !isPasskeyOnlyMode()
       }
     });
   } catch (error) {
@@ -387,19 +377,14 @@ router.post('/remove-password', authenticateToken, async (_req: Request, res: Re
   try {
     logger.info('Attempting to remove password authentication');
 
-    // Check if passkey-only mode is enabled
-    if (PASSKEY_ONLY_MODE) {
-      logger.info('Passkey-only mode is enabled, proceeding with password removal');
-    } else {
-      // Check if at least one passkey exists
-      const passkey = await prisma.webAuthnCredential.findFirst({
-        where: { userId: 'admin' }
-      });
+    // Check if at least one passkey exists before allowing password removal
+    const passkey = await prisma.webAuthnCredential.findFirst({
+      where: { userId: 'admin' }
+    });
 
-      if (!passkey) {
-        logger.warn('Cannot remove password: no passkey registered');
-        throw new AppError(400, 'Cannot remove password authentication without a passkey');
-      }
+    if (!passkey) {
+      logger.warn('Cannot remove password: no passkey registered');
+      throw new AppError(400, 'Cannot remove password authentication without a passkey');
     }
 
     try {
