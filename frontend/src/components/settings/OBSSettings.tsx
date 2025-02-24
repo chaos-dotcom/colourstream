@@ -42,16 +42,72 @@ export const OBSSettings: React.FC = () => {
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [obsInstance, setObsInstance] = useState<OBSWebSocket | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connected' | 'connecting' | 'error'>('disconnected');
+  const [lastError, setLastError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSettings();
     return () => {
-      // Cleanup OBS connection on unmount
-      if (obsInstance) {
-        obsInstance.disconnect();
-      }
+      cleanupOBSConnection();
     };
   }, []);
+
+  const cleanupOBSConnection = () => {
+    if (obsInstance) {
+      try {
+        obsInstance.disconnect();
+        setObsInstance(null);
+        setConnectionStatus('disconnected');
+      } catch (error) {
+        console.error('Error during cleanup:', error);
+      }
+    }
+  };
+
+  const setupOBSEventHandlers = (obs: OBSWebSocket) => {
+    obs.on('Hello', (data) => {
+      console.log('Received Hello from OBS:', data);
+    });
+
+    obs.on('Identified', () => {
+      setConnectionStatus('connected');
+      setError(null);
+      setSuccess('Connected to OBS successfully');
+    });
+
+    obs.on('ConnectionOpened', () => {
+      console.log('WebSocket connection opened');
+    });
+
+    obs.on('ConnectionClosed', () => {
+      setConnectionStatus('disconnected');
+      if (lastError) {
+        setError(`Connection closed: ${lastError}`);
+      }
+    });
+
+    obs.on('ConnectionError', (err: Error) => {
+      setConnectionStatus('error');
+      setLastError(err.message);
+      setError(`Connection error: ${err.message}`);
+    });
+
+    // Add periodic connection check
+    const checkInterval = setInterval(async () => {
+      if (obs && connectionStatus === 'connected') {
+        try {
+          const { obsVersion } = await obs.call('GetVersion');
+          console.debug('Connection check successful - OBS version:', obsVersion);
+        } catch (error) {
+          setConnectionStatus('error');
+          setError('Lost connection to OBS');
+          cleanupOBSConnection();
+        }
+      }
+    }, 30000);
+
+    return () => clearInterval(checkInterval);
+  };
 
   const fetchSettings = async () => {
     try {
@@ -69,16 +125,27 @@ export const OBSSettings: React.FC = () => {
 
   const testFrontendConnection = async (settingsToTest: OBSSettingsType) => {
     try {
+      setConnectionStatus('connecting');
       const obs = new OBSWebSocket();
       
-      // Try to connect
-      await obs.connect(`ws://${settingsToTest.localNetworkHost}:${settingsToTest.localNetworkPort}`, 
-        settingsToTest.password);
+      // Setup event handlers before connecting
+      setupOBSEventHandlers(obs);
       
-      // If we get here, connection was successful
+      // Try to connect with proper identification
+      await obs.connect(
+        `ws://${settingsToTest.localNetworkHost}:${settingsToTest.localNetworkPort}`,
+        settingsToTest.password,
+        {
+          eventSubscriptions: 0xFFFFFFFF, // Subscribe to all events
+          rpcVersion: 1
+        }
+      );
+      
       setObsInstance(obs);
       return true;
     } catch (error: any) {
+      setConnectionStatus('error');
+      setLastError(error.message);
       console.error('Failed to connect to OBS:', error);
       throw new Error(`Failed to connect to OBS: ${error.message}`);
     }
@@ -132,9 +199,21 @@ export const OBSSettings: React.FC = () => {
       } else {
         // For backend mode, send all settings to server
         console.log('Submitting OBS settings to backend:', settingsToSubmit);
-        const updatedSettings = await updateOBSSettings(settingsToSubmit);
-        setSettings(updatedSettings || settingsToSubmit);
-        setSuccess('OBS settings updated successfully');
+        try {
+          const updatedSettings = await updateOBSSettings(settingsToSubmit);
+          setSettings(updatedSettings || settingsToSubmit);
+          setSuccess('Successfully connected to OBS and updated settings');
+        } catch (error: any) {
+          console.error('Failed to update OBS settings:', error);
+          console.error('Error response:', error.response?.data);
+          
+          // Extract the actual error message from the response
+          const errorMessage = error.response?.data?.message || 
+            'Failed to update OBS settings. Please check all required fields are filled correctly.';
+          
+          setError(`Connection test failed: ${errorMessage}`);
+          return;
+        }
       }
     } catch (error: any) {
       console.error('Failed to update OBS settings:', error);
@@ -151,7 +230,31 @@ export const OBSSettings: React.FC = () => {
         <Typography variant="h6" gutterBottom>
           OBS WebSocket Settings
         </Typography>
-        <Box component="form" onSubmit={handleSubmit}>
+        <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%' }}>
+          <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="body2">
+              Status: 
+            </Typography>
+            <Box sx={{ 
+              width: 12, 
+              height: 12, 
+              borderRadius: '50%',
+              backgroundColor: 
+                connectionStatus === 'connected' ? 'success.main' :
+                connectionStatus === 'connecting' ? 'warning.main' :
+                connectionStatus === 'error' ? 'error.main' :
+                'grey.500'
+            }} />
+            <Typography variant="body2" color={
+              connectionStatus === 'connected' ? 'success.main' :
+              connectionStatus === 'connecting' ? 'warning.main' :
+              connectionStatus === 'error' ? 'error.main' :
+              'text.secondary'
+            }>
+              {connectionStatus.charAt(0).toUpperCase() + connectionStatus.slice(1)}
+            </Typography>
+          </Box>
+
           {error && (
             <Alert severity="error" sx={{ mb: 2 }}>
               {error}
@@ -256,13 +359,18 @@ export const OBSSettings: React.FC = () => {
             type="password"
             value={settings.password || ''}
             onChange={(e) => {
+              const newPassword = e.target.value.trim();
               setSettings(prev => ({
                 ...prev,
-                password: e.target.value
+                password: newPassword || undefined // Only set if not empty
               }));
             }}
             disabled={loading || !settings.enabled}
-            helperText="The password configured in OBS WebSocket settings (leave blank if no password is set)"
+            helperText={
+              settings.localNetworkMode === 'frontend' 
+                ? "The password configured in OBS WebSocket settings (leave blank if authentication is disabled in OBS)"
+                : "The password configured in OBS WebSocket settings for the remote OBS instance"
+            }
           />
           
           <FormControl component="fieldset" sx={{ mb: 2, mt: 2, width: '100%' }}>

@@ -24,6 +24,13 @@ export const loginLimiter = rateLimit({
 // Middleware to check if IP is blocked
 export const ipBlocker = async (req: Request, res: Response, next: NextFunction) => {
     try {
+        // Skip IP blocking for authentication and OBS routes
+        if (req.path.endsWith('/auth/login') || 
+            req.path.startsWith('/api/obs/') ||
+            req.path.startsWith('/api/rooms/validate')) {
+            return next();
+        }
+
         const clientIP = req.ip || req.socket.remoteAddress || 'unknown';
         const isBlocked = await blockedIPService.isBlocked(clientIP);
 
@@ -52,11 +59,12 @@ export const trackLoginAttempts = async (req: Request, res: Response, next: Next
         // Increment failed attempts
         const attempts = await blockedIPService.incrementFailedAttempts(clientIP, 'Failed login attempt');
         
-        // Block after 10 failed attempts
-        if (attempts >= 10) {
-            await blockedIPService.blockIP(clientIP, 'Too many failed login attempts', 24 * 60 * 60 * 1000); // 24 hours
+        // Block after 20 failed attempts (increased from 10)
+        if (attempts >= 20) {
+            // Block for 1 hour instead of 24 hours
+            await blockedIPService.blockIP(clientIP, 'Too many failed login attempts', 60 * 60 * 1000);
             logger.warn(`IP ${clientIP} blocked due to too many failed login attempts`);
-            return res.status(403).json({ error: 'IP has been blocked due to too many failed login attempts' });
+            return res.status(403).json({ error: 'IP has been blocked due to too many failed login attempts. Try again in 1 hour.' });
         }
 
         next();
