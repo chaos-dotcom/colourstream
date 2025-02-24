@@ -26,6 +26,7 @@ interface TabPanelProps {
 
 interface AppData {
     name: string;
+    type: string;
     stats?: OvenStatistics;
     error?: string;
     loading: boolean;
@@ -67,10 +68,18 @@ export const ApplicationList: React.FC<ApplicationListProps> = ({ api, vhost }) 
 
     const loadApplications = async () => {
         try {
-            const stats = await api.getVirtualHostStats(vhost);
-            // For now, we'll just use the connections object keys as app names
-            const appNames = Object.keys(stats.connections);
-            setApps(appNames.map(name => ({ name, loading: false })));
+            const applications = await api.getApplications(vhost);
+            console.log('Received applications:', applications); // Debug log
+            
+            // Ensure each application has the correct structure
+            const formattedApps = applications.map(app => ({
+                name: typeof app === 'string' ? app : app.name,
+                type: typeof app === 'string' ? 'default' : (app.type || 'default'),
+                loading: false
+            }));
+            
+            console.log('Formatted applications:', formattedApps); // Debug log
+            setApps(formattedApps);
             setError(null);
         } catch (err) {
             setError('Failed to load applications');
@@ -80,27 +89,61 @@ export const ApplicationList: React.FC<ApplicationListProps> = ({ api, vhost }) 
         }
     };
 
-    const handleAccordionChange = (app: string) => async (_event: React.SyntheticEvent, isExpanded: boolean) => {
-        setExpanded(isExpanded ? app : false);
+    const handleAccordionChange = (app: AppData) => async (_event: React.SyntheticEvent, isExpanded: boolean) => {
+        console.log('handleAccordionChange called with:', { app, vhost, isExpanded }); // Debug log
+
+        // Ensure app is an object with a name property
+        const appName = typeof app === 'string' ? app : app.name;
+        
+        if (!appName) {
+            console.error('App name is missing:', app);
+            return;
+        }
+        if (!vhost) {
+            console.error('Vhost is missing:', vhost);
+            return;
+        }
+
+        setExpanded(isExpanded ? appName : false);
         
         if (isExpanded) {
-            const appIndex = apps.findIndex(a => a.name === app);
-            if (appIndex === -1 || apps[appIndex].stats) return;
+            const appIndex = apps.findIndex(a => a.name === appName);
+            if (appIndex === -1) {
+                console.error('App not found in apps array:', app);
+                return;
+            }
 
+            // Skip if stats already loaded
+            if (apps[appIndex].stats) {
+                console.log('Stats already loaded for:', appName);
+                return;
+            }
+
+            // Set loading state
             setApps(prev => prev.map(a => 
-                a.name === app ? { ...a, loading: true } : a
+                a.name === appName ? { ...a, loading: true, error: undefined } : a
             ));
 
             try {
-                const stats = await api.getApplicationStats(vhost, app);
+                console.log('Fetching stats for:', { vhost, appName });
+                const stats = await api.getApplicationStats(vhost, appName);
+                console.log('Received stats:', stats); // Debug log
+                
                 setApps(prev => prev.map(a => 
-                    a.name === app ? { ...a, stats, loading: false } : a
+                    a.name === appName ? { ...a, stats, loading: false } : a
                 ));
-            } catch (err) {
+            } catch (err: any) {
+                console.error('Error fetching stats:', { 
+                    error: err, 
+                    response: err.response,
+                    app: appName, 
+                    vhost 
+                });
+                
+                const errorMessage = err.response?.data?.message || err.message || 'Failed to load statistics';
                 setApps(prev => prev.map(a => 
-                    a.name === app ? { ...a, error: 'Failed to load statistics', loading: false } : a
+                    a.name === appName ? { ...a, error: errorMessage, loading: false } : a
                 ));
-                console.error(`Error loading stats for ${app}:`, err);
             }
         }
     };
@@ -123,11 +166,11 @@ export const ApplicationList: React.FC<ApplicationListProps> = ({ api, vhost }) 
                 <Accordion
                     key={app.name}
                     expanded={expanded === app.name}
-                    onChange={handleAccordionChange(app.name)}
+                    onChange={handleAccordionChange(app)}
                 >
                     <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                         <Typography sx={{ width: '33%', flexShrink: 0 }}>
-                            {app.name}
+                            {app.name} ({app.type})
                         </Typography>
                         {app.loading ? (
                             <CircularProgress size={20} />

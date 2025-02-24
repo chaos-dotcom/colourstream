@@ -19,6 +19,20 @@ router.get('/vhosts', authenticateToken, async (_req, res, next) => {
     }
 });
 
+// Get applications for a virtual host
+router.get('/vhosts/:vhost/apps', authenticateToken, async (req, res, next) => {
+    try {
+        const applications = await omenService.getApplications(req.params.vhost);
+        res.json({
+            status: 'success',
+            data: { applications }
+        });
+    } catch (error) {
+        logger.error(`Error fetching applications for vhost ${req.params.vhost}:`, error);
+        next(error);
+    }
+});
+
 // Get virtual host statistics
 router.get('/vhosts/:vhost/stats', authenticateToken, async (req, res, next) => {
     try {
