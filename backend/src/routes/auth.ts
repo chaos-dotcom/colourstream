@@ -26,15 +26,13 @@ router.post(
       }
 
       const { password } = req.body;
-      const storedHash = process.env.ADMIN_PASSWORD_HASH;
+      const adminPassword = process.env.ADMIN_PASSWORD;
 
-      if (!storedHash) {
-        throw new AppError(500, 'Admin password hash not configured');
+      if (!adminPassword) {
+        throw new AppError(500, 'Admin password not configured');
       }
 
-      const isValid = await bcrypt.compare(password, storedHash);
-
-      if (!isValid) {
+      if (password !== adminPassword) {
         throw new AppError(401, 'Invalid password');
       }
 

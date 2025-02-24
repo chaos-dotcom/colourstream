@@ -1,4 +1,4 @@
-import axios from 'axios';
+import { api } from '../utils/api';
 
 export interface OvenStatistics {
     connections: {
@@ -17,30 +17,36 @@ export interface OvenStatistics {
 }
 
 export class OvenMediaEngineApi {
-    private baseURL: string;
-
     constructor() {
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5001';
-        this.baseURL = `${apiUrl}/omen`;
+        // No need for baseURL as we're using the api instance
     }
 
     async getVirtualHosts(): Promise<string[]> {
-        const response = await axios.get(`${this.baseURL}/vhosts`);
-        return response.data.data.vhosts;
+        try {
+            const response = await api.get('/omen/vhosts');
+            return response.data.data.vhosts;
+        } catch (error: any) {
+            console.error('Error fetching virtual hosts:', {
+                status: error.response?.status,
+                data: error.response?.data,
+                headers: error.response?.headers
+            });
+            throw error;
+        }
     }
 
     async getVirtualHostStats(vhost: string): Promise<OvenStatistics> {
-        const response = await axios.get(`${this.baseURL}/vhosts/${vhost}/stats`);
+        const response = await api.get(`/omen/vhosts/${vhost}/stats`);
         return response.data.data.stats;
     }
 
     async getApplicationStats(vhost: string, app: string): Promise<OvenStatistics> {
-        const response = await axios.get(`${this.baseURL}/vhosts/${vhost}/apps/${app}/stats`);
+        const response = await api.get(`/omen/vhosts/${vhost}/apps/${app}/stats`);
         return response.data.data.stats;
     }
 
     async getStreamStats(vhost: string, app: string, stream: string): Promise<OvenStatistics> {
-        const response = await axios.get(`${this.baseURL}/vhosts/${vhost}/apps/${app}/streams/${stream}/stats`);
+        const response = await api.get(`/omen/vhosts/${vhost}/apps/${app}/streams/${stream}/stats`);
         return response.data.data.stats;
     }
 } 
