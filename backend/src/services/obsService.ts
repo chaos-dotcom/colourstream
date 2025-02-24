@@ -21,6 +21,7 @@ class OBSService {
   private isConnected: boolean = false;
   private rtmpServer: string;
   private srtServer: string;
+  private srtLatency: number;
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 5;
   private reconnectTimeout: NodeJS.Timeout | null = null;
@@ -29,10 +30,12 @@ class OBSService {
   constructor() {
     this.obs = new OBSWebSocket();
     this.rtmpServer = process.env.RTMP_SERVER_URL || 'rtmp://live.johnrogerscolour.co.uk/live';
-    this.srtServer = process.env.SRT_SERVER_URL || 'srt://live.colourstream.johnrogerscolour.co.uk:9999?streamid=srt://live.colourstream.johnrogerscolour.co.uk:9999/app';
+    this.srtServer = process.env.SRT_SERVER_URL || 'srt://live.colourstream.johnrogerscolour.co.uk:9999';
+    this.srtLatency = parseInt(process.env.SRT_LATENCY || '2000000', 10);
     
     logger.info(`Initialized service with OME RTMP endpoint: ${this.rtmpServer}`);
     logger.info(`Initialized service with OME SRT endpoint: ${this.srtServer}`);
+    logger.info(`Using SRT latency: ${this.srtLatency} microseconds`);
     
     this.setupEventHandlers();
   }
@@ -208,9 +211,9 @@ class OBSService {
       
       if (settings.protocol === 'srt') {
         logger.info('Using SRT protocol');
-        const baseUrl = `srt://live.colourstream.johnrogerscolour.co.uk:9999`;
-        const streamId = encodeURIComponent(`srt://live.colourstream.johnrogerscolour.co.uk:9999/app/${streamKey}`);
-        const fullSrtUrl = `${baseUrl}?streamid=${streamId}&latency=2000000`;
+        const baseUrl = this.srtServer;
+        const streamId = encodeURIComponent(`${this.srtServer}/app/${streamKey}`);
+        const fullSrtUrl = `${baseUrl}?streamid=${streamId}&latency=${this.srtLatency}`;
         logger.info(`Setting SRT URL to: ${fullSrtUrl}`);
         
         streamServiceSettings.streamServiceSettings.server = fullSrtUrl;

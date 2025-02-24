@@ -14,6 +14,24 @@ The OBS integration supports two primary connection modes:
 - OBS WebSocket 5.0.0 or later
 - obs-websocket-js v5.0.0 or later (we use this library for both frontend and backend connections)
 
+## Environment Variables
+
+### Required Variables
+- `RTMP_SERVER_URL`: RTMP server endpoint (default: 'rtmp://live.johnrogerscolour.co.uk/live')
+- `SRT_SERVER_URL`: Base SRT server URL (default: 'srt://live.colourstream.johnrogerscolour.co.uk:9999')
+
+### Optional Variables
+- `SRT_LATENCY`: SRT stream latency in microseconds (default: 2000000)
+  - Example in docker-compose.yml:
+    ```yaml
+    environment:
+      - SRT_LATENCY=2000000  # 2 seconds latency
+    ```
+  - Recommended values:
+    - Low latency: 120000 (120ms)
+    - Balanced: 2000000 (2s)
+    - High stability: 4000000 (4s)
+
 ## Connection Modes
 
 ### Browser to OBS Connection
@@ -169,4 +187,18 @@ Common issues and solutions:
 3. **Authentication Issues**:
    - Verify password matches OBS settings
    - Check for special characters in password
-   - Ensure password is properly trimmed 
+   - Ensure password is properly trimmed
+
+### Stream Settings
+
+The integration supports both RTMP and SRT streaming protocols:
+
+#### RTMP
+- Standard RTMP streaming with stream key
+- Uses the configured RTMP_SERVER_URL
+
+#### SRT
+- Secure Reliable Transport protocol
+- Configurable latency via SRT_LATENCY environment variable
+- Full URL format: `[SRT_SERVER_URL]?streamid=[encoded-stream-id]&latency=[SRT_LATENCY]`
+- Stream ID is automatically encoded with the full path and stream key 
