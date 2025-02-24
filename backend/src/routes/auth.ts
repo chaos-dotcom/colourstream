@@ -257,7 +257,15 @@ router.post('/login', loginLimiter, trackLoginAttempts,
         throw new AppError(400, 'Validation error');
       }
 
-      const { password } = req.body;
+      // Check if passkeys exist
+      const existingPasskey = await prisma.webAuthnCredential.findFirst({
+        where: { userId: 'admin' }
+      });
+
+      if (existingPasskey) {
+        logger.warn('Password login attempted when passkeys exist');
+        throw new AppError(401, 'Password authentication is disabled. Please use your registered passkey to login.');
+      }
       
       // Check if we're in passkey-only mode
       if (isPasskeyOnlyMode()) {
@@ -265,6 +273,8 @@ router.post('/login', loginLimiter, trackLoginAttempts,
         throw new AppError(401, 'Password authentication is disabled. Please use a passkey to login.');
       }
 
+      const { password } = req.body;
+      
       // Get admin password from env
       const adminPassword = process.env.ADMIN_PASSWORD;
 
