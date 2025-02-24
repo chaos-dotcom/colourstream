@@ -1,0 +1,1 @@
+keep admin password as admin in the .env file as plain text, this is a temporary password for the admin user. and will be changed by the end user, this is  a safer method as it encorages the end user to change the password after login, and means our services does not have a default password so to speak

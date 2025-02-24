@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -8,6 +8,7 @@ import {
   Container,
   Paper,
   CircularProgress,
+  Alert,
 } from '@mui/material';
 import { adminLogin } from '../utils/api';
 
@@ -16,6 +17,15 @@ const AdminLogin: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Check for stored error message
+    const authError = localStorage.getItem('authError');
+    if (authError) {
+      setError(authError);
+      localStorage.removeItem('authError');
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,6 +56,11 @@ const AdminLogin: React.FC = () => {
           <Typography component="h1" variant="h5" align="center">
             Admin Login
           </Typography>
+          {error && (
+            <Alert severity="error" sx={{ mt: 2, mb: 1 }}>
+              {error}
+            </Alert>
+          )}
           <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
             <TextField
               margin="normal"
@@ -58,8 +73,6 @@ const AdminLogin: React.FC = () => {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              error={!!error}
-              helperText={error}
               disabled={loading}
             />
             <Button

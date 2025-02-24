@@ -11,6 +11,11 @@ export const api = axios.create({
 
 // Add request interceptor to include auth token
 api.interceptors.request.use((config) => {
+  // Don't add token for login endpoint
+  if (config.url?.endsWith('/auth/login')) {
+    return config;
+  }
+  
   const token = localStorage.getItem('adminToken');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -18,14 +23,20 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Add response interceptor to handle errors
+// Add response interceptor to handle token expiration
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
+      // Clear auth state
       localStorage.removeItem('adminToken');
       localStorage.removeItem('isAdminAuthenticated');
-      window.location.href = '/admin/login';
+      
+      // Store error message for login page
+      localStorage.setItem('authError', 'Your session has expired. Please log in again.');
+      
+      // Redirect to login page
+      window.location.href = '/login';
     }
     return Promise.reject(error);
   }

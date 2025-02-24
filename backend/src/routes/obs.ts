@@ -54,11 +54,16 @@ router.put(
         throw new AppError(400, 'Validation error: ' + errors.array().map(err => err.msg).join(', '));
       }
 
-      const settings = await obsService.updateSettings(req.body);
-      res.json({
-        status: 'success',
-        data: { settings },
-      });
+      try {
+        const settings = await obsService.updateSettings(req.body);
+        res.json({
+          status: 'success',
+          data: { settings },
+        });
+      } catch (error: any) {
+        // Pass through any OBS connection errors with their original message
+        throw new AppError(500, error.message || 'Failed to connect to OBS');
+      }
     } catch (error) {
       next(error);
     }

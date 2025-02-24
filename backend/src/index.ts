@@ -9,6 +9,7 @@ import obsRoutes from './routes/obs';
 import omenRoutes from './routes/omen';
 import securityRoutes from './routes/security';
 import { logger } from './utils/logger';
+import { initializePassword } from './utils/initPassword';
 
 dotenv.config();
 
@@ -46,7 +47,19 @@ app.use(`${basePath}/security`, securityRoutes);
 // Error handling
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 5001;
-app.listen(PORT, () => {
-  logger.info(`Server running on port ${PORT}`);
-}); 
+const startServer = async () => {
+  try {
+    // Initialize the admin password hash
+    await initializePassword();
+    
+    const PORT = process.env.PORT || 5001;
+    app.listen(PORT, () => {
+      logger.info(`Server is running on port ${PORT}`);
+    });
+  } catch (error) {
+    logger.error('Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+startServer(); 

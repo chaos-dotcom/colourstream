@@ -21,59 +21,151 @@ class OBSService {
   private isConnected: boolean = false;
   private rtmpServer: string;
   private srtServer: string;
+  private reconnectAttempts: number = 0;
+  private maxReconnectAttempts: number = 5;
+  private reconnectTimeout: NodeJS.Timeout | null = null;
+  private lastConnectionSettings: { host?: string; port?: number; password?: string } | null = null;
 
   constructor() {
     this.obs = new OBSWebSocket();
     this.rtmpServer = process.env.RTMP_SERVER_URL || 'rtmp://live.johnrogerscolour.co.uk/live';
     this.srtServer = process.env.SRT_SERVER_URL || 'srt://live.colourstream.johnrogerscolour.co.uk:9999?streamid=srt://live.colourstream.johnrogerscolour.co.uk:9999/app';
-    logger.info(`Initialized OBS Service with RTMP server: ${this.rtmpServer}`);
-    logger.info(`Initialized OBS Service with SRT server: ${this.srtServer}`);
     
-    this.obs.on('ConnectionOpened', () => {
-      logger.info('OBS WebSocket connected');
+    logger.info(`Initialized service with OME RTMP endpoint: ${this.rtmpServer}`);
+    logger.info(`Initialized service with OME SRT endpoint: ${this.srtServer}`);
+    
+    this.setupEventHandlers();
+  }
+
+  private setupEventHandlers() {
+    // Internal events from obs-websocket-js
+    this.obs.on('Hello', (data) => {
+      logger.info('Received Hello from OBS WebSocket server:', data);
+    });
+
+    this.obs.on('Identified', (data) => {
+      logger.info('Successfully identified with OBS WebSocket server:', data);
       this.isConnected = true;
+      this.reconnectAttempts = 0;
+      if (this.reconnectTimeout) {
+        clearTimeout(this.reconnectTimeout);
+        this.reconnectTimeout = null;
+      }
+    });
+
+    this.obs.on('ConnectionOpened', () => {
+      logger.info('OBS WebSocket connection opened');
     });
 
     this.obs.on('ConnectionClosed', () => {
       logger.info('OBS WebSocket disconnected');
       this.isConnected = false;
+      this.handleDisconnect();
     });
 
     this.obs.on('ConnectionError', (error: Error) => {
       logger.error('OBS WebSocket error:', error);
+      this.isConnected = false;
+      this.handleDisconnect();
     });
+
+    // Add heartbeat check every 30 seconds
+    setInterval(async () => {
+      if (this.isConnected) {
+        try {
+          await this.checkConnection();
+        } catch (error) {
+          logger.error('Heartbeat check failed:', error);
+          this.handleDisconnect();
+        }
+      }
+    }, 30000);
   }
 
-  async connect(host: string, port: number, password?: string): Promise<void> {
+  private async checkConnection(): Promise<void> {
+    try {
+      // Try to get OBS version as a lightweight check
+      const { obsVersion } = await this.obs.call('GetVersion');
+      logger.debug('OBS Version check successful:', obsVersion);
+    } catch (error) {
+      throw new Error('Connection check failed');
+    }
+  }
+
+  private async handleDisconnect() {
+    if (this.reconnectAttempts < this.maxReconnectAttempts && this.lastConnectionSettings) {
+      const backoffTime = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+      logger.info(`Attempting to reconnect in ${backoffTime}ms (attempt ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts})`);
+      
+      this.reconnectTimeout = setTimeout(async () => {
+        this.reconnectAttempts++;
+        try {
+          await this.connect(
+            this.lastConnectionSettings!.host,
+            this.lastConnectionSettings!.port,
+            this.lastConnectionSettings!.password
+          );
+        } catch (error) {
+          logger.error(`Reconnection attempt ${this.reconnectAttempts} failed:`, error);
+        }
+      }, backoffTime);
+    } else if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      logger.error('Max reconnection attempts reached');
+    }
+  }
+
+  async connect(host?: string, port?: number, password?: string): Promise<void> {
     try {
       const settings = await this.getSettings();
       
-      if (settings?.useLocalNetwork) {
-        switch (settings.localNetworkMode) {
-          case 'frontend':
-            // For frontend mode, we'll use the provided host/port directly
-            // as the client will connect from their browser
-            host = settings.localNetworkHost || 'localhost';
-            port = settings.localNetworkPort || 4455;
-            break;
-          case 'backend':
-            // For backend mode, we'll use localhost since OBS is on the same
-            // machine as the backend
-            host = 'localhost';
-            port = 4455;
-            break;
-        }
+      if (!settings?.enabled) {
+        logger.info('OBS integration is disabled, skipping connection');
+        return;
       }
 
-      logger.info(`Connecting to OBS at ws://${host}:${port}`);
-      await this.obs.connect(`ws://${host}:${port}`, password);
-      this.isConnected = true;
-      logger.info('Successfully connected to OBS');
+      // Use the settings from the database for OBS WebSocket connection
+      host = settings.localNetworkHost || 'localhost';
+      port = settings.localNetworkPort || 4455;
+      
+      // Only use password if it's actually set to something
+      const authPassword = settings.password?.trim() || undefined;
+
+      // Store connection settings for reconnection
+      this.lastConnectionSettings = { 
+        host, 
+        port, 
+        password: authPassword 
+      };
+
+      const connectionUrl = `ws://${host}:${port}`;
+      logger.info(`Connecting to OBS WebSocket at ${connectionUrl}${authPassword ? ' with authentication' : ''}`);
+      
+      try {
+        // Connect with proper identification
+        await this.obs.connect(connectionUrl, authPassword, {
+          eventSubscriptions: 0xFFFFFFFF, // Subscribe to all events
+          rpcVersion: 1
+        });
+
+        logger.info('Successfully connected to OBS WebSocket');
+      } catch (error: any) {
+        // Check if this is an auth error
+        if (error.code === 4009) {
+          logger.error('Authentication failed - incorrect password');
+          throw new Error('Authentication failed - incorrect password');
+        } else if (error.code === 4008) {
+          logger.error('Authentication required but no password provided');
+          throw new Error('Authentication required but no password provided');
+        }
+        throw error;
+      }
     } catch (error: any) {
       logger.error('Failed to connect to OBS:', {
         error: error.message,
         host,
-        port
+        port,
+        hasPassword: !!this.lastConnectionSettings?.password,
+        settings: await this.getSettings()
       });
       throw new Error(`Failed to connect to OBS: ${error.message}`);
     }
@@ -184,8 +276,33 @@ class OBSService {
     }
   }
 
+  async testConnection(settings: OBSSettings): Promise<void> {
+    try {
+      // Try to connect
+      await this.connect(settings.host, settings.port, settings.password);
+      
+      // If we get here, connection was successful
+      logger.info('Test connection to OBS successful');
+      
+      // Always disconnect after test
+      await this.disconnect();
+    } catch (error: any) {
+      logger.error('Test connection to OBS failed:', {
+        error: error.message,
+        host: settings.host,
+        port: settings.port
+      });
+      throw new Error(`Failed to connect to OBS: ${error.message}`);
+    }
+  }
+
   async updateSettings(settings: OBSSettings) {
     try {
+      // If backend mode and enabled, test the connection first
+      if (settings.enabled && settings.localNetworkMode === 'backend') {
+        await this.testConnection(settings);
+      }
+
       const updatedSettings = await prisma.obsSettings.upsert({
         where: { id: 'default' },
         update: settings,
