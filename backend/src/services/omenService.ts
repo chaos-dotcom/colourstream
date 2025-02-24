@@ -36,16 +36,15 @@ class OvenMediaEngineService {
 
     private async makeRequest<T>(method: string, path: string, data?: any): Promise<ApiResponse<T>> {
         try {
-            // Manually create base64 encoded token for comparison
-            const manualAuthHeader = 'Basic ' + Buffer.from(this.accessToken).toString('base64');
+            // Create Basic auth header
+            const basicAuthHeader = 'Basic ' + Buffer.from(this.accessToken).toString('base64');
+            
             logger.debug('Making OvenMediaEngine API request:', {
                 method,
                 url: `${this.baseURL}${path}`,
-                auth: {
-                    username: this.accessToken,
-                    password: ''
-                },
-                manualAuthHeader
+                headers: {
+                    'Authorization': basicAuthHeader
+                }
             });
 
             const response = await axios({
@@ -55,7 +54,7 @@ class OvenMediaEngineService {
                 headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
-                    'Authorization': manualAuthHeader
+                    'Authorization': basicAuthHeader
                 }
             });
 
@@ -63,6 +62,9 @@ class OvenMediaEngineService {
         } catch (error) {
             logger.error('OvenMediaEngine API error:', error);
             if (error instanceof AxiosError) {
+                if (error.response?.status === 401) {
+                    throw new Error('Authentication failed with OvenMediaEngine API. Please check your access token.');
+                }
                 throw new Error(`OvenMediaEngine API error: ${error.response?.data?.message || error.message}`);
             }
             throw new Error('Unknown error occurred while calling OvenMediaEngine API');

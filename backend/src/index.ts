@@ -14,6 +14,9 @@ dotenv.config();
 
 const app = express();
 
+// Trust proxy (needed for rate limiting behind reverse proxy)
+app.set('trust proxy', 1);
+
 // CORS configuration
 const corsOptions = {
   origin: process.env.FRONTEND_URL || 'https://live.colourstream.johnrogerscolour.co.uk',
