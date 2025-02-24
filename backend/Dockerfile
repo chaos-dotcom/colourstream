@@ -24,6 +24,9 @@ FROM node:20-alpine
 
 WORKDIR /app
 
+# Install curl for debugging
+RUN apk add --no-cache curl
+
 # Copy package files and install production dependencies
 COPY package*.json ./
 COPY prisma ./prisma/
