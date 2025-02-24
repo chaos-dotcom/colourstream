@@ -18,15 +18,30 @@ const AdminLogin: React.FC = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [passkeySupported, setPasskeySupported] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     // Check if WebAuthn/passkey is supported
-    setPasskeySupported(
-      window.PublicKeyCredential !== undefined &&
-      typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === 'function'
-    );
+    const checkPasskeySupport = async () => {
+      try {
+        const supported = window.PublicKeyCredential !== undefined &&
+          typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === 'function';
+        
+        if (supported) {
+          const result = await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+          setPasskeySupported(result);
+        } else {
+          setPasskeySupported(false);
+        }
+      } catch (error) {
+        console.error('Error checking passkey support:', error);
+        setPasskeySupported(false);
+      }
+    };
+
+    checkPasskeySupport();
 
     // Check for stored error message
     const authError = localStorage.getItem('authError');
@@ -53,19 +68,27 @@ const AdminLogin: React.FC = () => {
 
   const handlePasskeyLogin = async () => {
     setError('');
-    setLoading(true);
+    setPasskeyLoading(true);
 
     try {
       await authenticateWithPasskey();
       navigate('/admin/dashboard');
     } catch (error: any) {
-      if (error.response?.status === 400 && error.response?.data?.message === 'No passkey registered') {
+      console.error('Passkey authentication error:', error);
+      
+      if (error.message === 'User declined to authenticate with passkey') {
+        setError('Authentication cancelled by user');
+      } else if (error.response?.status === 400 && error.response?.data?.message === 'No passkey registered') {
         setError('No passkey registered. Please log in with password first to register a passkey.');
+      } else if (error.name === 'NotAllowedError') {
+        setError('Authentication cancelled by user');
+      } else if (error.name === 'SecurityError') {
+        setError('Security error: The origin is not secure or does not match the registered origin');
       } else {
         setError(error.response?.data?.message || 'Passkey authentication failed');
       }
     } finally {
-      setLoading(false);
+      setPasskeyLoading(false);
     }
   };
 
@@ -97,10 +120,10 @@ const AdminLogin: React.FC = () => {
                 variant="outlined"
                 startIcon={<KeyIcon />}
                 onClick={handlePasskeyLogin}
-                disabled={loading}
+                disabled={passkeyLoading || loading}
                 sx={{ mb: 2 }}
               >
-                {loading ? <CircularProgress size={24} /> : 'Sign in with Passkey'}
+                {passkeyLoading ? <CircularProgress size={24} /> : 'Sign in with Passkey'}
               </Button>
 
               <Divider sx={{ mb: 2 }}>
@@ -120,14 +143,14 @@ const AdminLogin: React.FC = () => {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              disabled={loading}
+              disabled={loading || passkeyLoading}
               autoFocus
             />
             <Button
               type="submit"
               fullWidth
               variant="contained"
-              disabled={loading}
+              disabled={loading || passkeyLoading}
               sx={{ mt: 3, mb: 2 }}
             >
               {loading ? <CircularProgress size={24} /> : 'Sign in with Password'}

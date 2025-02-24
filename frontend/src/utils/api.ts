@@ -1,13 +1,17 @@
 import axios from 'axios';
 import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
-import { 
-  WebAuthnRegistrationResponse, 
-  WebAuthnAuthenticationResponse,
+import type { 
+  ApiResponse, 
+  AuthResponse,
+  PasskeyInfo,
+  WebAuthnRegistrationResponse,
   WebAuthnRegistrationOptions,
   WebAuthnAuthenticationOptions,
 } from '../types';
 
 const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+
+export type { PasskeyInfo };
 
 export const api = axios.create({
   baseURL,
@@ -48,16 +52,6 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
-
-interface ApiResponse<T> {
-  status: 'success' | 'error';
-  data: T;
-  message?: string;
-}
-
-interface AuthResponse {
-  token: string;
-}
 
 interface RoomsResponse {
   rooms: Room[];
@@ -100,13 +94,6 @@ export interface OBSSettings {
   localNetworkPort?: number;
   srtUrl?: string;
   protocol?: 'rtmp' | 'srt';
-}
-
-export interface PasskeyInfo {
-  id: string;
-  credentialId: string;
-  lastUsed: string;
-  createdAt: string;
 }
 
 export const adminLogin = async (password: string): Promise<ApiResponse<AuthResponse>> => {
@@ -189,22 +176,77 @@ export const registerPasskey = async (): Promise<any> => {
 };
 
 export const authenticateWithPasskey = async (): Promise<ApiResponse<AuthResponse>> => {
-  const response = await api.post('/auth/webauthn/authenticate');
-  const options = response.data as WebAuthnAuthenticationOptions;
-  
   try {
-    const credential = await startAuthentication(options) as WebAuthnAuthenticationResponse;
-    const verificationResponse = await api.post('/auth/webauthn/authenticate/verify', credential);
-    const result = verificationResponse.data as ApiResponse<AuthResponse>;
-    const { token } = result.data;
-    localStorage.setItem('adminToken', token);
-    localStorage.setItem('isAdminAuthenticated', 'true');
-    return result;
-  } catch (error: any) {
-    if (error.name === 'NotAllowedError') {
-      throw new Error('User declined to authenticate with passkey');
+    const response = await api.post('/auth/webauthn/authenticate');
+    if (!response.data) {
+      throw new Error('No authentication options received from server');
     }
-    throw error;
+    
+    const options: WebAuthnAuthenticationOptions = response.data;
+    console.log('Authentication options received:', options);
+
+    try {
+      const credential = await startAuthentication(options);
+      console.log('Authentication credential created:', credential);
+      
+      const verificationResponse = await api.post('/auth/webauthn/authenticate/verify', credential);
+      console.log('Verification response:', verificationResponse.data);
+      
+      const result = verificationResponse.data as ApiResponse<AuthResponse>;
+      const { token } = result.data;
+      localStorage.setItem('adminToken', token);
+      localStorage.setItem('isAdminAuthenticated', 'true');
+      return result;
+    } catch (error: any) {
+      console.error('WebAuthn authentication error:', {
+        name: error.name,
+        message: error.message,
+        error
+      });
+      
+      // Handle browser-level WebAuthn errors
+      if (error.name === 'NotAllowedError') {
+        throw new Error('User declined to authenticate with passkey');
+      } else if (error.name === 'SecurityError') {
+        throw new Error('Security error: The origin is not secure or does not match the registered origin');
+      } else if (error.name === 'InvalidStateError') {
+        throw new Error('Invalid authentication state. Please try again.');
+      } else if (error.name === 'AbortError') {
+        throw new Error('Authentication was aborted. Please try again.');
+      } else if (error.name === 'TypeError') {
+        throw new Error('Authentication failed: Invalid response from authenticator');
+      }
+      
+      throw new Error(`Authentication failed: ${error.message}`);
+    }
+  } catch (error: any) {
+    console.error('Passkey authentication error:', {
+      name: error.name,
+      message: error.message,
+      response: error.response,
+      error
+    });
+
+    // If the error was already handled and transformed, just rethrow it
+    if (error.message && (
+      error.message.startsWith('User declined') ||
+      error.message.startsWith('Invalid authentication') ||
+      error.message.startsWith('Authentication failed') ||
+      error.message.startsWith('Security error') ||
+      error.message.startsWith('Authentication was aborted')
+    )) {
+      throw error;
+    }
+    
+    // Handle API-level errors
+    if (error.response?.status === 400) {
+      if (error.response.data?.message === 'No passkey registered') {
+        throw new Error('No passkey registered. Please log in with password first to register a passkey.');
+      }
+    }
+    
+    // For any other errors, throw with a generic message
+    throw new Error(error.response?.data?.message || 'Failed to authenticate with passkey');
   }
 };
 

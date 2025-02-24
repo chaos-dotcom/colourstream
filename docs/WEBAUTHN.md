@@ -14,9 +14,6 @@ ADMIN_PASSWORD=admin
 # WebAuthn Configuration
 WEBAUTHN_RP_ID=live.colourstream.johnrogerscolour.co.uk
 WEBAUTHN_ORIGIN=https://live.colourstream.johnrogerscolour.co.uk
-
-# Optional: Enable passkey-only mode (default: false)
-PASSKEY_ONLY_MODE=false
 ```
 
 ### 2. Database Configuration
@@ -53,12 +50,12 @@ Once you have registered at least one passkey, you can:
 
 1. Remove password authentication:
    - Click "Remove Password Authentication" in the Security tab
-   - This will remove the password option entirely
+   - This will remove the `ADMIN_PASSWORD` from your `.env` file
+   - The system will automatically switch to passkey-only mode
 
-2. Enable passkey-only mode (optional):
-   ```env
-   PASSKEY_ONLY_MODE=true
-   ```
+2. The system automatically detects passkey-only mode:
+   - When `ADMIN_PASSWORD` is empty or removed from `.env`
+   - No additional configuration needed
 
 ### Security Recommendations
 1. Register at least two passkeys before removing password authentication
@@ -67,17 +64,11 @@ Once you have registered at least one passkey, you can:
 
 ## Post-Setup Configuration
 
-### 1. Clean .env File
-After setting up passkeys, remove these variables from your `.env`:
+### Clean .env File
+After setting up passkeys, you can remove these variables from your `.env`:
 ```env
-# REMOVE THESE AFTER SETUP
-ADMIN_PASSWORD=admin  # Remove once passkeys are configured
-```
-
-### 2. Optional: Enable Passkey-Only Mode
-To enforce passkey authentication:
-```env
-PASSKEY_ONLY_MODE=true
+# REMOVE AFTER SETUP
+ADMIN_PASSWORD=admin  # Remove to enable passkey-only mode
 ```
 
 ## Managing Passkeys
