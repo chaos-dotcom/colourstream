@@ -125,6 +125,10 @@ Authorization: Bearer <jwt_token>
     "status": "success",
     "data": {
       "applications": [
+        // Applications can be returned in two formats:
+        // 1. As a string (name only):
+        "app",
+        // 2. As an object with name and type:
         {
           "name": "string",
           "type": "string"
@@ -133,6 +137,28 @@ Authorization: Bearer <jwt_token>
     }
   }
   ```
+- **Notes**:
+  - Applications can be returned either as simple strings (representing the app name) or as objects with name and type
+  - When returned as a string, the frontend will assign a default type of "default"
+  - The application name "app" is the default application configured in OvenMediaEngine for RTMP and SRT streaming
+  - Frontend handling:
+    ```typescript
+    // API layer transforms the data:
+    interface Application {
+        name: string;
+        type: string;
+    }
+    // String "app" becomes { name: "app", type: "default" }
+    // Object remains as-is: { name: "app", type: "live" }
+    ```
+  - Error handling:
+    - Invalid application names return 404
+    - Missing or malformed data returns 400
+    - Authentication failures return 401
+  - Display:
+    - Applications are shown in an accordion list
+    - Each application shows its name and type
+    - Statistics are loaded on demand when expanding an application
 
 ### Get Virtual Host Statistics
 - **URL**: `/omen/vhosts/:vhost/stats`

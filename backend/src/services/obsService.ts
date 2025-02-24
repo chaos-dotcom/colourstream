@@ -9,6 +9,10 @@ interface OBSSettings {
   enabled: boolean;
   streamType: 'rtmp' | 'srt';
   srtUrl?: string;
+  useLocalNetwork: boolean;
+  localNetworkMode: 'frontend' | 'backend' | 'custom';
+  localNetworkHost?: string;
+  localNetworkPort?: number;
 }
 
 class OBSService {
@@ -41,6 +45,30 @@ class OBSService {
 
   async connect(host: string, port: number, password?: string): Promise<void> {
     try {
+      const settings = await this.getSettings();
+      
+      if (settings?.useLocalNetwork) {
+        switch (settings.localNetworkMode) {
+          case 'frontend':
+            // For frontend mode, we'll use the provided host/port directly
+            // as the client will connect from their browser
+            host = settings.localNetworkHost || 'localhost';
+            port = settings.localNetworkPort || 4455;
+            break;
+          case 'backend':
+            // For backend mode, we'll use localhost since OBS is on the same
+            // machine as the backend
+            host = 'localhost';
+            port = 4455;
+            break;
+          case 'custom':
+            // For custom mode, use the specified host/port
+            host = settings.localNetworkHost || host;
+            port = settings.localNetworkPort || port;
+            break;
+        }
+      }
+
       logger.info(`Attempting to connect to OBS at ws://${host}:${port}`);
       await this.obs.connect(`ws://${host}:${port}`, password);
       logger.info('Successfully connected to OBS WebSocket');

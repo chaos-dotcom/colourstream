@@ -14,6 +14,10 @@ import {
   Radio,
   FormControl,
   FormLabel,
+  InputLabel,
+  Select,
+  MenuItem,
+  FormHelperText,
 } from '@mui/material';
 import { getOBSSettings, updateOBSSettings, OBSSettings as OBSSettingsType } from '../../utils/api';
 
@@ -23,6 +27,10 @@ const defaultSettings: OBSSettingsType = {
   password: '',
   enabled: false,
   streamType: 'rtmp',
+  useLocalNetwork: false,
+  localNetworkMode: 'frontend',
+  localNetworkHost: 'localhost',
+  localNetworkPort: 4455,
 };
 
 export const OBSSettings: React.FC = () => {
@@ -105,6 +113,85 @@ export const OBSSettings: React.FC = () => {
             sx={{ mb: 2 }}
           />
 
+          <FormControlLabel
+            control={
+              <Switch
+                checked={settings.useLocalNetwork}
+                disabled={loading || !settings.enabled}
+                onChange={(e) => {
+                  setSettings(prev => ({
+                    ...prev,
+                    useLocalNetwork: e.target.checked
+                  }));
+                }}
+              />
+            }
+            label="Use Local Network"
+            sx={{ mb: 2 }}
+          />
+
+          {settings.useLocalNetwork && (
+            <>
+              <FormControl fullWidth margin="normal">
+                <InputLabel>Local Network Mode</InputLabel>
+                <Select
+                  value={settings.localNetworkMode}
+                  label="Local Network Mode"
+                  onChange={(e) => {
+                    setSettings(prev => ({
+                      ...prev,
+                      localNetworkMode: e.target.value as 'frontend' | 'backend' | 'custom'
+                    }));
+                  }}
+                  disabled={loading || !settings.enabled}
+                >
+                  <MenuItem value="frontend">Frontend (Browser to OBS)</MenuItem>
+                  <MenuItem value="backend">Backend (Server to OBS)</MenuItem>
+                  <MenuItem value="custom">Custom Configuration</MenuItem>
+                </Select>
+                <FormHelperText>
+                  {settings.localNetworkMode === 'frontend' && "Connect directly from browser to OBS"}
+                  {settings.localNetworkMode === 'backend' && "Connect from backend server to OBS"}
+                  {settings.localNetworkMode === 'custom' && "Use custom host and port configuration"}
+                </FormHelperText>
+              </FormControl>
+
+              {(settings.localNetworkMode === 'frontend' || settings.localNetworkMode === 'custom') && (
+                <>
+                  <TextField
+                    margin="normal"
+                    fullWidth
+                    label="Local Network Host"
+                    value={settings.localNetworkHost || 'localhost'}
+                    onChange={(e) => {
+                      setSettings(prev => ({
+                        ...prev,
+                        localNetworkHost: e.target.value
+                      }));
+                    }}
+                    disabled={loading || !settings.enabled}
+                    helperText="The hostname or IP address where OBS is running"
+                  />
+                  <TextField
+                    margin="normal"
+                    fullWidth
+                    type="number"
+                    label="Local Network Port"
+                    value={settings.localNetworkPort || 4455}
+                    onChange={(e) => {
+                      setSettings(prev => ({
+                        ...prev,
+                        localNetworkPort: parseInt(e.target.value) || 4455
+                      }));
+                    }}
+                    disabled={loading || !settings.enabled}
+                    helperText="The WebSocket port configured in OBS (default: 4455)"
+                  />
+                </>
+              )}
+            </>
+          )}
+
           <TextField
             margin="normal"
             required
@@ -117,7 +204,8 @@ export const OBSSettings: React.FC = () => {
                 host: e.target.value
               }));
             }}
-            disabled={loading || !settings.enabled}
+            disabled={loading || !settings.enabled || settings.useLocalNetwork}
+            helperText={settings.useLocalNetwork ? "Host settings managed by local network configuration" : undefined}
           />
           <TextField
             margin="normal"
@@ -132,7 +220,8 @@ export const OBSSettings: React.FC = () => {
                 port: parseInt(e.target.value) || 4455
               }));
             }}
-            disabled={loading || !settings.enabled}
+            disabled={loading || !settings.enabled || settings.useLocalNetwork}
+            helperText={settings.useLocalNetwork ? "Port settings managed by local network configuration" : undefined}
           />
           <TextField
             margin="normal"

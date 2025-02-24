@@ -76,6 +76,10 @@ export interface OBSSettings {
   password?: string;
   enabled: boolean;
   streamType: 'rtmp' | 'srt';
+  useLocalNetwork: boolean;
+  localNetworkMode: 'frontend' | 'backend' | 'custom';
+  localNetworkHost?: string;
+  localNetworkPort?: number;
 }
 
 export const adminLogin = async (password: string): Promise<ApiResponse<AuthResponse>> => {
