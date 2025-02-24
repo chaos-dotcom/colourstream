@@ -31,6 +31,7 @@ import {
 import { Visibility, VisibilityOff, ContentCopy, PlayArrow, OpenInNew, Videocam } from '@mui/icons-material';
 import { createRoom, getRooms, deleteRoom, cleanupExpiredRooms, Room, CreateRoomData, setOBSStreamKey } from '../utils/api';
 import { Settings } from './settings';
+import { OvenMediaConfig } from './OvenMediaConfig';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -222,6 +223,7 @@ const AdminDashboard: React.FC = () => {
           <Tabs value={mainTabValue} onChange={handleMainTabChange} aria-label="admin dashboard tabs">
             <Tab label="ROOMS" />
             <Tab label="SETTINGS" />
+            <Tab label="OVEN MEDIA" />
           </Tabs>
         </Box>
 
@@ -415,6 +417,10 @@ const AdminDashboard: React.FC = () => {
 
         <TabPanel value={mainTabValue} index={1}>
           <Settings />
+        </TabPanel>
+
+        <TabPanel value={mainTabValue} index={2}>
+          <OvenMediaConfig />
         </TabPanel>
 
         <Dialog open={openDialog} onClose={handleDialogClose}>

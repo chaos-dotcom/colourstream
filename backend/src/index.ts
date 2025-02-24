@@ -6,6 +6,7 @@ import { generalLimiter, ipBlocker } from './middleware/security';
 import authRoutes from './routes/auth';
 import roomRoutes from './routes/rooms';
 import obsRoutes from './routes/obs';
+import omenRoutes from './routes/omen';
 import securityRoutes from './routes/security';
 import { logger } from './utils/logger';
 
@@ -30,12 +31,13 @@ app.use(cors(corsOptions));
 app.use(express.json());
 
 // Get base path from environment variable
-const basePath = process.env.BASE_PATH || '';
+const basePath = process.env.BASE_PATH || '/api';
 
 // Routes with base path
 app.use(`${basePath}/auth`, authRoutes);
 app.use(`${basePath}/rooms`, roomRoutes);
 app.use(`${basePath}/obs`, obsRoutes);
+app.use(`${basePath}/omen`, omenRoutes);
 app.use(`${basePath}/security`, securityRoutes);
 
 // Error handling
