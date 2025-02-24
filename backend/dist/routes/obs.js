@@ -8,6 +8,7 @@ const express_validator_1 = require("express-validator");
 const auth_1 = require("../middleware/auth");
 const errorHandler_1 = require("../middleware/errorHandler");
 const obsService_1 = require("../services/obsService");
+const logger_1 = require("../utils/logger");
 const router = express_1.default.Router();
 // Get OBS settings
 router.get('/settings', auth_1.authenticateToken, async (_req, res, next) => {
@@ -24,20 +25,40 @@ router.get('/settings', auth_1.authenticateToken, async (_req, res, next) => {
 });
 // Update OBS settings
 router.put('/settings', auth_1.authenticateToken, [
-    (0, express_validator_1.body)('host').notEmpty().withMessage('Host is required'),
-    (0, express_validator_1.body)('port').isInt({ min: 1 }).withMessage('Port must be a positive number'),
     (0, express_validator_1.body)('enabled').isBoolean().withMessage('Enabled must be a boolean'),
+    (0, express_validator_1.body)('streamType').equals('rtmp_custom').withMessage('Stream type must be rtmp_custom'),
+    (0, express_validator_1.body)('protocol').isIn(['rtmp', 'srt']).withMessage('Protocol must be rtmp or srt'),
+    (0, express_validator_1.body)('useLocalNetwork').isBoolean().withMessage('useLocalNetwork must be a boolean'),
+    (0, express_validator_1.body)('localNetworkMode').isIn(['frontend', 'backend']).withMessage('localNetworkMode must be frontend or backend'),
+    // Host validation depends on mode
+    (0, express_validator_1.body)().custom((body) => {
+        if (body.localNetworkMode === 'backend') {
+            if (!body.localNetworkHost) {
+                throw new Error('Host is required for backend mode');
+            }
+            if (!body.localNetworkPort || !Number.isInteger(body.localNetworkPort) || body.localNetworkPort < 1) {
+                throw new Error('Valid port is required for backend mode');
+            }
+        }
+        return true;
+    })
 ], async (req, res, next) => {
     try {
         const errors = (0, express_validator_1.validationResult)(req);
         if (!errors.isEmpty()) {
-            throw new errorHandler_1.AppError(400, 'Validation error');
+            throw new errorHandler_1.AppError(400, 'Validation error: ' + errors.array().map(err => err.msg).join(', '));
         }
-        const settings = await obsService_1.obsService.updateSettings(req.body);
-        res.json({
-            status: 'success',
-            data: { settings },
-        });
+        try {
+            const settings = await obsService_1.obsService.updateSettings(req.body);
+            res.json({
+                status: 'success',
+                data: { settings },
+            });
+        }
+        catch (error) {
+            // Pass through any OBS connection errors with their original message
+            throw new errorHandler_1.AppError(500, error.message || 'Failed to connect to OBS');
+        }
     }
     catch (error) {
         next(error);
@@ -46,23 +67,51 @@ router.put('/settings', auth_1.authenticateToken, [
 // Set stream key in OBS
 router.post('/set-stream-key', auth_1.authenticateToken, [
     (0, express_validator_1.body)('streamKey').notEmpty().withMessage('Stream key is required'),
+    (0, express_validator_1.body)('protocol').isIn(['rtmp', 'srt']).withMessage('Protocol must be either rtmp or srt'),
 ], async (req, res, next) => {
     try {
         const errors = (0, express_validator_1.validationResult)(req);
         if (!errors.isEmpty()) {
-            throw new errorHandler_1.AppError(400, 'Validation error');
+            throw new errorHandler_1.AppError(400, 'Validation error: ' + errors.array().map(err => err.msg).join(', '));
         }
         const settings = await obsService_1.obsService.getSettings();
         if (!(settings === null || settings === void 0 ? void 0 : settings.enabled)) {
             throw new errorHandler_1.AppError(400, 'OBS integration is not enabled');
         }
-        await obsService_1.obsService.connect(settings.host, settings.port, settings.password || undefined);
-        await obsService_1.obsService.setStreamKey(req.body.streamKey);
-        await obsService_1.obsService.disconnect();
-        res.json({
-            status: 'success',
-            message: 'Stream key set successfully',
+        logger_1.logger.info('Setting stream key with settings:', {
+            protocol: req.body.protocol,
+            host: settings.host,
+            port: settings.port,
+            useLocalNetwork: settings.useLocalNetwork,
+            localNetworkMode: settings.localNetworkMode
         });
+        // Update the settings with the current protocol
+        await obsService_1.obsService.updateSettings({
+            ...settings,
+            protocol: req.body.protocol
+        });
+        try {
+            await obsService_1.obsService.connect(settings.host, settings.port, settings.password || undefined);
+            await obsService_1.obsService.setStreamKey(req.body.streamKey);
+            await obsService_1.obsService.disconnect();
+            res.json({
+                status: 'success',
+                message: 'Stream key set successfully',
+            });
+        }
+        catch (obsError) {
+            logger_1.logger.error('Failed to set stream key:', {
+                error: obsError.message,
+                settings: {
+                    protocol: req.body.protocol,
+                    host: settings.host,
+                    port: settings.port,
+                    useLocalNetwork: settings.useLocalNetwork,
+                    localNetworkMode: settings.localNetworkMode
+                }
+            });
+            throw new errorHandler_1.AppError(500, `Failed to set stream key: ${obsError.message}`);
+        }
     }
     catch (error) {
         next(error);

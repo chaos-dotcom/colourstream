@@ -29,15 +29,27 @@ RUN apk add --no-cache curl
 
 # Copy package files and install production dependencies
 COPY package*.json ./
+
+# Copy Prisma files including migrations
 COPY prisma ./prisma/
 RUN npm ci --production
 
-# Copy built files and Prisma schema
+# Copy built files and Prisma client
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
+
+# Create data directory and set permissions
+RUN mkdir -p /app/data && chown -R node:node /app && chmod -R 777 /app/data
+
+# Switch to non-root user
+USER node
 
 # Expose port
 EXPOSE 5001
 
-# Start the server
-CMD ["npm", "start"] 
+# Start script that ensures database is ready
+COPY --chown=node:node docker-entrypoint.sh /app/
+RUN chmod +x /app/docker-entrypoint.sh
+
+# Start the server using the entrypoint script
+CMD ["/app/docker-entrypoint.sh"] 

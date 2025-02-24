@@ -27,9 +27,17 @@ import {
   Tabs,
   IconButton,
   Tooltip,
+  Card,
+  CardContent,
+  CardActions,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction,
+  Divider,
 } from '@mui/material';
-import { Visibility, VisibilityOff, ContentCopy, PlayArrow, OpenInNew, Videocam } from '@mui/icons-material';
-import { createRoom, getRooms, deleteRoom, cleanupExpiredRooms, Room, CreateRoomData, setOBSStreamKey } from '../utils/api';
+import { Visibility, VisibilityOff, ContentCopy, PlayArrow, OpenInNew, Videocam, Key, Delete, LockOpen } from '@mui/icons-material';
+import { createRoom, getRooms, deleteRoom, cleanupExpiredRooms, Room, CreateRoomData, setOBSStreamKey, registerPasskey, changePassword, PasskeyInfo, getPasskeys, removePasskey, removePassword, hasPassword } from '../utils/api';
 import { Settings } from './settings';
 import { OvenMediaConfig } from './OvenMediaConfig';
 
@@ -76,6 +84,13 @@ const AdminDashboard: React.FC = () => {
     password: '',
     expiryDays: 30,
   });
+  const [registering, setRegistering] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passkeys, setPasskeys] = useState<PasskeyInfo[]>([]);
+  const [hasAdminPassword, setHasAdminPassword] = useState(true);
+  const [loadingPasskeys, setLoadingPasskeys] = useState(false);
 
   const handleMainTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setMainTabValue(newValue);
@@ -128,6 +143,28 @@ const AdminDashboard: React.FC = () => {
     fetchRooms();
   }, []);
 
+  useEffect(() => {
+    const fetchPasskeys = async () => {
+      try {
+        setLoadingPasskeys(true);
+        const [fetchedPasskeys, passwordExists] = await Promise.all([
+          getPasskeys(),
+          hasPassword()
+        ]);
+        setPasskeys(fetchedPasskeys);
+        setHasAdminPassword(passwordExists);
+      } catch (error: any) {
+        setError(error.response?.data?.message || 'Failed to fetch passkeys');
+      } finally {
+        setLoadingPasskeys(false);
+      }
+    };
+    
+    if (mainTabValue === 3) {
+      fetchPasskeys();
+    }
+  }, [mainTabValue]);
+
   const handleCreateRoom = async () => {
     if (!newRoom.name || !newRoom.password) {
       setError('Room name and password are required');
@@ -145,11 +182,10 @@ const AdminDashboard: React.FC = () => {
         password: '',
         expiryDays: 30,
       });
-      await fetchRooms(); // Wait for rooms to be fetched
+      await fetchRooms();
     } catch (error: any) {
       console.error('Failed to create room:', error);
       setError(error?.response?.data?.message || 'Failed to create room');
-      // Keep dialog open on error
     } finally {
       setLoading(false);
     }
@@ -207,6 +243,75 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleRegisterPasskey = async () => {
+    try {
+      setRegistering(true);
+      setError(null);
+      await registerPasskey();
+      setSuccess('Passkey registered successfully');
+    } catch (error: any) {
+      if (error.message === 'User declined to register passkey') {
+        setError('Passkey registration was cancelled');
+      } else {
+        setError(error?.response?.data?.message || 'Failed to register passkey');
+      }
+    } finally {
+      setRegistering(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (newPassword !== confirmPassword) {
+      setError('New passwords do not match');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      await changePassword(currentPassword, newPassword);
+      setSuccess('Password changed successfully');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error: any) {
+      setError(error.response?.data?.message || 'Failed to change password');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRemovePasskey = async (credentialId: string) => {
+    try {
+      setLoading(true);
+      await removePasskey(credentialId);
+      setPasskeys(prev => prev.filter(p => p.credentialId !== credentialId));
+      setSuccess('Passkey removed successfully');
+    } catch (error: any) {
+      setError(error.response?.data?.message || 'Failed to remove passkey');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRemovePassword = async () => {
+    if (passkeys.length === 0) {
+      setError('You must have at least one passkey before removing the password');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await removePassword();
+      setHasAdminPassword(false);
+      setSuccess('Password removed successfully');
+    } catch (error: any) {
+      setError(error.response?.data?.message || 'Failed to remove password');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Container 
       sx={{ 
@@ -224,6 +329,7 @@ const AdminDashboard: React.FC = () => {
             <Tab label="ROOMS" />
             <Tab label="SETTINGS" />
             <Tab label="OVEN MEDIA" />
+            <Tab label="SECURITY" />
           </Tabs>
         </Box>
 
@@ -423,6 +529,140 @@ const AdminDashboard: React.FC = () => {
           <OvenMediaConfig />
         </TabPanel>
 
+        <TabPanel value={mainTabValue} index={3}>
+          <Box sx={{ maxWidth: 600, mx: 'auto', display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {hasAdminPassword && (
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom>
+                    Change Password
+                  </Typography>
+                  <Box component="form" onSubmit={handleChangePassword}>
+                    <TextField
+                      margin="normal"
+                      required
+                      fullWidth
+                      label="Current Password"
+                      type="password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      disabled={loading}
+                    />
+
+                    <TextField
+                      margin="normal"
+                      required
+                      fullWidth
+                      label="New Password"
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      disabled={loading}
+                    />
+
+                    <TextField
+                      margin="normal"
+                      required
+                      fullWidth
+                      label="Confirm New Password"
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      disabled={loading}
+                    />
+
+                    <Button
+                      type="submit"
+                      fullWidth
+                      variant="contained"
+                      sx={{ mt: 3 }}
+                      disabled={loading}
+                    >
+                      Change Password
+                    </Button>
+                  </Box>
+                </CardContent>
+              </Card>
+            )}
+
+            <Card>
+              <CardContent>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="h6" gutterBottom>
+                    Passkey Management
+                  </Typography>
+                  {hasAdminPassword && passkeys.length > 0 && (
+                    <Button
+                      variant="outlined"
+                      color="warning"
+                      startIcon={<LockOpen />}
+                      onClick={handleRemovePassword}
+                      disabled={loading}
+                    >
+                      Remove Password Authentication
+                    </Button>
+                  )}
+                </Box>
+                
+                <Typography variant="body1" color="text.secondary" paragraph>
+                  Passkeys provide a more secure way to authenticate without passwords. They use biometric authentication or device PIN.
+                  {!hasAdminPassword && (
+                    <Typography component="span" color="warning.main" sx={{ display: 'block', mt: 1 }}>
+                      Password authentication is disabled. You can only login using passkeys.
+                    </Typography>
+                  )}
+                </Typography>
+
+                {loadingPasskeys ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', my: 2 }}>
+                    <CircularProgress />
+                  </Box>
+                ) : (
+                  <>
+                    {passkeys.length > 0 && (
+                      <List>
+                        {passkeys.map((passkey, index) => (
+                          <React.Fragment key={passkey.id}>
+                            {index > 0 && <Divider />}
+                            <ListItem>
+                              <ListItemText
+                                primary={`Passkey ${index + 1}`}
+                                secondary={`Last used: ${new Date(passkey.lastUsed).toLocaleString()}`}
+                              />
+                              <ListItemSecondaryAction>
+                                <Tooltip title="Remove passkey">
+                                  <IconButton
+                                    edge="end"
+                                    onClick={() => handleRemovePasskey(passkey.credentialId)}
+                                    disabled={loading || (!hasAdminPassword && passkeys.length === 1)}
+                                  >
+                                    <Delete />
+                                  </IconButton>
+                                </Tooltip>
+                              </ListItemSecondaryAction>
+                            </ListItem>
+                          </React.Fragment>
+                        ))}
+                      </List>
+                    )}
+                  </>
+                )}
+              </CardContent>
+              <CardActions>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={<Key />}
+                  onClick={handleRegisterPasskey}
+                  disabled={registering || loading}
+                >
+                  {registering ? 'Registering...' : 'Register New Passkey'}
+                </Button>
+              </CardActions>
+            </Card>
+          </Box>
+        </TabPanel>
+
         <Dialog open={openDialog} onClose={handleDialogClose}>
           <DialogTitle>Create New Room</DialogTitle>
           <DialogContent>
@@ -480,25 +720,21 @@ const AdminDashboard: React.FC = () => {
           </DialogActions>
         </Dialog>
 
-        <Snackbar
-          open={!!error || !!success}
-          autoHideDuration={6000}
-          onClose={() => {
-            setError(null);
-            setSuccess(null);
-          }}
-        >
-          <Alert
-            onClose={() => {
-              setError(null);
-              setSuccess(null);
-            }}
-            severity={error ? 'error' : 'success'}
-            sx={{ width: '100%' }}
-          >
-            {error || success}
-          </Alert>
-        </Snackbar>
+        {error && (
+          <Snackbar open={!!error} autoHideDuration={6000} onClose={() => setError(null)}>
+            <Alert onClose={() => setError(null)} severity="error">
+              {error}
+            </Alert>
+          </Snackbar>
+        )}
+
+        {success && (
+          <Snackbar open={!!success} autoHideDuration={6000} onClose={() => setSuccess(null)}>
+            <Alert onClose={() => setSuccess(null)} severity="success">
+              {success}
+            </Alert>
+          </Snackbar>
+        )}
       </Box>
     </Container>
   );

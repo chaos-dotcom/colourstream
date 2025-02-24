@@ -1,60 +1,11 @@
-# Certificates and security - allow specific needed files
-certs/acme.json
-certs/private/*.key
-certs/certs/*.key
-*.key
-*.pem
-/letsencrypt/*
-
-# Environment variables and secrets
+db-data
+node_modules
 .env
-.env.*
-*.env
-.env.local
-.env.*.local
-
-# Private keys and security files
-*.pem
-*.key
-*.cert
-*.crt
-*.csr
-*.p12
-*.pfx
-*.der
-
-# Logs
-*.log
-logs/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Dependencies
-/node_modules
-/.pnp
-.pnp.js
-
-# Build outputs
-/dist
-/build
-/.next
-/out
-
-# IDE and editor files
-.idea/
-.vscode/
-*.swp
-*.swo
-.DS_Store
-Thumbs.db
-
-# Local configuration
-config.local.js
-config.*.local.js
-
-# API keys and credentials
-**/credentials.*
-**/service-account.*
-google-credentials.json
-aws-credentials.*
+certs
+certs/certs
+certs/private
+certs/acme.json
+certs/chain.pem
+certs/fullchain.pem
+certs/privkey.pem
+certs/extract_certs.sh
