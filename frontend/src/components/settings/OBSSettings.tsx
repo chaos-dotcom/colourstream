@@ -20,6 +20,7 @@ import {
   FormHelperText,
 } from '@mui/material';
 import { getOBSSettings, updateOBSSettings, OBSSettings as OBSSettingsType } from '../../utils/api';
+import OBSWebSocket from 'obs-websocket-js';
 
 const defaultSettings: OBSSettingsType = {
   host: 'localhost',
@@ -27,10 +28,11 @@ const defaultSettings: OBSSettingsType = {
   password: '',
   enabled: false,
   streamType: 'rtmp',
-  useLocalNetwork: false,
+  useLocalNetwork: true,
   localNetworkMode: 'frontend',
   localNetworkHost: 'localhost',
   localNetworkPort: 4455,
+  srtUrl: undefined
 };
 
 export const OBSSettings: React.FC = () => {
@@ -38,9 +40,16 @@ export const OBSSettings: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [obsInstance, setObsInstance] = useState<OBSWebSocket | null>(null);
 
   useEffect(() => {
     fetchSettings();
+    return () => {
+      // Cleanup OBS connection on unmount
+      if (obsInstance) {
+        obsInstance.disconnect();
+      }
+    };
   }, []);
 
   const fetchSettings = async () => {
@@ -57,6 +66,23 @@ export const OBSSettings: React.FC = () => {
     }
   };
 
+  const testFrontendConnection = async (settingsToTest: OBSSettingsType) => {
+    try {
+      const obs = new OBSWebSocket();
+      
+      // Try to connect
+      await obs.connect(`ws://${settingsToTest.localNetworkHost}:${settingsToTest.localNetworkPort}`, 
+        settingsToTest.password);
+      
+      // If we get here, connection was successful
+      setObsInstance(obs);
+      return true;
+    } catch (error: any) {
+      console.error('Failed to connect to OBS:', error);
+      throw new Error(`Failed to connect to OBS: ${error.message}`);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     void submitSettings();
@@ -68,12 +94,41 @@ export const OBSSettings: React.FC = () => {
     setLoading(true);
 
     try {
-      const updatedSettings = await updateOBSSettings(settings);
-      setSettings(updatedSettings || settings);
-      setSuccess('OBS settings updated successfully');
+      // Create a clean settings object
+      const settingsToSubmit: OBSSettingsType = {
+        host: settings.localNetworkHost || 'localhost',
+        port: settings.localNetworkPort || 4455,
+        enabled: settings.enabled,
+        streamType: settings.streamType || 'rtmp',
+        useLocalNetwork: true,
+        localNetworkMode: settings.localNetworkMode || 'frontend',
+        ...(settings.password ? { password: settings.password } : {}),
+        ...(settings.localNetworkHost ? { localNetworkHost: settings.localNetworkHost } : {}),
+        ...(settings.localNetworkPort ? { localNetworkPort: settings.localNetworkPort } : {}),
+        ...(settings.srtUrl ? { srtUrl: settings.srtUrl } : {})
+      };
+
+      if (settings.localNetworkMode === 'frontend') {
+        // For frontend mode, test the connection locally first
+        try {
+          await testFrontendConnection(settingsToSubmit);
+          setSuccess('Successfully connected to OBS');
+          // Store settings locally
+          localStorage.setItem('obsSettings', JSON.stringify(settingsToSubmit));
+        } catch (error: any) {
+          setError(error.message);
+        }
+      } else {
+        // For backend/custom modes, send to server
+        console.log('Submitting OBS settings to backend:', settingsToSubmit);
+        const updatedSettings = await updateOBSSettings(settingsToSubmit);
+        setSettings(updatedSettings || settingsToSubmit);
+        setSuccess('OBS settings updated successfully');
+      }
     } catch (error: any) {
       console.error('Failed to update OBS settings:', error);
-      setError(error?.response?.data?.message || 'Failed to update OBS settings');
+      console.error('Error response:', error.response?.data);
+      setError(error?.response?.data?.message || 'Failed to update OBS settings. Please check all required fields are filled correctly.');
     } finally {
       setLoading(false);
     }
@@ -119,62 +174,69 @@ export const OBSSettings: React.FC = () => {
               value={settings.localNetworkMode}
               label="Connection Mode"
               onChange={(e) => {
-                const mode = e.target.value as 'frontend' | 'backend' | 'custom';
+                const mode = e.target.value as 'frontend' | 'backend';
                 setSettings(prev => ({
                   ...prev,
                   localNetworkMode: mode,
                   useLocalNetwork: true,
-                  // Set default values based on mode
-                  localNetworkHost: mode === 'backend' ? 'localhost' : prev.localNetworkHost || 'localhost',
-                  localNetworkPort: mode === 'backend' ? 4455 : prev.localNetworkPort || 4455
+                  // Keep existing values or set defaults
+                  localNetworkHost: prev.localNetworkHost || 'localhost',
+                  localNetworkPort: prev.localNetworkPort || 4455,
+                  // Also update the main host/port to match
+                  host: prev.localNetworkHost || 'localhost',
+                  port: prev.localNetworkPort || 4455
                 }));
               }}
               disabled={loading || !settings.enabled}
             >
               <MenuItem value="frontend">Browser to OBS Connection</MenuItem>
               <MenuItem value="backend">Server to OBS Connection</MenuItem>
-              <MenuItem value="custom">Custom Connection</MenuItem>
             </Select>
             <FormHelperText>
               {settings.localNetworkMode === 'frontend' && "Connect directly from your browser to OBS (OBS must be running on your local machine)"}
-              {settings.localNetworkMode === 'backend' && "Connect from the server to OBS (OBS must be running on the same machine as the server)"}
-              {settings.localNetworkMode === 'custom' && "Use a custom connection configuration"}
+              {settings.localNetworkMode === 'backend' && "Connect from the server to OBS (OBS can be running anywhere the server can reach)"}
             </FormHelperText>
           </FormControl>
 
-          {(settings.localNetworkMode === 'frontend' || settings.localNetworkMode === 'custom') && (
-            <>
-              <TextField
-                margin="normal"
-                fullWidth
-                label="OBS WebSocket Host"
-                value={settings.localNetworkHost || 'localhost'}
-                onChange={(e) => {
-                  setSettings(prev => ({
-                    ...prev,
-                    localNetworkHost: e.target.value
-                  }));
-                }}
-                disabled={loading || !settings.enabled}
-                helperText="The hostname or IP address where OBS is running"
-              />
-              <TextField
-                margin="normal"
-                fullWidth
-                type="number"
-                label="OBS WebSocket Port"
-                value={settings.localNetworkPort || 4455}
-                onChange={(e) => {
-                  setSettings(prev => ({
-                    ...prev,
-                    localNetworkPort: parseInt(e.target.value) || 4455
-                  }));
-                }}
-                disabled={loading || !settings.enabled}
-                helperText="The WebSocket port configured in OBS (default: 4455)"
-              />
-            </>
-          )}
+          <TextField
+            margin="normal"
+            fullWidth
+            required
+            label={settings.localNetworkMode === 'frontend' ? "OBS WebSocket Host" : "OBS Host"}
+            value={settings.localNetworkHost || 'localhost'}
+            onChange={(e) => {
+              const newHost = e.target.value;
+              setSettings(prev => ({
+                ...prev,
+                localNetworkHost: newHost,
+                host: newHost // Keep both in sync
+              }));
+            }}
+            disabled={loading || !settings.enabled}
+            helperText={
+              settings.localNetworkMode === 'frontend' 
+                ? "The hostname or IP address where OBS is running (usually localhost)"
+                : "The hostname or IP address where OBS is running relative to the server"
+            }
+          />
+          <TextField
+            margin="normal"
+            fullWidth
+            required
+            type="number"
+            label={settings.localNetworkMode === 'frontend' ? "OBS WebSocket Port" : "OBS Port"}
+            value={settings.localNetworkPort || 4455}
+            onChange={(e) => {
+              const newPort = parseInt(e.target.value) || 4455;
+              setSettings(prev => ({
+                ...prev,
+                localNetworkPort: newPort,
+                port: newPort // Keep both in sync
+              }));
+            }}
+            disabled={loading || !settings.enabled}
+            helperText="The WebSocket port configured in OBS (default: 4455)"
+          />
 
           <TextField
             margin="normal"

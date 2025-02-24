@@ -80,6 +80,7 @@ export interface OBSSettings {
   localNetworkMode: 'frontend' | 'backend' | 'custom';
   localNetworkHost?: string;
   localNetworkPort?: number;
+  srtUrl?: string;
 }
 
 export const adminLogin = async (password: string): Promise<ApiResponse<AuthResponse>> => {
