@@ -23,13 +23,19 @@ model Room {
 }
 
 model obsSettings {
-  id          String   @id @default("default")
-  host        String   @default("localhost")
-  port        Int      @default(4455)
-  password    String?
-  enabled     Boolean  @default(false)
-  streamType  String   @default("rtmp")
-  updatedAt   DateTime @updatedAt
+  id              String   @id @default("default")
+  host            String   @default("localhost")
+  port            Int      @default(4455)
+  password        String?
+  enabled         Boolean  @default(false)
+  streamType      String   @default("rtmp_custom")
+  protocol        String   @default("rtmp")
+  useLocalNetwork Boolean  @default(true)
+  localNetworkMode String  @default("frontend")
+  localNetworkHost String? @default("localhost")
+  localNetworkPort Int?    @default(4455)
+  srtUrl          String?
+  updatedAt       DateTime @updatedAt
 }
 
 model blockedIP {
