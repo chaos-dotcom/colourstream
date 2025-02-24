@@ -1,4 +1,11 @@
 import axios from 'axios';
+import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
+import { 
+  WebAuthnRegistrationResponse, 
+  WebAuthnAuthenticationResponse,
+  WebAuthnRegistrationOptions,
+  WebAuthnAuthenticationOptions,
+} from '../types';
 
 const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
 
@@ -95,6 +102,13 @@ export interface OBSSettings {
   protocol?: 'rtmp' | 'srt';
 }
 
+export interface PasskeyInfo {
+  id: string;
+  credentialId: string;
+  lastUsed: string;
+  createdAt: string;
+}
+
 export const adminLogin = async (password: string): Promise<ApiResponse<AuthResponse>> => {
   const response = await api.post('/auth/login', { password });
   const result = response.data as ApiResponse<AuthResponse>;
@@ -156,4 +170,60 @@ export const setOBSStreamKey = async (streamKey: string): Promise<void> => {
     protocol: settings.protocol || 'rtmp'  // Use protocol instead of streamType
   });
   return response.data;
+};
+
+export const registerPasskey = async (): Promise<any> => {
+  const response = await api.post('/auth/webauthn/register');
+  const options = response.data as WebAuthnRegistrationOptions;
+  
+  try {
+    const credential = await startRegistration(options) as WebAuthnRegistrationResponse;
+    const verificationResponse = await api.post('/auth/webauthn/register/verify', credential);
+    return verificationResponse.data;
+  } catch (error: any) {
+    if (error.name === 'NotAllowedError') {
+      throw new Error('User declined to register passkey');
+    }
+    throw error;
+  }
+};
+
+export const authenticateWithPasskey = async (): Promise<ApiResponse<AuthResponse>> => {
+  const response = await api.post('/auth/webauthn/authenticate');
+  const options = response.data as WebAuthnAuthenticationOptions;
+  
+  try {
+    const credential = await startAuthentication(options) as WebAuthnAuthenticationResponse;
+    const verificationResponse = await api.post('/auth/webauthn/authenticate/verify', credential);
+    const result = verificationResponse.data as ApiResponse<AuthResponse>;
+    const { token } = result.data;
+    localStorage.setItem('adminToken', token);
+    localStorage.setItem('isAdminAuthenticated', 'true');
+    return result;
+  } catch (error: any) {
+    if (error.name === 'NotAllowedError') {
+      throw new Error('User declined to authenticate with passkey');
+    }
+    throw error;
+  }
+};
+
+export const getPasskeys = async (): Promise<PasskeyInfo[]> => {
+  const response = await api.get('/auth/webauthn/credentials');
+  return response.data.data.credentials;
+};
+
+export const removePasskey = async (credentialId: string): Promise<void> => {
+  const response = await api.delete(`/auth/webauthn/credentials/${credentialId}`);
+  return response.data;
+};
+
+export const removePassword = async (): Promise<void> => {
+  const response = await api.post('/auth/remove-password');
+  return response.data;
+};
+
+export const hasPassword = async (): Promise<boolean> => {
+  const response = await api.get('/auth/has-password');
+  return response.data.data.hasPassword;
 }; 

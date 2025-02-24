@@ -7,7 +7,7 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = "file:./dev.db"
+  url      = env("DATABASE_URL")
 }
 
 model Room {
@@ -47,4 +47,15 @@ model blockedIP {
   unblockAt      DateTime?
   failedAttempts Int       @default(0)
   isActive       Boolean   @default(true)
+}
+
+model WebAuthnCredential {
+  id              String   @id @default(uuid())
+  credentialId    String   @unique
+  publicKey       String
+  counter         BigInt
+  userId          String   @unique // Since we only have one admin user
+  transports      String?  // JSON string of allowed transports
+  createdAt       DateTime @default(now())
+  lastUsed        DateTime @default(now())
 } 

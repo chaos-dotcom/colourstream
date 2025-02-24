@@ -9,6 +9,7 @@ import {
 import { GeneralSettings } from './GeneralSettings';
 import { OBSSettings } from './OBSSettings';
 import { SecuritySettings } from './SecuritySettings';
+import PasskeyRegistration from '../PasskeyRegistration';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -64,6 +65,7 @@ export const Settings: React.FC = () => {
       </TabPanel>
 
       <TabPanel value={activeTab} index={1}>
+        <PasskeyRegistration />
         <OBSSettings />
       </TabPanel>
 
