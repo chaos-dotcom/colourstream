@@ -1,4 +1,5 @@
 import express from 'express';
+import http from 'http';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { errorHandler } from './middleware/errorHandler';
@@ -11,10 +12,19 @@ import securityRoutes from './routes/security';
 import { logger } from './utils/logger';
 import { initializePassword } from './utils/initPassword';
 import mirotalkRoutes from './routes/mirotalk';
+import WebSocketService from './services/websocket';
+import OBSService from './services/obsService';
 
 dotenv.config();
 
 const app = express();
+const server = http.createServer(app);
+
+// Initialize WebSocket service
+const wsService = new WebSocketService(server);
+
+// Initialize OBS service with WebSocket service
+export const obsService = new OBSService(wsService);
 
 // Trust proxy (needed for rate limiting behind reverse proxy)
 app.set('trust proxy', 1);
@@ -55,7 +65,7 @@ const startServer = async () => {
     await initializePassword();
     
     const PORT = process.env.PORT || 5001;
-    app.listen(PORT, () => {
+    server.listen(PORT, () => {
       logger.info(`Server is running on port ${PORT}`);
     });
   } catch (error) {
@@ -64,4 +74,27 @@ const startServer = async () => {
   }
 };
 
-startServer(); 
+startServer();
+
+// Cleanup on server shutdown
+process.on('SIGTERM', () => {
+  logger.info('SIGTERM received. Cleaning up...');
+  wsService.cleanup();
+  obsService.cleanup();
+  server.close(() => {
+    logger.info('Server closed');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  logger.info('SIGINT received. Cleaning up...');
+  wsService.cleanup();
+  obsService.cleanup();
+  server.close(() => {
+    logger.info('Server closed');
+    process.exit(0);
+  });
+});
+
+export default server; 

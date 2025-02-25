@@ -1,5 +1,5 @@
 # Build stage
-FROM node:20-alpine as builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -19,7 +19,7 @@ ENV VITE_API_URL=https://live.colourstream.johnrogerscolour.co.uk/api
 # Build the app
 RUN npm run build
 
-# Serve stage
+# Production stage
 FROM node:20-alpine
 
 WORKDIR /app

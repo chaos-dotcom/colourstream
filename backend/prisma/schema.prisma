@@ -59,4 +59,21 @@ model WebAuthnCredential {
   transports      String?  // JSON string of allowed transports
   createdAt       DateTime @default(now())
   lastUsed        DateTime @default(now())
+}
+
+model OBSSettings {
+  id              String   @id @default(cuid())
+  host            String
+  port            Int
+  password        String?
+  enabled         Boolean  @default(false)
+  streamType      String   @default("rtmp_custom")
+  protocol        String   @default("rtmp")
+  useLocalNetwork Boolean  @default(true)
+  localNetworkMode String  @default("frontend")
+  localNetworkHost String?
+  localNetworkPort Int?
+  srtUrl          String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 } 

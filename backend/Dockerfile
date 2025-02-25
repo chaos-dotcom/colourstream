@@ -1,5 +1,5 @@
 # Build stage
-FROM node:20-alpine as build
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -38,8 +38,8 @@ RUN npm ci --production
 RUN npx prisma generate
 
 # Copy built files and Prisma client
-COPY --from=build /app/dist ./dist
-COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
 # Create data directory and set permissions
 RUN mkdir -p /app/data && chown -R node:node /app && chmod -R 777 /app
