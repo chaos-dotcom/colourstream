@@ -2,15 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
-  Button,
   Typography,
   Container,
   Paper,
   CircularProgress,
-  Alert,
 } from '@mui/material';
 import { authenticateWithPasskey } from '../utils/api';
-import KeyIcon from '@mui/icons-material/Key';
+import { PageHeading, Button, WarningText, InsetText } from './GovUkComponents';
 
 const AdminLogin: React.FC = () => {
   const [error, setError] = useState('');
@@ -75,14 +73,14 @@ const AdminLogin: React.FC = () => {
 
   if (!passkeySupported) {
     return (
-      <Container component="main" maxWidth="xs">
-        <Box sx={{ mt: 8 }}>
-          <Paper elevation={3} sx={{ p: 4 }}>
-            <Typography variant="h5" component="h1" align="center" gutterBottom>
-              Device Not Supported
-            </Typography>
-            <Typography align="center" color="error">
+      <Container component="main" maxWidth="md">
+        <Box sx={{ mt: 6 }}>
+          <PageHeading>Admin Login</PageHeading>
+          <Paper sx={{ p: 4, backgroundColor: '#f3f2f1', borderRadius: 0 }}>
+            <WarningText>
               Your device or browser does not support passkey authentication.
+            </WarningText>
+            <Typography variant="body1" sx={{ mt: 2 }}>
               Please use a supported browser (like Chrome, Safari, or Edge) on a compatible device.
             </Typography>
           </Paper>
@@ -92,40 +90,38 @@ const AdminLogin: React.FC = () => {
   }
 
   return (
-    <Container component="main" maxWidth="xs">
-      <Box
-        sx={{
-          marginTop: 8,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-        }}
-      >
-        <Paper elevation={3} sx={{ p: 4, width: '100%' }}>
-          <Typography component="h1" variant="h5" align="center" gutterBottom>
-            Admin Login
+    <Container component="main" maxWidth="md">
+      <Box sx={{ mt: 6 }}>
+        <PageHeading>Admin Login</PageHeading>
+        
+        {error && (
+          <Box className="govuk-error-summary" role="alert" tabIndex={-1} aria-labelledby="error-summary-title">
+            <Typography variant="h3" component="h2" className="govuk-error-summary__title" id="error-summary-title">
+              There is a problem
+            </Typography>
+            <div className="govuk-error-summary__body">
+              <Typography variant="body1">{error}</Typography>
+            </div>
+          </Box>
+        )}
+
+        <Paper sx={{ p: 4, backgroundColor: '#f3f2f1', borderRadius: 0, mb: 4 }}>
+          <Typography variant="body1" sx={{ mb: 4 }}>
+            Sign in to the admin dashboard using your registered passkey.
           </Typography>
-
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
-
+          
           <Button
-            fullWidth
-            variant="contained"
-            startIcon={<KeyIcon />}
             onClick={handlePasskeyLogin}
             disabled={loading}
-            sx={{ mt: 2 }}
+            fullWidth={false}
+            type="button"
           >
-            {loading ? <CircularProgress size={24} /> : 'Sign in with Passkey'}
+            {loading ? <CircularProgress size={24} color="inherit" /> : 'Sign in with Passkey'}
           </Button>
-
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 3 }} align="center">
-            Use your registered passkey to sign in. This may use your device's biometric sensors or PIN.
-          </Typography>
+          
+          <InsetText>
+            This will use your device's biometric sensors (fingerprint, face recognition) or PIN for authentication.
+          </InsetText>
         </Paper>
       </Box>
     </Container>
