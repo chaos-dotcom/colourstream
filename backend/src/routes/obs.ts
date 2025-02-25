@@ -2,100 +2,78 @@ import express, { Request, Response, NextFunction } from 'express';
 import { body, validationResult } from 'express-validator';
 import { authenticateToken } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
-import { obsService } from '../services/obsService';
+import { obsService } from '../services';
 import { logger } from '../utils/logger';
-import { obsWebSocketManager } from '../services/obsWebSocket';
-import { WebSocket } from 'ws';
-import { IncomingMessage } from 'http';
-import { getOBSSettings, updateOBSSettings } from '../services/obsSettings';
 
 const router = express.Router();
 
-// Middleware to handle WebSocket upgrade for OBS status
-export const handleWebSocket = (ws: WebSocket, req: IncomingMessage) => {
-  // Check authentication
-  const token = req.url?.split('token=')[1];
-  if (!token) {
-    ws.close(1008, 'Authentication required');
-    return;
-  }
-
-  // Add the client to the OBS WebSocket manager
-  obsWebSocketManager.addClient(ws);
-};
-
-// Get current OBS connection status
-router.get('/status', authenticateToken, async (req, res) => {
-  try {
-    const status = obsWebSocketManager.getStatus();
-    res.json({ success: true, data: status });
-  } catch (error) {
-    console.error('Error getting OBS status:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to get OBS status' 
-    });
-  }
-});
+// Require authentication for all OBS routes
+router.use(authenticateToken);
 
 // Get OBS settings
 router.get(
   '/settings',
-  authenticateToken,
   async (_req: Request, res: Response, next: NextFunction) => {
     try {
-      const settings = await getOBSSettings();
+      const settings = await obsService.getSettings();
       res.json({
         status: 'success',
         data: { settings },
       });
     } catch (error) {
-      console.error('Error getting OBS settings:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: 'Failed to get OBS settings'
-      });
+      next(error);
     }
   }
 );
 
-// Update OBS settings and connection
-router.put('/settings', authenticateToken, async (req, res) => {
-  try {
-    const settings = req.body;
-    
-    // Save settings first
-    const savedSettings = await updateOBSSettings(settings);
-    
-    // If enabled and in backend mode, connect to OBS
-    if (settings.enabled && settings.localNetworkMode === 'backend') {
-      await obsWebSocketManager.connect({
-        host: settings.host,
-        port: settings.port,
-        password: settings.password
-      });
-    } else {
-      // If disabled or in frontend mode, disconnect from OBS
-      await obsWebSocketManager.disconnect();
+// Update OBS settings
+router.put(
+  '/settings',
+  [
+    body('enabled').isBoolean().withMessage('Enabled must be a boolean'),
+    body('streamType').equals('rtmp_custom').withMessage('Stream type must be rtmp_custom'),
+    body('protocol').isIn(['rtmp', 'srt']).withMessage('Protocol must be rtmp or srt'),
+    body('useLocalNetwork').isBoolean().withMessage('useLocalNetwork must be a boolean'),
+    body('localNetworkMode').isIn(['frontend', 'backend']).withMessage('localNetworkMode must be frontend or backend'),
+    // Host validation depends on mode
+    body().custom((body) => {
+      if (body.localNetworkMode === 'backend') {
+        if (!body.localNetworkHost) {
+          throw new Error('Host is required for backend mode');
+        }
+        if (!body.localNetworkPort || !Number.isInteger(body.localNetworkPort) || body.localNetworkPort < 1) {
+          throw new Error('Valid port is required for backend mode');
+        }
+      }
+      return true;
+    })
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        throw new AppError(400, 'Validation error: ' + errors.array().map(err => err.msg).join(', '));
+      }
+
+      try {
+        const settings = await obsService.updateSettings(req.body);
+        res.json({
+          status: 'success',
+          data: { settings },
+        });
+      } catch (error: any) {
+        // Pass through any OBS connection errors with their original message
+        throw new AppError(500, error.message || 'Failed to connect to OBS');
+      }
+    } catch (error) {
+      next(error);
     }
-    
-    res.json({ 
-      success: true, 
-      data: { settings: savedSettings }
-    });
-  } catch (error: any) {
-    console.error('Error updating OBS settings:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: error.message || 'Failed to update OBS settings'
-    });
   }
-});
+);
 
 // Set stream key in OBS
 router.post(
   '/set-stream-key',
-  authenticateToken,
   [
     body('streamKey').notEmpty().withMessage('Stream key is required'),
     body('protocol').isIn(['rtmp', 'srt']).withMessage('Protocol must be either rtmp or srt'),
@@ -157,7 +135,6 @@ router.post(
 // Stop stream
 router.post(
   '/stream/stop',
-  authenticateToken,
   async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const settings = await obsService.getSettings();
@@ -191,5 +168,21 @@ router.post(
     }
   }
 );
+
+// Get OBS connection status
+router.get('/status', async (req, res) => {
+  try {
+    const status = obsService.getWebSocketStatus();
+    res.json({
+      success: true,
+      data: status
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to get OBS status'
+    });
+  }
+});
 
 export default router; 

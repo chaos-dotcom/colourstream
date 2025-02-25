@@ -1,6 +1,9 @@
 import OBSWebSocket from 'obs-websocket-js';
-import prisma from '../lib/prisma';
 import { logger } from '../utils/logger';
+import OBSWebSocketService from './obsWebSocket';
+import WebSocketService from './websocket';
+import prisma from '../lib/prisma';
+import { obsSettings } from '@prisma/client';
 
 interface OBSSettings {
   host: string;
@@ -16,7 +19,9 @@ interface OBSSettings {
   localNetworkPort?: number;
 }
 
-class OBSService {
+export class OBSService {
+  private obsWebSocket: OBSWebSocketService;
+  private wsService: WebSocketService;
   private obs: OBSWebSocket;
   private isConnected: boolean = false;
   private rtmpServer: string;
@@ -27,7 +32,9 @@ class OBSService {
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private lastConnectionSettings: { host?: string; port?: number; password?: string } | null = null;
 
-  constructor() {
+  constructor(wsService: WebSocketService) {
+    this.wsService = wsService;
+    this.obsWebSocket = new OBSWebSocketService(wsService);
     this.obs = new OBSWebSocket();
     this.rtmpServer = process.env.RTMP_SERVER_URL || 'rtmp://live.johnrogerscolour.co.uk/live';
     this.srtServer = process.env.SRT_SERVER_URL || 'srt://live.colourstream.johnrogerscolour.co.uk:9999';
@@ -333,6 +340,15 @@ class OBSService {
       throw err;
     }
   }
+
+  public getWebSocketStatus() {
+    return this.obsWebSocket.getStatus();
+  }
+
+  public cleanup() {
+    this.obsWebSocket.cleanup();
+  }
 }
 
-export const obsService = new OBSService(); 
+// Export the class only - the instance will be created in index.ts
+export default OBSService; 

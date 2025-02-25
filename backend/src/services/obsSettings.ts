@@ -1,77 +1,82 @@
-import { PrismaClient } from '@prisma/client';
-import { OBSSettings } from '../types/obs';
+import prisma from '../lib/prisma';
+import { logger } from '../utils/logger';
 
-const prisma = new PrismaClient();
-
-export async function getOBSSettings(): Promise<OBSSettings> {
-  const settings = await prisma.obsSettings.findFirst();
-  
-  if (!settings) {
-    // Return default settings if none exist
-    return {
-      host: 'localhost',
-      port: 4455,
-      enabled: false,
-      streamType: 'rtmp_custom',
-      protocol: 'rtmp',
-      useLocalNetwork: true,
-      localNetworkMode: 'frontend',
-      localNetworkHost: 'localhost',
-      localNetworkPort: 4455
-    };
-  }
-
-  return {
-    ...settings,
-    password: settings.password || undefined // Only include password if it exists
-  };
+export interface OBSSettings {
+  id: string;
+  host: string;
+  port: number;
+  password?: string;
+  enabled: boolean;
+  streamType: 'rtmp_custom';
+  protocol: 'rtmp' | 'srt';
+  useLocalNetwork: boolean;
+  localNetworkMode: 'frontend' | 'backend';
+  localNetworkHost?: string;
+  localNetworkPort?: number;
+  srtUrl?: string;
 }
 
-export async function updateOBSSettings(settings: OBSSettings): Promise<OBSSettings> {
-  const existingSettings = await prisma.obsSettings.findFirst();
+export const getOBSSettings = async (): Promise<OBSSettings | null> => {
+  try {
+    const settings = await prisma.obsSettings.findUnique({
+      where: { id: 'default' }
+    });
 
-  if (existingSettings) {
-    const updated = await prisma.obsSettings.update({
-      where: { id: existingSettings.id },
-      data: {
-        host: settings.host,
-        port: settings.port,
+    if (!settings) return null;
+
+    // Convert null values to undefined and ensure correct types
+    return {
+      ...settings,
+      streamType: 'rtmp_custom',
+      password: settings.password || undefined,
+      localNetworkHost: settings.localNetworkHost || undefined,
+      localNetworkPort: settings.localNetworkPort || undefined,
+      srtUrl: settings.srtUrl || undefined,
+      protocol: (settings.protocol || 'rtmp') as 'rtmp' | 'srt',
+      localNetworkMode: (settings.localNetworkMode || 'frontend') as 'frontend' | 'backend'
+    } as OBSSettings;
+  } catch (error) {
+    logger.error('Error getting OBS settings:', error);
+    throw error;
+  }
+};
+
+export const updateOBSSettings = async (settings: Omit<OBSSettings, 'id'>): Promise<OBSSettings> => {
+  try {
+    const updatedSettings = await prisma.obsSettings.upsert({
+      where: { id: 'default' },
+      update: {
+        ...settings,
+        streamType: 'rtmp_custom',
         password: settings.password || null,
-        enabled: settings.enabled,
-        streamType: settings.streamType,
-        protocol: settings.protocol || 'rtmp',
-        useLocalNetwork: settings.useLocalNetwork,
-        localNetworkMode: settings.localNetworkMode,
+        localNetworkHost: settings.localNetworkHost || null,
+        localNetworkPort: settings.localNetworkPort || null,
+        srtUrl: settings.srtUrl || null
+      },
+      create: {
+        ...settings,
+        id: 'default',
+        streamType: 'rtmp_custom',
+        password: settings.password || null,
         localNetworkHost: settings.localNetworkHost || null,
         localNetworkPort: settings.localNetworkPort || null,
         srtUrl: settings.srtUrl || null
       }
     });
 
+    // Convert null values to undefined in the return value
     return {
-      ...updated,
-      password: updated.password || undefined
-    };
+      ...updatedSettings,
+      streamType: 'rtmp_custom',
+      password: updatedSettings.password || undefined,
+      localNetworkHost: updatedSettings.localNetworkHost || undefined,
+      localNetworkPort: updatedSettings.localNetworkPort || undefined,
+      srtUrl: updatedSettings.srtUrl || undefined,
+      protocol: (updatedSettings.protocol || 'rtmp') as 'rtmp' | 'srt',
+      localNetworkMode: (updatedSettings.localNetworkMode || 'frontend') as 'frontend' | 'backend'
+    } as OBSSettings;
+  } catch (error) {
+    logger.error('Error updating OBS settings:', error);
+    throw error;
   }
-
-  const created = await prisma.obsSettings.create({
-    data: {
-      host: settings.host,
-      port: settings.port,
-      password: settings.password || null,
-      enabled: settings.enabled,
-      streamType: settings.streamType,
-      protocol: settings.protocol || 'rtmp',
-      useLocalNetwork: settings.useLocalNetwork,
-      localNetworkMode: settings.localNetworkMode,
-      localNetworkHost: settings.localNetworkHost || null,
-      localNetworkPort: settings.localNetworkPort || null,
-      srtUrl: settings.srtUrl || null
-    }
-  });
-
-  return {
-    ...created,
-    password: created.password || undefined
-  };
-} 
+}; 

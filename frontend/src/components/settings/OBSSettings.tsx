@@ -53,6 +53,128 @@ export const OBSSettings: React.FC = () => {
     };
   }, []);
 
+  // Add effect to handle backend WebSocket connection
+  useEffect(() => {
+    const setupBackendWebSocket = () => {
+      if (settings.localNetworkMode === 'backend' && settings.enabled) {
+        const token = localStorage.getItem('adminToken');
+        if (!token) {
+          console.error('No admin token found');
+          return;
+        }
+
+        // Get the base URL from the environment or window location
+        const apiUrl = import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.host}/api`;
+        console.log('API URL:', apiUrl);
+        
+        // Convert HTTP(S) to WS(S)
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        console.log('WebSocket protocol:', wsProtocol);
+        
+        // Parse the API URL to extract host and path
+        let wsBaseUrl = '';
+        try {
+          // Handle both full URLs and relative paths
+          if (apiUrl.startsWith('http')) {
+            const apiUrlObj = new URL(apiUrl);
+            wsBaseUrl = apiUrlObj.host + apiUrlObj.pathname.replace(/\/+$/, '');
+            console.log('Parsed API URL object:', {
+              host: apiUrlObj.host,
+              pathname: apiUrlObj.pathname,
+              protocol: apiUrlObj.protocol
+            });
+          } else {
+            wsBaseUrl = window.location.host + apiUrl.replace(/\/+$/, '');
+            console.log('Using window.location.host:', window.location.host);
+          }
+          
+          console.log('Initial wsBaseUrl:', wsBaseUrl);
+          
+          // Remove 'api' from the end if it exists to get the base path
+          wsBaseUrl = wsBaseUrl.replace(/\/api$/, '');
+          console.log('Final wsBaseUrl after removing /api:', wsBaseUrl);
+          
+          const wsUrl = `${wsProtocol}//${wsBaseUrl}/api/ws/obs-status?token=${token}`;
+          console.log('Connecting to WebSocket URL:', wsUrl);
+
+          // Close any existing connection before creating a new one
+          if (backendWebSocket && backendWebSocket.readyState === WebSocket.OPEN) {
+            console.log('Closing existing WebSocket connection');
+            backendWebSocket.close();
+          }
+
+          console.log('Creating new WebSocket connection');
+          const ws = new WebSocket(wsUrl);
+
+          ws.onopen = () => {
+            console.log('Backend WebSocket connected successfully');
+            setBackendWebSocket(ws);
+          };
+
+          ws.onmessage = (event) => {
+            try {
+              console.log('Received WebSocket message:', event.data);
+              const data = JSON.parse(event.data);
+              if (data.type === 'obs_status') {
+                console.log('Updating connection status to:', data.status);
+                setConnectionStatus(data.status);
+                if (data.error) {
+                  setLastError(data.error);
+                  setError(`OBS Connection Error: ${data.error}`);
+                } else {
+                  setLastError(null);
+                  setError(null);
+                }
+              }
+            } catch (error) {
+              console.error('Failed to parse WebSocket message:', error);
+            }
+          };
+
+          ws.onerror = (error) => {
+            console.error('Backend WebSocket error:', error);
+            setConnectionStatus('error');
+            setError('Failed to connect to backend WebSocket');
+          };
+
+          ws.onclose = (event) => {
+            console.log('Backend WebSocket closed:', {
+              code: event.code,
+              reason: event.reason,
+              wasClean: event.wasClean
+            });
+            setBackendWebSocket(null);
+            // Only attempt to reconnect if the connection was not closed intentionally
+            // and if we're still in backend mode with OBS enabled
+            if (settings.enabled && settings.localNetworkMode === 'backend') {
+              console.log('Scheduling WebSocket reconnection in 5 seconds');
+              setTimeout(setupBackendWebSocket, 5000);
+            }
+          };
+        } catch (error) {
+          console.error('Error setting up WebSocket connection:', error);
+          setError(`WebSocket connection error: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      } else if (backendWebSocket) {
+        // Clean up existing connection if OBS is disabled or mode changed
+        console.log('Closing WebSocket connection due to settings change');
+        backendWebSocket.close();
+        setBackendWebSocket(null);
+      }
+    };
+
+    setupBackendWebSocket();
+
+    // Cleanup function
+    return () => {
+      if (backendWebSocket) {
+        console.log('Cleaning up WebSocket connection on component unmount');
+        backendWebSocket.close();
+        setBackendWebSocket(null);
+      }
+    };
+  }, [settings.localNetworkMode, settings.enabled, backendWebSocket, setConnectionStatus, setLastError, setError, setBackendWebSocket]);
+
   // Add effect to fetch initial connection status for backend mode
   useEffect(() => {
     const fetchConnectionStatus = async () => {

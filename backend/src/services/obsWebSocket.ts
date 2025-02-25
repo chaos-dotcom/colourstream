@@ -1,172 +1,207 @@
 import OBSWebSocket from 'obs-websocket-js';
-import { WebSocket } from 'ws';
-import { EventEmitter } from 'events';
+import { logger } from '../utils/logger';
+import WebSocketService from './websocket';
 
-export type OBSConnectionStatus = {
-  status: 'disconnected' | 'connected' | 'connecting' | 'error';
-  error?: string;
-};
-
-class OBSWebSocketManager extends EventEmitter {
+export class OBSWebSocketService {
   private obs: OBSWebSocket;
-  private status: OBSConnectionStatus;
-  private reconnectTimer: NodeJS.Timeout | null;
-  private heartbeatTimer: NodeJS.Timeout | null;
-  private connectedClients: Set<WebSocket>;
-  private static instance: OBSWebSocketManager;
+  private wsService: WebSocketService;
+  private connectionStatus: 'disconnected' | 'connected' | 'connecting' | 'error' = 'disconnected';
+  private lastError: string | null = null;
+  private reconnectTimeout: NodeJS.Timeout | null = null;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+  private reconnectDelay = 5000; // 5 seconds
+  private connectionCheckInterval: NodeJS.Timeout | null = null;
 
-  private constructor() {
-    super();
+  constructor(wsService: WebSocketService) {
     this.obs = new OBSWebSocket();
-    this.status = { status: 'disconnected' };
-    this.reconnectTimer = null;
-    this.heartbeatTimer = null;
-    this.connectedClients = new Set();
-
-    // Set up event handlers
-    this.obs.on('ConnectionOpened', this.handleConnectionOpened.bind(this));
-    this.obs.on('ConnectionClosed', this.handleConnectionClosed.bind(this));
-    this.obs.on('ConnectionError', this.handleConnectionError.bind(this));
-    this.obs.on('Identified', this.handleIdentified.bind(this));
+    this.wsService = wsService;
+    this.setupEventHandlers();
+    logger.info('OBS WebSocket service initialized');
   }
 
-  public static getInstance(): OBSWebSocketManager {
-    if (!OBSWebSocketManager.instance) {
-      OBSWebSocketManager.instance = new OBSWebSocketManager();
-    }
-    return OBSWebSocketManager.instance;
-  }
+  private setupEventHandlers() {
+    this.obs.on('ConnectionOpened', () => {
+      logger.info('OBS WebSocket connection opened');
+      this.updateStatus('connecting');
+    });
 
-  public getStatus(): OBSConnectionStatus {
-    return this.status;
-  }
+    this.obs.on('Hello', (data) => {
+      logger.info('Received Hello from OBS WebSocket server:', data);
+    });
 
-  public addClient(ws: WebSocket): void {
-    this.connectedClients.add(ws);
-    // Send current status immediately to new client
-    ws.send(JSON.stringify({ type: 'obs_status', ...this.status }));
+    this.obs.on('Identified', () => {
+      logger.info('Successfully connected and identified with OBS');
+      this.connectionStatus = 'connected';
+      this.lastError = null;
+      this.reconnectAttempts = 0;
+      this.broadcastStatus();
+      this.startConnectionCheck();
+    });
 
-    ws.on('close', () => {
-      this.connectedClients.delete(ws);
+    this.obs.on('ConnectionClosed', () => {
+      logger.warn('OBS WebSocket connection closed');
+      this.connectionStatus = 'disconnected';
+      this.broadcastStatus();
+      this.stopConnectionCheck();
+      this.attemptReconnect();
+    });
+
+    this.obs.on('ConnectionError', (err: Error) => {
+      logger.error('OBS WebSocket connection error:', err);
+      this.connectionStatus = 'error';
+      this.lastError = err.message;
+      this.broadcastStatus();
+      this.stopConnectionCheck();
+      this.attemptReconnect();
     });
   }
 
-  private broadcastStatus(): void {
-    const message = JSON.stringify({ type: 'obs_status', ...this.status });
-    for (const client of this.connectedClients) {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(message);
+  private broadcastStatus() {
+    this.wsService.broadcastOBSStatus({
+      type: 'obs_status',
+      status: this.connectionStatus,
+      ...(this.lastError && { error: this.lastError })
+    });
+    logger.debug(`Broadcasting OBS status: ${this.connectionStatus}${this.lastError ? ` (Error: ${this.lastError})` : ''}`);
+  }
+
+  private startConnectionCheck() {
+    // Stop any existing interval
+    this.stopConnectionCheck();
+    
+    // Start a new interval to periodically check the connection
+    this.connectionCheckInterval = setInterval(async () => {
+      if (this.connectionStatus === 'connected') {
+        try {
+          const { obsVersion } = await this.obs.call('GetVersion');
+          logger.debug(`OBS connection check successful - OBS version: ${obsVersion}`);
+        } catch (error) {
+          logger.error('OBS connection check failed:', error);
+          this.connectionStatus = 'error';
+          this.lastError = 'Connection check failed';
+          this.broadcastStatus();
+          this.stopConnectionCheck();
+          this.attemptReconnect();
+        }
       }
+    }, 30000); // Check every 30 seconds
+    
+    logger.debug('Started OBS connection check interval');
+  }
+
+  private stopConnectionCheck() {
+    if (this.connectionCheckInterval) {
+      clearInterval(this.connectionCheckInterval);
+      this.connectionCheckInterval = null;
+      logger.debug('Stopped OBS connection check interval');
     }
   }
 
-  private updateStatus(newStatus: OBSConnectionStatus): void {
-    this.status = newStatus;
-    this.broadcastStatus();
-    this.emit('statusChanged', newStatus);
-  }
-
-  private handleConnectionOpened(): void {
-    console.log('OBS WebSocket connection opened');
-    this.updateStatus({ status: 'connecting' });
-  }
-
-  private handleConnectionClosed(): void {
-    console.log('OBS WebSocket connection closed');
-    this.updateStatus({ status: 'disconnected' });
-    this.startReconnectTimer();
-  }
-
-  private handleConnectionError(error: Error): void {
-    console.error('OBS WebSocket connection error:', error);
-    this.updateStatus({ status: 'error', error: error.message });
-    this.startReconnectTimer();
-  }
-
-  private handleIdentified(): void {
-    console.log('OBS WebSocket identified successfully');
-    this.updateStatus({ status: 'connected' });
-    this.startHeartbeat();
-  }
-
-  private startHeartbeat(): void {
-    if (this.heartbeatTimer) {
-      clearInterval(this.heartbeatTimer);
+  private attemptReconnect() {
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
     }
 
-    this.heartbeatTimer = setInterval(async () => {
-      try {
-        await this.obs.call('GetVersion');
-      } catch (error) {
-        console.error('OBS heartbeat failed:', error);
-        this.handleConnectionError(error as Error);
-      }
-    }, 30000); // 30 second interval
-  }
-
-  private startReconnectTimer(): void {
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      logger.error('Max reconnection attempts reached');
+      return;
     }
 
-    this.reconnectTimer = setTimeout(() => {
-      this.connect();
-    }, 5000); // 5 second reconnect delay
+    const delay = Math.min(this.reconnectDelay * Math.pow(1.5, this.reconnectAttempts), 60000);
+    this.reconnectAttempts++;
+    
+    logger.info(`Scheduling OBS reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`);
+    
+    this.reconnectTimeout = setTimeout(() => {
+      logger.info(`Attempting to reconnect to OBS (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+      this.connect().catch(error => {
+        logger.error('Reconnection attempt failed:', error);
+      });
+    }, delay);
   }
 
-  public async connect(settings?: { host: string; port: number; password?: string }): Promise<void> {
+  public async connect(settings?: { host: string; port: number; password?: string }) {
     try {
-      if (this.reconnectTimer) {
-        clearTimeout(this.reconnectTimer);
-        this.reconnectTimer = null;
-      }
-
-      if (this.heartbeatTimer) {
-        clearInterval(this.heartbeatTimer);
-        this.heartbeatTimer = null;
-      }
-
-      // Disconnect if already connected
-      try {
-        await this.obs.disconnect();
-      } catch (error) {
-        // Ignore disconnect errors
-      }
-
-      this.updateStatus({ status: 'connecting' });
-
       if (settings) {
         const { host, port, password } = settings;
-        await this.obs.connect(`ws://${host}:${port}`, password, {
-          eventSubscriptions: 0xFFFFFFFF, // Subscribe to all events
-          rpcVersion: 1
-        });
+        const url = `ws://${host}:${port}`;
+        
+        logger.info(`Connecting to OBS at ${url}${password ? ' with authentication' : ''}`);
+        this.updateStatus('connecting');
+        
+        try {
+          await this.obs.connect(url, password, {
+            eventSubscriptions: 0xFFFFFFFF, // Subscribe to all events
+            rpcVersion: 1
+          });
+          
+          logger.info('Successfully connected to OBS');
+          this.updateStatus('connected');
+        } catch (error: any) {
+          // Check if this is an auth error
+          if (error.code === 4009) {
+            logger.error('Authentication failed - incorrect password');
+            throw new Error('Authentication failed - incorrect password');
+          } else if (error.code === 4008) {
+            logger.error('Authentication required but no password provided');
+            throw new Error('Authentication required but no password provided');
+          }
+          throw error;
+        }
       }
-    } catch (error) {
-      console.error('Failed to connect to OBS:', error);
-      this.handleConnectionError(error as Error);
+    } catch (error: any) {
+      logger.error('Failed to connect to OBS:', error);
+      this.lastError = error.message;
+      this.updateStatus('error');
+      throw error;
     }
   }
 
-  public async disconnect(): Promise<void> {
+  private updateStatus(status: 'disconnected' | 'connected' | 'connecting' | 'error') {
+    this.connectionStatus = status;
+    this.broadcastStatus();
+  }
+
+  public getStatus() {
+    return {
+      status: this.connectionStatus,
+      ...(this.lastError && { error: this.lastError })
+    };
+  }
+
+  public async disconnect() {
     try {
-      if (this.reconnectTimer) {
-        clearTimeout(this.reconnectTimer);
-        this.reconnectTimer = null;
+      this.stopConnectionCheck();
+      if (this.reconnectTimeout) {
+        clearTimeout(this.reconnectTimeout);
+        this.reconnectTimeout = null;
       }
-
-      if (this.heartbeatTimer) {
-        clearInterval(this.heartbeatTimer);
-        this.heartbeatTimer = null;
+      
+      if (this.obs) {
+        logger.info('Disconnecting from OBS WebSocket');
+        await this.obs.disconnect();
+        this.updateStatus('disconnected');
       }
-
-      await this.obs.disconnect();
-      this.updateStatus({ status: 'disconnected' });
     } catch (error) {
-      console.error('Error disconnecting from OBS:', error);
-      this.handleConnectionError(error as Error);
+      logger.error('Error disconnecting from OBS:', error);
     }
+  }
+
+  public getObs() {
+    return this.obs;
+  }
+
+  public cleanup() {
+    this.stopConnectionCheck();
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
+    this.disconnect();
+    logger.info('OBS WebSocket service cleaned up');
   }
 }
 
-export const obsWebSocketManager = OBSWebSocketManager.getInstance(); 
+export default OBSWebSocketService; 
