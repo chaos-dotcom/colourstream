@@ -6,14 +6,12 @@ import prisma from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { logger } from '../utils/logger';
 import crypto from 'crypto';
+import fetch from 'node-fetch';
+import jwt from 'jsonwebtoken';
+import CryptoJS from 'crypto-js';
+import { RoomCreateBody, RoomCreateInput, RoomSelect } from '../types/room';
 
 const router = express.Router();
-
-interface CreateRoomBody {
-  name: string;
-  password: string;
-  expiryDays: number;
-}
 
 interface ValidateRoomBody {
   password: string;
@@ -27,6 +25,45 @@ const generateRandomId = (length: number = 12): string => {
 // Utility function to generate stream key
 const generateStreamKey = (): string => {
   return crypto.randomBytes(16).toString('hex');
+};
+
+// Utility function to generate MiroTalk token
+const generateMiroTalkToken = async (roomId: string): Promise<string> => {
+  try {
+    if (!process.env.JWT_KEY) {
+      throw new Error('JWT_KEY environment variable is not set');
+    }
+    
+    const JWT_KEY = process.env.JWT_KEY;
+    const username = `room_${roomId}`;
+    const password = process.env.HOST_USERS ? 
+      JSON.parse(process.env.HOST_USERS)[0].password : 
+      'globalPassword';
+
+    // Constructing payload
+    const payload = {
+      username: username,
+      password: password,
+      presenter: "1", // MiroTalk expects "1" or "true" as a string
+      expire: "1d"  // Match MiroTalk's expected format
+    };
+
+    // Encrypt payload using AES encryption
+    const payloadString = JSON.stringify(payload);
+    const encryptedPayload = CryptoJS.AES.encrypt(payloadString, JWT_KEY).toString();
+
+    // Constructing JWT token with numeric expiration
+    const jwtToken = jwt.sign(
+      { data: encryptedPayload },
+      JWT_KEY,
+      { expiresIn: 24 * 60 * 60 } // 24 hours in seconds
+    );
+
+    return jwtToken;
+  } catch (error) {
+    logger.error('Error generating MiroTalk token:', error);
+    throw new AppError(500, 'Failed to generate MiroTalk token');
+  }
 };
 
 // Middleware to validate room ID
@@ -46,7 +83,7 @@ router.post(
   '/',
   authenticateToken,
   validateRoom,
-  async (req: Request<{}, {}, CreateRoomBody>, res: Response, next: NextFunction) => {
+  async (req: Request<{}, {}, RoomCreateBody>, res: Response, next: NextFunction) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -59,20 +96,26 @@ router.post(
       const mirotalkRoomId = generateRandomId();
       const streamKey = generateStreamKey();
 
+      // Generate MiroTalk token
+      const mirotalkToken = await generateMiroTalkToken(mirotalkRoomId);
+
       // Hash the password
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(password, salt);
 
+      const createData: RoomCreateInput = {
+        name,
+        mirotalkRoomId,
+        streamKey,
+        password: hashedPassword,
+        displayPassword: password,
+        expiryDate: new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000),
+        link: `${process.env.FRONTEND_URL}/room/${Math.random().toString(36).substr(2, 9)}`,
+        mirotalkToken,
+      };
+
       const room = await prisma.room.create({
-        data: {
-          name,
-          mirotalkRoomId,
-          streamKey,
-          password: hashedPassword,
-          displayPassword: password,
-          expiryDate: new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000),
-          link: `${process.env.FRONTEND_URL}/room/${Math.random().toString(36).substr(2, 9)}`,
-        },
+        data: createData,
         select: {
           id: true,
           name: true,
@@ -81,7 +124,8 @@ router.post(
           mirotalkRoomId: true,
           streamKey: true,
           displayPassword: true,
-        },
+          mirotalkToken: true,
+        } as RoomSelect,
       });
 
       res.status(201).json({
@@ -171,6 +215,12 @@ router.post(
           link: { contains: req.params.id },
           expiryDate: { gt: new Date() },
         },
+        select: {
+          mirotalkRoomId: true,
+          streamKey: true,
+          mirotalkToken: true,
+          password: true,
+        } as RoomSelect,
       });
 
       if (!room) {
@@ -187,6 +237,7 @@ router.post(
         data: {
           mirotalkRoomId: room.mirotalkRoomId,
           streamKey: room.streamKey,
+          mirotalkToken: room.mirotalkToken,
         },
       });
     } catch (error) {

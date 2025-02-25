@@ -10,6 +10,7 @@ import omenRoutes from './routes/omen';
 import securityRoutes from './routes/security';
 import { logger } from './utils/logger';
 import { initializePassword } from './utils/initPassword';
+import mirotalkRoutes from './routes/mirotalk';
 
 dotenv.config();
 
@@ -43,6 +44,7 @@ app.use(`${basePath}/rooms`, roomRoutes);
 app.use(`${basePath}/obs`, obsRoutes);
 app.use(`${basePath}/omen`, omenRoutes);
 app.use(`${basePath}/security`, securityRoutes);
+app.use('/api/mirotalk', mirotalkRoutes);
 
 // Error handling
 app.use(errorHandler);

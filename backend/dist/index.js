@@ -15,6 +15,7 @@ const omen_1 = __importDefault(require("./routes/omen"));
 const security_2 = __importDefault(require("./routes/security"));
 const logger_1 = require("./utils/logger");
 const initPassword_1 = require("./utils/initPassword");
+const mirotalk_1 = __importDefault(require("./routes/mirotalk"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 // Trust proxy (needed for rate limiting behind reverse proxy)
@@ -40,6 +41,7 @@ app.use(`${basePath}/rooms`, rooms_1.default);
 app.use(`${basePath}/obs`, obs_1.default);
 app.use(`${basePath}/omen`, omen_1.default);
 app.use(`${basePath}/security`, security_2.default);
+app.use('/api/mirotalk', mirotalk_1.default);
 // Error handling
 app.use(errorHandler_1.errorHandler);
 const startServer = async () => {

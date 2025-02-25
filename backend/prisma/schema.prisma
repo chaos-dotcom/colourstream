@@ -19,6 +19,7 @@ model Room {
   displayPassword String
   expiryDate      DateTime
   link            String   @unique
+  mirotalkToken   String?  // Optional since we might not always have a token
   createdAt       DateTime @default(now())
 }
 
@@ -54,7 +55,7 @@ model WebAuthnCredential {
   credentialId    String   @unique
   publicKey       String
   counter         BigInt
-  userId          String   @unique // Since we only have one admin user
+  userId          String   // We want to allow multiple passkeys per user
   transports      String?  // JSON string of allowed transports
   createdAt       DateTime @default(now())
   lastUsed        DateTime @default(now())
