@@ -2,6 +2,15 @@
 
 This repository contains a Docker-based infrastructure for running a streaming media platform with video conferencing capabilities. The system uses Traefik as a reverse proxy for SSL/TLS termination and routing for Mirotalk, while OvenMediaEngine handles streaming directly through its ports.
 
+## Authentication
+
+The platform uses a modern, secure authentication system that prioritizes passkey (WebAuthn) authentication:
+- Passwordless authentication using device biometrics
+- Automatic transition from password to passkey authentication
+- Enhanced security with WebAuthn standard
+
+For detailed information about the authentication system, see [Authentication Documentation](docs/authentication.md).
+
 ## System Architecture
 
 The infrastructure consists of four main containers:

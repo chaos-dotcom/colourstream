@@ -22,11 +22,6 @@ export const api = axios.create({
 
 // Add request interceptor to include auth token
 api.interceptors.request.use((config) => {
-  // Don't add token for login endpoint
-  if (config.url?.endsWith('/auth/login')) {
-    return config;
-  }
-  
   const token = localStorage.getItem('adminToken');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -80,6 +75,7 @@ export interface Room {
 export interface RoomConfig {
   mirotalkRoomId: string;
   streamKey: string;
+  mirotalkToken: string;
 }
 
 export interface OBSSettings {
@@ -94,6 +90,16 @@ export interface OBSSettings {
   localNetworkPort?: number;
   srtUrl?: string;
   protocol?: 'rtmp' | 'srt';
+}
+
+export interface SetupStatus {
+  setupRequired: boolean;
+  hasPasskeys: boolean;
+}
+
+export interface OBSConnectionStatus {
+  status: 'disconnected' | 'connected' | 'connecting' | 'error';
+  error?: string;
 }
 
 export const adminLogin = async (password: string): Promise<ApiResponse<AuthResponse>> => {
@@ -159,17 +165,36 @@ export const setOBSStreamKey = async (streamKey: string): Promise<void> => {
   return response.data;
 };
 
+export const stopOBSStream = async (): Promise<void> => {
+  const response = await api.post('/obs/stream/stop');
+  return response.data;
+};
+
+export const checkSetupRequired = async (): Promise<ApiResponse<SetupStatus>> => {
+  const response = await api.get('/auth/setup-required');
+  return response.data;
+};
+
 export const registerPasskey = async (): Promise<any> => {
-  const response = await api.post('/auth/webauthn/register');
-  const options = response.data as WebAuthnRegistrationOptions;
-  
   try {
+    const response = await api.post('/auth/webauthn/register');
+    const options = response.data as WebAuthnRegistrationOptions;
+    
     const credential = await startRegistration(options) as WebAuthnRegistrationResponse;
     const verificationResponse = await api.post('/auth/webauthn/register/verify', credential);
+    
+    // If this is the first passkey (no token yet), set the token from the response
+    if (!localStorage.getItem('adminToken') && verificationResponse.data?.data?.token) {
+      localStorage.setItem('adminToken', verificationResponse.data.data.token);
+      localStorage.setItem('isAdminAuthenticated', 'true');
+    }
+    
     return verificationResponse.data;
   } catch (error: any) {
     if (error.name === 'NotAllowedError') {
       throw new Error('User declined to register passkey');
+    } else if (error.response?.status === 401) {
+      throw new Error('Please log in first to register additional passkeys');
     }
     throw error;
   }
@@ -220,32 +245,7 @@ export const authenticateWithPasskey = async (): Promise<ApiResponse<AuthRespons
       throw new Error(`Authentication failed: ${error.message}`);
     }
   } catch (error: any) {
-    console.error('Passkey authentication error:', {
-      name: error.name,
-      message: error.message,
-      response: error.response,
-      error
-    });
-
-    // If the error was already handled and transformed, just rethrow it
-    if (error.message && (
-      error.message.startsWith('User declined') ||
-      error.message.startsWith('Invalid authentication') ||
-      error.message.startsWith('Authentication failed') ||
-      error.message.startsWith('Security error') ||
-      error.message.startsWith('Authentication was aborted')
-    )) {
-      throw error;
-    }
-    
-    // Handle API-level errors
-    if (error.response?.status === 400) {
-      if (error.response.data?.message === 'No passkey registered') {
-        throw new Error('No passkey registered. Please log in with password first to register a passkey.');
-      }
-    }
-    
-    // For any other errors, throw with a generic message
+    console.error('Passkey authentication error:', error);
     throw new Error(error.response?.data?.message || 'Failed to authenticate with passkey');
   }
 };
@@ -260,12 +260,14 @@ export const removePasskey = async (credentialId: string): Promise<void> => {
   return response.data;
 };
 
-export const removePassword = async (): Promise<void> => {
-  const response = await api.post('/auth/remove-password');
-  return response.data;
+export const adminLogout = (): void => {
+  localStorage.removeItem('adminToken');
+  localStorage.removeItem('isAdminAuthenticated');
+  window.location.href = '/login';
 };
 
-export const hasPassword = async (): Promise<boolean> => {
-  const response = await api.get('/auth/has-password');
-  return response.data.data.hasPassword;
+export const getOBSConnectionStatus = async (): Promise<OBSConnectionStatus> => {
+  const response = await api.get('/obs/status');
+  const result = response.data as ApiResponse<OBSConnectionStatus>;
+  return result.data;
 }; 

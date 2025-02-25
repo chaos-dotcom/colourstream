@@ -1,11 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
-import { body, validationResult } from 'express-validator';
 import { AppError } from '../middleware/errorHandler';
 import { authenticateToken } from '../middleware/auth';
-import { updatePasswordHash } from '../utils/updateEnvFile';
-import { loginLimiter, trackLoginAttempts } from '../middleware/security';
 import { logger } from '../utils/logger';
 import prisma from '../lib/prisma';
 import {
@@ -22,9 +18,6 @@ const router = express.Router();
 const rpName = 'ColourStream Admin';
 const rpID = process.env.WEBAUTHN_RP_ID || 'live.colourstream.johnrogerscolour.co.uk';
 const origin = process.env.WEBAUTHN_ORIGIN || `https://${rpID}`;
-
-// Passkey-only mode is implicit when no password exists
-const isPasskeyOnlyMode = () => !process.env.ADMIN_PASSWORD;
 
 // Store challenge temporarily (in production, use Redis or similar)
 let currentChallenge: string | undefined;
@@ -45,43 +38,58 @@ function bigIntToNumber(value: bigint): number {
 
 // WebAuthn registration endpoint
 router.post('/webauthn/register', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    logger.info('Starting passkey registration process');
-    
-    // Only allow registration if no credential exists with the same name
-    const existingCredentials = await prisma.webAuthnCredential.findMany({
-      where: { userId: 'admin' }
-    });
+    try {
+        logger.info('Starting passkey registration process', {
+            userAgent: req.headers['user-agent'],
+            ip: req.ip
+        });
 
-    logger.info(`Found ${existingCredentials.length} existing passkeys`);
+        // Only allow registration if no credential exists with the same name
+        const existingCredentials = await prisma.webAuthnCredential.findMany({
+            where: { userId: 'admin' }
+        });
 
-    const options = await generateRegistrationOptions({
-      rpName,
-      rpID,
-      userID: 'admin',
-      userName: 'admin',
-      attestationType: 'none',
-      authenticatorSelection: {
-        residentKey: 'preferred',
-        userVerification: 'preferred',
-        authenticatorAttachment: 'platform'
-      }
-    });
+        logger.info('Checking existing passkeys', {
+            count: existingCredentials.length,
+            lastUsed: existingCredentials[0]?.lastUsed || null
+        });
 
-    // Store challenge
-    currentChallenge = options.challenge;
+        const options = await generateRegistrationOptions({
+            rpName,
+            rpID,
+            userID: 'admin',
+            userName: 'admin',
+            attestationType: 'none',
+            authenticatorSelection: {
+                residentKey: 'preferred',
+                userVerification: 'preferred',
+                authenticatorAttachment: 'platform'
+            }
+        });
 
-    logger.info('Generated registration options', {
-      rpID,
-      origin,
-      challenge: currentChallenge
-    });
+        // Store challenge
+        currentChallenge = options.challenge;
 
-    res.json(options);
-  } catch (error) {
-    logger.error('Error in passkey registration:', error);
-    next(error);
-  }
+        logger.info('Generated registration options', {
+            rpID,
+            origin,
+            challenge: currentChallenge,
+            hasChallenge: !!currentChallenge
+        });
+
+        res.json(options);
+    } catch (error: unknown) {
+        if (error instanceof Error) {
+            logger.error('Error in passkey registration:', {
+                error: error.message,
+                stack: error.stack,
+                type: error.constructor.name
+            });
+        } else {
+            logger.error('Unknown error in passkey registration:', error);
+        }
+        next(error);
+    }
 });
 
 // WebAuthn registration verification endpoint
@@ -159,21 +167,21 @@ router.post('/webauthn/register/verify', authenticateToken, async (req: Request,
 // WebAuthn authentication endpoint
 router.post('/webauthn/authenticate', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const credential = await prisma.webAuthnCredential.findFirst({
+    const credentials = await prisma.webAuthnCredential.findMany({
       where: { userId: 'admin' }
     });
 
-    if (!credential) {
+    if (credentials.length === 0) {
       throw new AppError(400, 'No passkey registered');
     }
 
     const options = await generateAuthenticationOptions({
       rpID,
-      allowCredentials: [{
-        id: base64url.toBuffer(credential.credentialId),
-        type: 'public-key',
-        transports: credential.transports ? JSON.parse(credential.transports) : undefined,
-      }],
+      allowCredentials: credentials.map(cred => ({
+        id: base64url.toBuffer(cred.credentialId),
+        type: 'public-key' as const,
+        transports: cred.transports ? JSON.parse(cred.transports) : undefined,
+      })),
       userVerification: 'preferred',
     });
 
@@ -192,12 +200,16 @@ router.post('/webauthn/authenticate/verify', async (req: Request, res: Response,
       throw new AppError(400, 'Authentication challenge not found');
     }
 
+    // Find the credential that matches the authentication response
     const credential = await prisma.webAuthnCredential.findFirst({
-      where: { userId: 'admin' }
+      where: { 
+        userId: 'admin',
+        credentialId: base64url.encode(Buffer.from(req.body.id, 'base64url'))
+      }
     });
 
     if (!credential) {
-      throw new AppError(400, 'No passkey registered');
+      throw new AppError(400, 'No matching passkey found');
     }
 
     const verification = await verifyAuthenticationResponse({
@@ -243,177 +255,21 @@ router.post('/webauthn/authenticate/verify', async (req: Request, res: Response,
   }
 });
 
-router.post('/login', loginLimiter, trackLoginAttempts,
-  [
-    body('password')
-      .notEmpty()
-      .withMessage('Password is required'),
-  ],
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        logger.warn('Login validation failed:', errors.array());
-        throw new AppError(400, 'Validation error');
-      }
-
-      // Check if passkeys exist
-      const existingPasskey = await prisma.webAuthnCredential.findFirst({
-        where: { userId: 'admin' }
-      });
-
-      if (existingPasskey) {
-        logger.warn('Password login attempted when passkeys exist');
-        throw new AppError(401, 'Password authentication is disabled. Please use your registered passkey to login.');
-      }
-      
-      // Check if we're in passkey-only mode
-      if (isPasskeyOnlyMode()) {
-        logger.warn('Password login attempted while in passkey-only mode');
-        throw new AppError(401, 'Password authentication is disabled. Please use a passkey to login.');
-      }
-
-      const { password } = req.body;
-      
-      // Get admin password from env
-      const adminPassword = process.env.ADMIN_PASSWORD;
-
-      logger.info('Attempting password login', {
-        hasPassword: !!adminPassword,
-        passKeyOnlyMode: isPasskeyOnlyMode()
-      });
-
-      // Simple string comparison for password check
-      if (password !== adminPassword) {
-        logger.warn('Invalid password attempt', {
-          ip: req.ip
-        });
-        throw new AppError(401, 'Invalid password');
-      }
-
-      const token = jwt.sign(
-        { userId: 'admin' },
-        process.env.JWT_SECRET!,
-        { expiresIn: '7d' }
-      );
-
-      logger.info('Successful password login', { 
-        ip: req.ip
-      });
-      
-      res.json({
-        status: 'success',
-        data: {
-          token,
-        },
-      });
-    } catch (error) {
-      logger.error('Login error:', {
-        error,
-        ip: req.ip,
-        headers: req.headers
-      });
-      next(error);
-    }
-  }
-);
-
-router.post(
-  '/change-password',
-  authenticateToken,
-  [
-    body('currentPassword')
-      .notEmpty()
-      .withMessage('Current password is required'),
-    body('newPassword')
-      .notEmpty()
-      .withMessage('New password is required')
-      .isLength({ min: 6 })
-      .withMessage('New password must be at least 6 characters long'),
-  ],
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        throw new AppError(400, 'Validation error');
-      }
-
-      const { currentPassword, newPassword } = req.body;
-      const adminPassword = process.env.ADMIN_PASSWORD;
-
-      // If no password is set, this is a misconfiguration
-      if (!adminPassword) {
-        logger.error('No admin password set in environment');
-        throw new AppError(401, 'No password has been set. Please contact your administrator.');
-      }
-
-      // Verify current password
-      if (currentPassword !== adminPassword) {
-        throw new AppError(401, 'Current password is incorrect');
-      }
-
-      // Update .env file with new password
-      await updatePasswordHash(newPassword);
-
-      // Update environment variable
-      process.env.ADMIN_PASSWORD = newPassword;
-
-      res.json({
-        status: 'success',
-        message: 'Password changed successfully',
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-// Check if password authentication is enabled
-router.get('/has-password', authenticateToken, async (_req: Request, res: Response, next: NextFunction) => {
+// Check if system needs first-time setup
+router.get('/setup-required', async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    res.json({
-      status: 'success',
-      data: {
-        hasPassword: !isPasskeyOnlyMode()
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// Remove password authentication
-router.post('/remove-password', authenticateToken, async (_req: Request, res: Response, next: NextFunction) => {
-  try {
-    logger.info('Attempting to remove password authentication');
-
-    // Check if at least one passkey exists before allowing password removal
-    const passkey = await prisma.webAuthnCredential.findFirst({
+    const credentials = await prisma.webAuthnCredential.findMany({
       where: { userId: 'admin' }
     });
 
-    if (!passkey) {
-      logger.warn('Cannot remove password: no passkey registered');
-      throw new AppError(400, 'Cannot remove password authentication without a passkey');
-    }
-
-    try {
-      // Remove the password from .env file
-      await updatePasswordHash('');
-      
-      // Update the environment variable immediately
-      process.env.ADMIN_PASSWORD = '';
-      
-      logger.info('Password authentication removed successfully');
-
-      res.json({
-        status: 'success',
-        message: 'Password authentication removed'
-      });
-    } catch (error) {
-      logger.error('Failed to remove password:', error);
-      throw new AppError(500, 'Failed to remove password authentication');
-    }
+    res.json({
+      status: 'success',
+      data: {
+        setupRequired: credentials.length === 0,
+        hasPasskeys: credentials.length > 0,
+        hasPassword: false // Always false now that we're passkey-only
+      }
+    });
   } catch (error) {
     next(error);
   }
@@ -448,13 +304,13 @@ router.delete('/webauthn/credentials/:credentialId', authenticateToken, async (r
   try {
     const { credentialId } = req.params;
 
-    // Check if this is the last passkey and password is disabled
+    // Check if this is the last passkey
     const credentials = await prisma.webAuthnCredential.findMany({
       where: { userId: 'admin' }
     });
 
-    if (credentials.length === 1 && !process.env.ADMIN_PASSWORD_HASH) {
-      throw new AppError(400, 'Cannot remove the last passkey when password authentication is disabled');
+    if (credentials.length === 1) {
+      throw new AppError(400, 'Cannot remove the last passkey');
     }
 
     await prisma.webAuthnCredential.deleteMany({

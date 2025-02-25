@@ -3,22 +3,18 @@ import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Button,
-  TextField,
   Typography,
   Container,
   Paper,
   CircularProgress,
   Alert,
-  Divider,
 } from '@mui/material';
-import { adminLogin, authenticateWithPasskey } from '../utils/api';
+import { authenticateWithPasskey } from '../utils/api';
 import KeyIcon from '@mui/icons-material/Key';
 
 const AdminLogin: React.FC = () => {
-  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [passkeySupported, setPasskeySupported] = useState(false);
   const navigate = useNavigate();
 
@@ -51,24 +47,9 @@ const AdminLogin: React.FC = () => {
     }
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-
-    try {
-      await adminLogin(password);
-      navigate('/admin/dashboard');
-    } catch (error: any) {
-      setError(error.response?.data?.message || 'Login failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handlePasskeyLogin = async () => {
     setError('');
-    setPasskeyLoading(true);
+    setLoading(true);
 
     try {
       await authenticateWithPasskey();
@@ -79,7 +60,7 @@ const AdminLogin: React.FC = () => {
       if (error.message === 'User declined to authenticate with passkey') {
         setError('Authentication cancelled by user');
       } else if (error.response?.status === 400 && error.response?.data?.message === 'No passkey registered') {
-        setError('No passkey registered. Please log in with password first to register a passkey.');
+        setError('No passkey registered. Please complete the first-time setup.');
       } else if (error.name === 'NotAllowedError') {
         setError('Authentication cancelled by user');
       } else if (error.name === 'SecurityError') {
@@ -88,9 +69,27 @@ const AdminLogin: React.FC = () => {
         setError(error.response?.data?.message || 'Passkey authentication failed');
       }
     } finally {
-      setPasskeyLoading(false);
+      setLoading(false);
     }
   };
+
+  if (!passkeySupported) {
+    return (
+      <Container component="main" maxWidth="xs">
+        <Box sx={{ mt: 8 }}>
+          <Paper elevation={3} sx={{ p: 4 }}>
+            <Typography variant="h5" component="h1" align="center" gutterBottom>
+              Device Not Supported
+            </Typography>
+            <Typography align="center" color="error">
+              Your device or browser does not support passkey authentication.
+              Please use a supported browser (like Chrome, Safari, or Edge) on a compatible device.
+            </Typography>
+          </Paper>
+        </Box>
+      </Container>
+    );
+  }
 
   return (
     <Container component="main" maxWidth="xs">
@@ -113,49 +112,20 @@ const AdminLogin: React.FC = () => {
             </Alert>
           )}
 
-          {passkeySupported && (
-            <>
-              <Button
-                fullWidth
-                variant="outlined"
-                startIcon={<KeyIcon />}
-                onClick={handlePasskeyLogin}
-                disabled={passkeyLoading || loading}
-                sx={{ mb: 2 }}
-              >
-                {passkeyLoading ? <CircularProgress size={24} /> : 'Sign in with Passkey'}
-              </Button>
+          <Button
+            fullWidth
+            variant="contained"
+            startIcon={<KeyIcon />}
+            onClick={handlePasskeyLogin}
+            disabled={loading}
+            sx={{ mt: 2 }}
+          >
+            {loading ? <CircularProgress size={24} /> : 'Sign in with Passkey'}
+          </Button>
 
-              <Divider sx={{ mb: 2 }}>
-                <Typography color="textSecondary" variant="body2">
-                  or
-                </Typography>
-              </Divider>
-            </>
-          )}
-
-          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              label="Admin Password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={loading || passkeyLoading}
-              autoFocus
-            />
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              disabled={loading || passkeyLoading}
-              sx={{ mt: 3, mb: 2 }}
-            >
-              {loading ? <CircularProgress size={24} /> : 'Sign in with Password'}
-            </Button>
-          </Box>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 3 }} align="center">
+            Use your registered passkey to sign in. This may use your device's biometric sensors or PIN.
+          </Typography>
         </Paper>
       </Box>
     </Container>

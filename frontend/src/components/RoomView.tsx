@@ -24,9 +24,11 @@ const RoomView: React.FC<RoomViewProps> = ({ isPasswordProtected = false }) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [roomConfig, setRoomConfig] = useState<RoomConfig | null>(null);
+  const [isPlayerReady, setIsPlayerReady] = useState<boolean>(false);
   
   const scriptRef = useRef<HTMLScriptElement | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const playerRef = useRef<any>(null);
 
   useEffect(() => {
     const savedName = Cookies.get('userName');
@@ -73,26 +75,31 @@ const RoomView: React.FC<RoomViewProps> = ({ isPasswordProtected = false }) => {
     await handleAutoSubmit(userName, password);
   };
 
+  // Initialize OvenPlayer
   useEffect(() => {
-    if (!scriptRef.current && isNameSubmitted) {
+    if (!scriptRef.current && isNameSubmitted && roomConfig) {
       const script = document.createElement('script');
       script.src = 'https://cdn.jsdelivr.net/npm/ovenplayer/dist/ovenplayer.js';
       script.async = true;
       script.onload = () => {
         const player = (window as any).OvenPlayer;
         if (player && player.create) {
-          player.create('player_id', {
+          playerRef.current = player.create('player_id', {
             autoStart: true,
             mute: true,
             sources: [
               {
                 label: 'Secure Live Stream',
                 type: 'webrtc',
-                file: roomConfig?.streamKey
+                file: roomConfig.streamKey
                   ? `wss://live.colourstream.johnrogerscolour.co.uk:3334/app/${roomConfig.streamKey}`
                   : 'wss://live.colourstream.johnrogerscolour.co.uk:3334/app/stream',
               }
             ]
+          });
+          
+          playerRef.current.on('ready', () => {
+            setIsPlayerReady(true);
           });
         }
       };
@@ -105,30 +112,36 @@ const RoomView: React.FC<RoomViewProps> = ({ isPasswordProtected = false }) => {
 
     return () => {
       if (scriptRef.current) {
+        if (playerRef.current) {
+          playerRef.current.remove();
+          playerRef.current = null;
+        }
         document.head.removeChild(scriptRef.current);
         scriptRef.current = null;
       }
     };
   }, [isNameSubmitted, roomConfig]);
 
+  // Initialize MiroTalk iframe after player is ready
   useEffect(() => {
-    if (isNameSubmitted && iframeRef.current) {
+    if (isNameSubmitted && isPlayerReady && iframeRef.current && roomConfig) {
       const timestamp = new Date().getTime();
       const baseUrl = 'https://video.colourstream.johnrogerscolour.co.uk/join';
       const queryParams = new URLSearchParams({
-        room: roomConfig?.mirotalkRoomId || 'test',
+        room: roomConfig.mirotalkRoomId,
         name: userName,
         audio: '1',
         video: '1',
         screen: '0',
         hide: '0',
         notify: '0',
+        token: roomConfig.mirotalkToken,
         _: timestamp.toString(),
         fresh: '1'
       });
       iframeRef.current.src = `${baseUrl}?${queryParams.toString()}`;
     }
-  }, [isNameSubmitted, userName, roomConfig]);
+  }, [isNameSubmitted, isPlayerReady, userName, roomConfig]);
 
   if (!isNameSubmitted) {
     return (
@@ -207,18 +220,20 @@ const RoomView: React.FC<RoomViewProps> = ({ isPasswordProtected = false }) => {
           width: '100%',
         }}
       />
-      <iframe
-        ref={iframeRef}
-        title="Mirotalk Call"
-        allow="camera; microphone; display-capture; fullscreen; clipboard-read; clipboard-write; web-share; autoplay"
-        style={{
-          width: '100%',
-          height: '30vh',
-          border: 'none',
-          overflow: 'hidden',
-          display: 'block',
-        }}
-      />
+      {isPlayerReady && (
+        <iframe
+          ref={iframeRef}
+          title="Mirotalk Call"
+          allow="camera; microphone; display-capture; fullscreen; clipboard-read; clipboard-write; web-share; autoplay"
+          style={{
+            width: '100%',
+            height: '30vh',
+            border: 'none',
+            overflow: 'hidden',
+            display: 'block',
+          }}
+        />
+      )}
     </Box>
   );
 };

@@ -1,22 +1,27 @@
-import bcrypt from 'bcryptjs';
 import { logger } from './logger';
 
 export const initializePassword = async () => {
     try {
-        const tempPassword = process.env.ADMIN_PASSWORD;
-        if (!tempPassword) {
-            throw new Error('ADMIN_PASSWORD not set in environment variables');
+        logger.info('Initializing authentication system');
+        
+        // Check for required WebAuthn configuration
+        if (!process.env.WEBAUTHN_RP_ID || !process.env.JWT_SECRET) {
+            throw new Error('Required WebAuthn configuration missing');
         }
 
-        // Hash the temporary password
-        const hashedPassword = await bcrypt.hash(tempPassword, 12);
-        
-        // Store the hash in environment
-        process.env.ADMIN_PASSWORD_HASH = hashedPassword;
-        
-        logger.info('Temporary admin password has been hashed and stored');
+        logger.info('Authentication system initialized successfully', {
+            envVars: {
+                NODE_ENV: process.env.NODE_ENV,
+                hasJwtSecret: !!process.env.JWT_SECRET,
+                hasWebAuthnConfig: !!process.env.WEBAUTHN_RP_ID
+            }
+        });
     } catch (error: any) {
-        logger.error('Failed to initialize admin password:', error);
+        logger.error('Failed to initialize authentication system:', {
+            error: error.message,
+            stack: error.stack,
+            type: error.constructor.name
+        });
         throw error;
     }
 }; 

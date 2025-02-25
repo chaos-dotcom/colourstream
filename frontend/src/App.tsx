@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { SnackbarProvider } from 'notistack';
 import './App.css';
 import AdminLogin from './components/AdminLogin';
@@ -11,6 +11,7 @@ function App() {
     <SnackbarProvider maxSnack={3}>
       <Router>
         <Routes>
+          <Route path="/login" element={<Navigate to="/admin/login" replace />} />
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route
             path="/admin/dashboard"

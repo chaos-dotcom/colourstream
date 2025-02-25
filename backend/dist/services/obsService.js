@@ -217,17 +217,28 @@ class OBSService {
     }
     async startStream() {
         if (!this.isConnected) {
-            logger_1.logger.error('Cannot start stream: Not connected to OBS');
             throw new Error('Not connected to OBS');
         }
         try {
-            logger_1.logger.info('Starting OBS stream');
             await this.obs.call('StartStream');
             logger_1.logger.info('Stream started successfully');
         }
-        catch (err) {
-            logger_1.logger.error('Failed to start stream:', err);
-            throw new Error(`Failed to start stream in OBS: ${err.message}`);
+        catch (error) {
+            logger_1.logger.error('Failed to start stream:', error);
+            throw new Error(`Failed to start stream: ${error.message}`);
+        }
+    }
+    async stopStream() {
+        if (!this.isConnected) {
+            throw new Error('Not connected to OBS');
+        }
+        try {
+            await this.obs.call('StopStream');
+            logger_1.logger.info('Stream stopped successfully');
+        }
+        catch (error) {
+            logger_1.logger.error('Failed to stop stream:', error);
+            throw new Error(`Failed to stop stream: ${error.message}`);
         }
     }
     async getSettings() {

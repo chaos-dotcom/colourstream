@@ -19,7 +19,7 @@ import {
   MenuItem,
   FormHelperText,
 } from '@mui/material';
-import { getOBSSettings, updateOBSSettings, OBSSettings as OBSSettingsType } from '../../utils/api';
+import { getOBSSettings, updateOBSSettings, OBSSettings as OBSSettingsType, getOBSConnectionStatus } from '../../utils/api';
 import OBSWebSocket from 'obs-websocket-js';
 
 const defaultSettings: OBSSettingsType = {
@@ -44,13 +44,44 @@ export const OBSSettings: React.FC = () => {
   const [obsInstance, setObsInstance] = useState<OBSWebSocket | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connected' | 'connecting' | 'error'>('disconnected');
   const [lastError, setLastError] = useState<string | null>(null);
+  const [backendWebSocket, setBackendWebSocket] = useState<WebSocket | null>(null);
 
   useEffect(() => {
     fetchSettings();
     return () => {
-      cleanupOBSConnection();
+      cleanupConnections();
     };
   }, []);
+
+  // Add effect to fetch initial connection status for backend mode
+  useEffect(() => {
+    const fetchConnectionStatus = async () => {
+      if (settings.localNetworkMode === 'backend' && settings.enabled) {
+        try {
+          const status = await getOBSConnectionStatus();
+          setConnectionStatus(status.status);
+          if (status.error) {
+            setLastError(status.error);
+            setError(`OBS Connection Error: ${status.error}`);
+          }
+        } catch (error: any) {
+          console.error('Failed to fetch OBS connection status:', error);
+          setConnectionStatus('error');
+          setError(error?.response?.data?.message || 'Failed to fetch OBS connection status');
+        }
+      }
+    };
+
+    fetchConnectionStatus();
+  }, [settings.localNetworkMode, settings.enabled]);
+
+  const cleanupConnections = () => {
+    cleanupOBSConnection();
+    if (backendWebSocket) {
+      backendWebSocket.close();
+      setBackendWebSocket(null);
+    }
+  };
 
   const cleanupOBSConnection = () => {
     if (obsInstance) {
@@ -70,9 +101,11 @@ export const OBSSettings: React.FC = () => {
     });
 
     obs.on('Identified', () => {
-      setConnectionStatus('connected');
-      setError(null);
-      setSuccess('Connected to OBS successfully');
+      if (settings.localNetworkMode === 'frontend') {
+        setConnectionStatus('connected');
+        setError(null);
+        setSuccess('Connected to OBS successfully');
+      }
     });
 
     obs.on('ConnectionOpened', () => {
@@ -80,21 +113,25 @@ export const OBSSettings: React.FC = () => {
     });
 
     obs.on('ConnectionClosed', () => {
-      setConnectionStatus('disconnected');
-      if (lastError) {
-        setError(`Connection closed: ${lastError}`);
+      if (settings.localNetworkMode === 'frontend') {
+        setConnectionStatus('disconnected');
+        if (lastError) {
+          setError(`Connection closed: ${lastError}`);
+        }
       }
     });
 
     obs.on('ConnectionError', (err: Error) => {
-      setConnectionStatus('error');
-      setLastError(err.message);
-      setError(`Connection error: ${err.message}`);
+      if (settings.localNetworkMode === 'frontend') {
+        setConnectionStatus('error');
+        setLastError(err.message);
+        setError(`Connection error: ${err.message}`);
+      }
     });
 
-    // Add periodic connection check
+    // Add periodic connection check only for frontend mode
     const checkInterval = setInterval(async () => {
-      if (obs && connectionStatus === 'connected') {
+      if (obs && connectionStatus === 'connected' && settings.localNetworkMode === 'frontend') {
         try {
           const { obsVersion } = await obs.call('GetVersion');
           console.debug('Connection check successful - OBS version:', obsVersion);
@@ -232,25 +269,34 @@ export const OBSSettings: React.FC = () => {
         </Typography>
         <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%' }}>
           <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="body2">
+            <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
               Status: 
             </Typography>
             <Box sx={{ 
-              width: 12, 
-              height: 12, 
+              width: 10,
+              height: 10,
               borderRadius: '50%',
               backgroundColor: 
-                connectionStatus === 'connected' ? 'success.main' :
-                connectionStatus === 'connecting' ? 'warning.main' :
-                connectionStatus === 'error' ? 'error.main' :
-                'grey.500'
+                connectionStatus === 'connected' ? '#4caf50' :
+                connectionStatus === 'connecting' ? '#ff9800' :
+                connectionStatus === 'error' ? '#f44336' :
+                '#9e9e9e',
+              transition: 'background-color 0.3s ease',
+              boxShadow: (theme) => `0 0 8px ${
+                connectionStatus === 'connected' ? theme.palette.success.main :
+                connectionStatus === 'connecting' ? theme.palette.warning.main :
+                connectionStatus === 'error' ? theme.palette.error.main :
+                'transparent'
+              }`
             }} />
-            <Typography variant="body2" color={
-              connectionStatus === 'connected' ? 'success.main' :
-              connectionStatus === 'connecting' ? 'warning.main' :
-              connectionStatus === 'error' ? 'error.main' :
-              'text.secondary'
-            }>
+            <Typography variant="body2" sx={{ 
+              color: (theme) => 
+                connectionStatus === 'connected' ? theme.palette.success.main :
+                connectionStatus === 'connecting' ? theme.palette.warning.main :
+                connectionStatus === 'error' ? theme.palette.error.main :
+                theme.palette.text.secondary,
+              fontWeight: 'medium'
+            }}>
               {connectionStatus.charAt(0).toUpperCase() + connectionStatus.slice(1)}
             </Typography>
           </Box>

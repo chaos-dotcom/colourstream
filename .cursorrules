@@ -1,2 +1,16 @@
-keep admin password as admin in the .env file as plain text, this is a temporary password for the admin user. and will be changed by the end user, this is  a safer method as it encorages the end user to change the password after login, and means our services does not have a default password so to speak
 backend prisma is in - cd /Users/john/myapps/colourstream/backend && npx prisma generate
+
+
+FRONTEND CHANGE VERIFICATION RULE:
+1. Code Inspection Stage:
+   - Check the current implementation in the codebase
+   - Verify where changes need to be made
+   - Understand the component structure and dependencies
+2. Implementation Stage:
+   - Make the necessary code changes
+   - Verify changes are in the correct files using grep or file inspection
+   - Run any necessary linting/type checks
+3. Deployment Stage:
+   - For Docker deployments, which this repository is, run the following command to rebuild the frontend container:
+     * Rebuild the frontend container: `docker-compose up -d --build frontend`
+     * Check container logs for any errors

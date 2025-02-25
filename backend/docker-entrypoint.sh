@@ -11,6 +11,6 @@ npx prisma migrate deploy
 echo "Ensuring Prisma client is up to date..."
 npx prisma generate
 
-# Start the application
+# Start the application with more verbose error logging
 echo "Starting the application..."
-exec npm start 
+exec node --trace-warnings dist/index.js 

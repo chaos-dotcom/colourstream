@@ -1,5 +1,5 @@
 # Build stage
-FROM node:20-alpine as build
+FROM node:20-alpine as builder
 
 WORKDIR /app
 
@@ -19,11 +19,19 @@ ENV VITE_API_URL=https://live.colourstream.johnrogerscolour.co.uk/api
 # Build the app
 RUN npm run build
 
-# Install serve for static file serving
+# Serve stage
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install serve
 RUN npm install -g serve
+
+# Copy only the built files from builder stage
+COPY --from=builder /app/build ./build
 
 # Expose port
 EXPOSE 3000
 
-# Start static file server
+# Start static file server with SPA support
 CMD ["serve", "-s", "build", "-l", "3000"]

@@ -117,4 +117,37 @@ router.post('/set-stream-key', auth_1.authenticateToken, [
         next(error);
     }
 });
+// Stop stream
+router.post('/stream/stop', auth_1.authenticateToken, async (_req, res, next) => {
+    try {
+        const settings = await obsService_1.obsService.getSettings();
+        if (!(settings === null || settings === void 0 ? void 0 : settings.enabled)) {
+            throw new errorHandler_1.AppError(400, 'OBS integration is not enabled');
+        }
+        try {
+            await obsService_1.obsService.connect(settings.host, settings.port, settings.password || undefined);
+            await obsService_1.obsService.stopStream();
+            await obsService_1.obsService.disconnect();
+            res.json({
+                status: 'success',
+                message: 'Stream stopped successfully',
+            });
+        }
+        catch (obsError) {
+            logger_1.logger.error('Failed to stop stream:', {
+                error: obsError.message,
+                settings: {
+                    host: settings.host,
+                    port: settings.port,
+                    useLocalNetwork: settings.useLocalNetwork,
+                    localNetworkMode: settings.localNetworkMode
+                }
+            });
+            throw new errorHandler_1.AppError(500, `Failed to stop stream: ${obsError.message}`);
+        }
+    }
+    catch (error) {
+        next(error);
+    }
+});
 exports.default = router;
