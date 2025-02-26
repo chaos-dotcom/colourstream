@@ -5,7 +5,7 @@ import WebSocket from 'ws';
 
 // API Settings from MiroTalk .env file
 const API_KEY_SECRET = process.env.MIROTALK_API_KEY_SECRET || 'MIROTALK_API_SECRET_KEY_2024';
-const JWT_KEY = process.env.MIROTALK_JWT_KEY || 'MIROTALK_JWT_SECRET_KEY_2024';
+const JWT_KEY = process.env.JWT_KEY || 'MIROTALK_JWT_SECRET_KEY_2024';
 const HOST_USERS = [{ username: 'globalUsername', password: 'globalPassword' }];
 
 interface MiroTalkMeetingResponse {

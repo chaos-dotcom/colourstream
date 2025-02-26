@@ -60,22 +60,27 @@ export interface CreateRoomData {
   name: string;
   password: string;
   expiryDays: number;
+  mirotalkUsername?: string;
+  mirotalkPassword?: string;
 }
 
 export interface Room {
   id: string;
   name: string;
   link: string;
+  presenterLink: string;
   expiryDate: string;
   mirotalkRoomId: string;
   streamKey: string;
   displayPassword: string;
+  password: string;
 }
 
 export interface RoomConfig {
   mirotalkRoomId: string;
   streamKey: string;
   mirotalkToken: string;
+  isPresenter?: boolean;
 }
 
 export interface OBSSettings {
@@ -115,6 +120,11 @@ export interface TokenGenerationResponse {
   expiresIn: number;
 }
 
+export interface DefaultMiroTalkCredentials {
+  username: string;
+  password: string;
+}
+
 export const adminLogin = async (password: string): Promise<ApiResponse<AuthResponse>> => {
   const response = await api.post('/auth/login', { password });
   const result = response.data as ApiResponse<AuthResponse>;
@@ -130,7 +140,13 @@ export const changePassword = async (currentPassword: string, newPassword: strin
 };
 
 export const createRoom = async (roomData: CreateRoomData): Promise<ApiResponse<{ room: Room }>> => {
+  console.log('Creating room with data:', {
+    ...roomData,
+    password: roomData.password ? '***' : null, // Mask password for security
+  });
+  
   const response = await api.post('/rooms', roomData);
+  console.log('Room creation response:', response.data);
   return response.data as ApiResponse<{ room: Room }>;
 };
 
@@ -145,10 +161,16 @@ export const deleteRoom = async (roomId: string): Promise<ApiResponse<null>> => 
   return response.data as ApiResponse<null>;
 };
 
-export const validateRoomAccess = async (roomId: string, password: string): Promise<RoomConfig> => {
-  const response = await api.post(`/rooms/validate/${roomId}`, { password });
-  const result = response.data as ApiResponse<RoomConfig>;
-  return result.data;
+export const validateRoomAccess = async (roomId: string, password: string, isPresenter: boolean = false): Promise<RoomConfig> => {
+  try {
+    const response = await api.post(`/rooms/validate/${roomId}`, { password, isPresenter });
+    const result = response.data as ApiResponse<RoomConfig>;
+    return result.data;
+  } catch (error: any) {
+    // Extract error message from the response if available
+    const errorMessage = error.response?.data?.message || 'Failed to validate room access';
+    throw new Error(errorMessage);
+  }
 };
 
 export const cleanupExpiredRooms = async (): Promise<ApiResponse<CleanupResponse>> => {
@@ -162,10 +184,13 @@ export const getOBSSettings = async (): Promise<OBSSettings> => {
   return result.data.settings;
 };
 
-export const updateOBSSettings = async (settings: OBSSettings): Promise<OBSSettings> => {
+export const updateOBSSettings = async (settings: OBSSettings): Promise<{ settings: OBSSettings, warning?: string }> => {
   const response = await api.put('/obs/settings', settings);
-  const result = response.data as ApiResponse<{ settings: OBSSettings }>;
-  return result.data.settings;
+  const result = response.data as ApiResponse<{ settings: OBSSettings, warning?: string }>;
+  return { 
+    settings: result.data.settings,
+    warning: result.data.warning
+  };
 };
 
 export const setOBSStreamKey = async (streamKey: string): Promise<void> => {
@@ -315,4 +340,30 @@ export const generateMirotalkToken = async (
 ): Promise<ApiResponse<TokenGenerationResponse>> => {
   const response = await api.post('/mirotalk/generate-token', request);
   return response.data as ApiResponse<TokenGenerationResponse>;
+};
+
+export const getDefaultMiroTalkCredentials = async (): Promise<DefaultMiroTalkCredentials> => {
+  try {
+    const response = await fetch(`${baseURL}/mirotalk/default-credentials`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch default MiroTalk credentials');
+    }
+
+    const data = await response.json();
+    return data.data.defaultCredentials;
+  } catch (error) {
+    console.error('Error fetching default MiroTalk credentials:', error);
+    // Return default values if API call fails
+    return {
+      username: 'globalUsername',
+      password: 'globalPassword'
+    };
+  }
 }; 

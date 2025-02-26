@@ -34,6 +34,11 @@ In `global.env`, set:
 - WebAuthn configuration
 - MiroTalk configuration
 
+Key security variables to set:
+- `JWT_KEY` - Main JWT secret for the application
+- `COLOURSTREAM_AUTH_JWT_MIROTALK` - JWT key for ColourStream to authenticate with MiroTalk
+- `MIROTALK_AUTH_JWT_INTERNAL` - JWT key used internally by MiroTalk
+
 ### Backend Configuration
 
 In `backend/.env`, set:
@@ -52,6 +57,7 @@ In `frontend/.env`, set:
 In `mirotalk/.env`, set:
 - Host configuration
 - Authentication settings
+- Note: The `JWT_KEY` variable references `${MIROTALK_AUTH_JWT_INTERNAL}` from global.env
 
 ### OvenMediaEngine Configuration
 
@@ -59,6 +65,13 @@ In `ovenmediaengine/.env`, set:
 - Host IP
 - Port configurations
 - API access token
+
+## Naming Convention
+
+Environment variables, especially security keys, follow this naming pattern:
+`{SOURCE}_{PURPOSE}_{DESTINATION}`
+
+This makes it clear where the key is coming from, what it's used for, and where it's being used.
 
 ## Security Considerations
 

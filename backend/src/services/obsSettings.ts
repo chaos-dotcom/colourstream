@@ -18,7 +18,7 @@ export interface OBSSettings {
 
 export const getOBSSettings = async (): Promise<OBSSettings | null> => {
   try {
-    const settings = await prisma.obsSettings.findUnique({
+    const settings = await (prisma as any).obssettings.findUnique({
       where: { id: 'default' }
     });
 
@@ -43,7 +43,7 @@ export const getOBSSettings = async (): Promise<OBSSettings | null> => {
 
 export const updateOBSSettings = async (settings: Omit<OBSSettings, 'id'>): Promise<OBSSettings> => {
   try {
-    const updatedSettings = await prisma.obsSettings.upsert({
+    const updatedSettings = await (prisma as any).obssettings.upsert({
       where: { id: 'default' },
       update: {
         ...settings,

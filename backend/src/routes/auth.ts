@@ -275,7 +275,7 @@ router.post('/webauthn/authenticate/verify', async (req: Request, res: Response,
       // Generate JWT token - no need to check for password here
       const token = jwt.sign(
         { userId: 'admin' },
-        process.env.JWT_SECRET!,
+        process.env.ADMIN_AUTH_SECRET!,
         { expiresIn: '7d' }
       );
 
@@ -407,7 +407,7 @@ router.post('/webauthn/first-time-setup/verify', async (req: Request, res: Respo
     // Generate a token for the admin user
     const token = jwt.sign(
       { userId: 'admin', type: 'admin' },
-      process.env.COLOURSTREAM_JWT_SECRET!,
+      process.env.ADMIN_AUTH_SECRET!,
       { expiresIn: '7d' }
     );
 

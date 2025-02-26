@@ -10,11 +10,14 @@ import fetch from 'node-fetch';
 import jwt from 'jsonwebtoken';
 import CryptoJS from 'crypto-js';
 import { RoomCreateBody, RoomCreateInput, RoomSelect } from '../types/room';
+import { Prisma } from '@prisma/client';
+import { generateUniqueId } from '../utils/idGenerator';
 
 const router = express.Router();
 
 interface ValidateRoomBody {
   password: string;
+  isPresenter?: boolean;
 }
 
 // Utility function to generate random IDs
@@ -28,46 +31,101 @@ const generateStreamKey = (): string => {
 };
 
 // Utility function to generate MiroTalk token
-const generateMiroTalkToken = async (roomId: string): Promise<string> => {
+const generateMiroTalkToken = async (
+  roomId: string, 
+  expiryDays?: number, 
+  customUsername?: string, 
+  customPassword?: string
+): Promise<string> => {
   try {
-    if (!process.env.COLOURSTREAM_MIROTALK_JWT_KEY) {
-      throw new Error('COLOURSTREAM_MIROTALK_JWT_KEY environment variable is not set');
+    if (!process.env.JWT_KEY) {
+      throw new Error('JWT_KEY environment variable is not set');
     }
     
-    // Use the same JWT_KEY as configured in MiroTalk
-    const JWT_KEY = process.env.COLOURSTREAM_MIROTALK_JWT_KEY;
+    // Use the standard JWT_KEY
+    const JWT_KEY = process.env.JWT_KEY;
     
-    // Format username as expected by MiroTalk
-    const username = `room_${roomId}`;
+    // Log the incoming parameters for debugging
+    logger.debug('generateMiroTalkToken called with params:', {
+      roomId,
+      expiryDays,
+      useDefaultCredentials: !customUsername && !customPassword
+    });
     
-    // Get password from environment or use default
-    const password = process.env.HOST_USERS ? 
-      JSON.parse(process.env.HOST_USERS)[0].password : 
-      'globalPassword';
+    // Default username and password
+    let username = `room_${roomId}`;
+    let password = 'globalPassword';
+    
+    // Try to get default credentials from HOST_USERS environment variable
+    try {
+      if (process.env.HOST_USERS) {
+        // Remove any surrounding quotes that might be included in the env var
+        const cleanedHostUsers = process.env.HOST_USERS.replace(/^['"]|['"]$/g, '');
+        logger.debug('Parsing HOST_USERS:', { cleanedHostUsers });
+        
+        const parsedUsers = JSON.parse(cleanedHostUsers);
+        if (parsedUsers && parsedUsers.length > 0) {
+          // Only override username if customUsername is provided and not empty
+          if (customUsername && customUsername.trim() !== '') {
+            username = customUsername;
+            logger.debug('Using custom username:', { username });
+          } else {
+            // Otherwise use the default username from HOST_USERS
+            username = parsedUsers[0].username || username;
+            logger.debug('Using default username from HOST_USERS');
+          }
+          
+          // Only override password if customPassword is provided and not empty
+          if (customPassword && customPassword.trim() !== '') {
+            password = customPassword;
+            logger.debug('Using custom password');
+          } else {
+            // Otherwise use the default password from HOST_USERS
+            password = parsedUsers[0].password || password;
+            logger.debug('Using default password from HOST_USERS');
+          }
+        }
+      }
+    } catch (error) {
+      logger.error('Error parsing HOST_USERS environment variable:', error);
+      // Continue with default values already set
+      logger.debug('Using fallback default credentials after error');
+    }
+
+    // Set expiration to match room expiry (default to 30 days if not specified)
+    const expireDays = expiryDays || 30;
+    const expireValue = `${expireDays}d`;
 
     // Constructing payload - MiroTalk expects presenter as a string "true" or "1"
     const payload = {
       username: username,
       password: password,
       presenter: "true", // MiroTalk expects "true" or "1" as a string
-      expire: "24h"  // Match MiroTalk's expected format
+      expire: expireValue  // Match room expiration
     };
+
+    logger.debug('Final token payload:', {
+      username: payload.username,
+      hasPassword: !!payload.password,
+      presenter: payload.presenter,
+      expire: payload.expire
+    });
 
     // Encrypt payload using AES encryption
     const payloadString = JSON.stringify(payload);
     const encryptedPayload = CryptoJS.AES.encrypt(payloadString, JWT_KEY).toString();
 
-    // Constructing JWT token with string expiration format as expected by MiroTalk
+    // Constructing JWT token with expiration matching room expiry
     const jwtToken = jwt.sign(
       { data: encryptedPayload },
       JWT_KEY,
-      { expiresIn: "24h" } // Use string format as expected by MiroTalk
+      { expiresIn: `${expireDays}d` } // Use room expiry
     );
 
     logger.info('Generated MiroTalk token', {
       roomId,
       username,
-      tokenExpiry: "24h"
+      tokenExpiry: expireValue
     });
 
     return jwtToken;
@@ -89,198 +147,280 @@ const validateRoom = [
   body('expiryDays').isInt({ min: 1 }).withMessage('Expiry days must be a positive number'),
 ];
 
-// Create a new room (protected)
-router.post(
-  '/',
-  authenticateToken,
-  validateRoom,
-  async (req: Request<{}, {}, RoomCreateBody>, res: Response, next: NextFunction) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        throw new AppError(400, 'Validation error');
+// Get all rooms
+router.get("/", async (_req: Request, res: Response) => {
+  try {
+    const rooms = await prisma.room.findMany({
+      orderBy: {
+        createdAt: 'desc',
+      },
+      select: {
+        id: true,
+        name: true,
+        mirotalkRoomId: true,
+        streamKey: true,
+        password: true, // Include the actual password
+        displayPassword: true,
+        expiryDate: true,
+        link: true,
+        presenterLink: true,
+        mirotalkToken: true,
+        createdAt: true
       }
+    });
+    return res.status(200).json({
+      status: 'success',
+      data: { rooms }
+    });
+  } catch (error) {
+    console.error("Error fetching rooms:", error);
+    return res.status(500).json({ error: "Failed to fetch rooms" });
+  }
+});
 
-      const { name, password, expiryDays } = req.body;
+// Create a new room
+router.post("/", async (req: Request, res: Response) => {
+  try {
+    const { name, password, expiryDays } = req.body;
 
-      // Generate random IDs
-      const mirotalkRoomId = generateRandomId();
-      const streamKey = generateStreamKey();
+    // Log the incoming request for debugging
+    logger.debug('Room creation request received:', {
+      name,
+      hasPassword: !!password,
+      expiryDays
+    });
 
-      // Generate MiroTalk token
-      const mirotalkToken = await generateMiroTalkToken(mirotalkRoomId);
+    // Validate required fields
+    if (!name || !password || !expiryDays) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
 
-      // Hash the password
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(password, salt);
+    // Calculate expiry date from expiryDays
+    const expiryDate = new Date();
+    expiryDate.setDate(expiryDate.getDate() + Number(expiryDays));
 
-      const createData: RoomCreateInput = {
-        name,
-        mirotalkRoomId,
-        streamKey,
-        password: hashedPassword,
-        displayPassword: password,
-        expiryDate: new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000),
-        link: `${process.env.FRONTEND_URL}/room/${Math.random().toString(36).substr(2, 9)}`,
-        mirotalkToken,
-      };
-
-      const room = await prisma.room.create({
-        data: createData,
-        select: {
-          id: true,
-          name: true,
-          link: true,
-          expiryDate: true,
-          mirotalkRoomId: true,
-          streamKey: true,
-          displayPassword: true,
-          mirotalkToken: true,
-        } as RoomSelect,
-      });
-
-      res.status(201).json({
-        status: 'success',
-        data: { room },
+    // Generate unique IDs and tokens
+    const mirotalkRoomId = generateUniqueId();
+    const streamKey = generateUniqueId();
+    const displayPassword = password.substring(0, 3) + "***";
+    
+    // Generate room ID
+    const roomId = generateUniqueId();
+    
+    // Generate links using the room ID
+    const link = `${process.env.FRONTEND_URL}/room/${roomId}`;
+    const presenterLink = `${process.env.FRONTEND_URL}/room/${roomId}?access=p`;
+    
+    // Generate MiroTalk token that expires at the same time as the room
+    // Always use default credentials from HOST_USERS
+    let mirotalkToken;
+    try {
+      mirotalkToken = await generateMiroTalkToken(
+        mirotalkRoomId, 
+        Number(expiryDays),
+        undefined,  // Force using default username from HOST_USERS
+        undefined   // Force using default password from HOST_USERS
+      );
+      logger.info('Generated MiroTalk token for room using default credentials', { 
+        roomId, 
+        mirotalkRoomId
       });
     } catch (error) {
-      next(error);
+      logger.error('Failed to generate MiroTalk token', { error });
+      // Continue without token if generation fails
     }
+
+    // Create room data
+    const roomData: Prisma.RoomCreateInput = {
+      id: roomId, // Use the generated ID
+      name,
+      mirotalkRoomId,
+      streamKey,
+      password,
+      displayPassword,
+      expiryDate,
+      link,
+      presenterLink,
+      mirotalkToken, // Always include the token
+    };
+    
+    const room = await prisma.room.create({
+      data: roomData,
+    });
+    
+    return res.status(201).json({
+      status: 'success',
+      data: { room }
+    });
+  } catch (error) {
+    console.error("Error creating room:", error);
+    return res.status(500).json({ error: "Failed to create room" });
   }
-);
+});
 
-// Get all rooms (protected)
-router.get(
-  '/',
-  authenticateToken,
-  async (_req: Request, res: Response, next: NextFunction) => {
-    try {
-      const rooms = await prisma.room.findMany({
-        select: {
-          id: true,
-          name: true,
-          link: true,
-          expiryDate: true,
-          mirotalkRoomId: true,
-          streamKey: true,
-          displayPassword: true,
-        },
-      });
+// Get a specific room
+router.get("/:id", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const room = await prisma.room.findUnique({
+      where: {
+        id: String(id),
+      },
+    });
 
-      res.json({
-        status: 'success',
-        data: { rooms },
-      });
-    } catch (error) {
-      next(error);
+    if (!room) {
+      return res.status(404).json({ error: "Room not found" });
     }
+
+    return res.status(200).json(room);
+  } catch (error) {
+    console.error("Error fetching room:", error);
+    return res.status(500).json({ error: "Failed to fetch room" });
   }
-);
+});
 
-// Delete a room (protected)
-router.delete(
-  '/:id',
-  authenticateToken,
-  validateRoomId,
-  async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        throw new AppError(400, 'Validation error');
-      }
+// Validate room access
+router.get("/validate", async (req: Request, res: Response) => {
+  try {
+    const { roomId, password, presenterLink: isPresenterLink } = req.query;
 
-      const room = await prisma.room.delete({
-        where: { id: req.params.id },
-      });
-
-      if (!room) {
-        throw new AppError(404, 'Room not found');
-      }
-
-      res.json({
-        status: 'success',
-        data: null,
-      });
-    } catch (error) {
-      next(error);
+    if (!roomId) {
+      return res.status(400).json({ error: "Room ID is required" });
     }
-  }
-);
 
-// Validate room access (public)
-router.post(
-  '/validate/:id',
-  [
-    param('id').notEmpty().withMessage('Room ID is required'),
-    body('password').notEmpty().withMessage('Password is required'),
-  ],
-  async (req: Request<{ id: string }, {}, ValidateRoomBody>, res: Response, next: NextFunction) => {
+    let room;
+    
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        throw new AppError(400, 'Validation error');
-      }
-
-      const room = await prisma.room.findFirst({
+      // Find the room by mirotalkRoomId
+      room = await prisma.room.findUnique({
         where: {
-          link: { contains: req.params.id },
-          expiryDate: { gt: new Date() },
-        },
-        select: {
-          mirotalkRoomId: true,
-          streamKey: true,
-          mirotalkToken: true,
-          password: true,
-        } as RoomSelect,
-      });
-
-      if (!room) {
-        throw new AppError(404, 'Room not found or expired');
-      }
-
-      const isValid = await bcrypt.compare(req.body.password, room.password);
-      if (!isValid) {
-        throw new AppError(401, 'Invalid password');
-      }
-
-      res.json({
-        status: 'success',
-        data: {
-          mirotalkRoomId: room.mirotalkRoomId,
-          streamKey: room.streamKey,
-          mirotalkToken: room.mirotalkToken,
+          mirotalkRoomId: roomId as string,
         },
       });
     } catch (error) {
-      next(error);
+      console.error("Error finding room by mirotalkRoomId:", error);
+      room = null;
     }
-  }
-);
 
-// Cleanup expired rooms (protected)
-router.delete(
-  '/cleanup/expired',
-  authenticateToken,
-  async (_req: Request, res: Response, next: NextFunction) => {
+    if (!room) {
+      return res.status(404).json({ error: "Room not found" });
+    }
+
+    // Check if room has expired
+    if (new Date() > new Date(room.expiryDate)) {
+      return res.status(403).json({ error: "Room has expired" });
+    }
+
+    // If password is provided, validate it
+    if (password && password !== room.password) {
+      return res.status(403).json({ error: "Invalid password" });
+    }
+
+    // Return room data
+    return res.status(200).json({
+      status: 'success',
+      data: {
+        mirotalkRoomId: room.mirotalkRoomId,
+        streamKey: room.streamKey,
+        mirotalkToken: room.mirotalkToken,
+        isPresenter: isPresenterLink === "true"
+      }
+    });
+  } catch (error) {
+    console.error("Error validating room:", error);
+    return res.status(500).json({ error: "Failed to validate room" });
+  }
+});
+
+// Add a POST endpoint for room validation
+router.post("/validate/:id", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { password, isPresenter } = req.body;
+
+    if (!id) {
+      return res.status(400).json({ error: "Room ID is required" });
+    }
+
+    let room;
+    
     try {
-      const result = await prisma.room.deleteMany({
+      // First try to find by mirotalkRoomId
+      room = await prisma.room.findUnique({
         where: {
-          expiryDate: { lt: new Date() },
+          mirotalkRoomId: id,
         },
       });
 
-      logger.info(`Cleaned up ${result.count} expired rooms`);
-
-      res.json({
-        status: 'success',
-        data: {
-          deletedCount: result.count,
-        },
-      });
+      // If not found, try by room ID
+      if (!room) {
+        room = await prisma.room.findUnique({
+          where: {
+            id: id,
+          },
+        });
+      }
     } catch (error) {
-      next(error);
+      console.error("Error finding room:", error);
+      room = null;
     }
+
+    if (!room) {
+      return res.status(404).json({ 
+        status: 'error',
+        message: "Room not found" 
+      });
+    }
+
+    // Check if room has expired
+    if (new Date() > new Date(room.expiryDate)) {
+      return res.status(403).json({ 
+        status: 'error',
+        message: "Room has expired" 
+      });
+    }
+
+    // If password is provided, validate it
+    if (password && password !== room.password) {
+      return res.status(403).json({ 
+        status: 'error',
+        message: "Invalid password" 
+      });
+    }
+
+    // Return room data
+    return res.status(200).json({
+      status: 'success',
+      data: {
+        mirotalkRoomId: room.mirotalkRoomId,
+        streamKey: room.streamKey,
+        mirotalkToken: room.mirotalkToken,
+        isPresenter: isPresenter === true
+      }
+    });
+  } catch (error) {
+    console.error("Error validating room:", error);
+    return res.status(500).json({ 
+      status: 'error',
+      message: "Failed to validate room" 
+    });
   }
-);
+});
+
+// Delete a room
+router.delete("/:id", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await prisma.room.delete({
+      where: {
+        id: String(id),
+      },
+    });
+    return res.status(204).send();
+  } catch (error) {
+    console.error("Error deleting room:", error);
+    return res.status(500).json({ error: "Failed to delete room" });
+  }
+});
 
 export default router; 

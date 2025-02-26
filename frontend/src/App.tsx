@@ -8,6 +8,7 @@ import Login from './pages/Login';
 import AdminDashboard from './components/AdminDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 import RoomView from './components/RoomView';
+import PresenterView from './components/PresenterView';
 import govukTheme from './lib/govukTheme';
 import GovUkLayout from './components/GovUkLayout';
 
@@ -31,6 +32,7 @@ function App() {
                 }
               />
               <Route path="/room/:roomId" element={<RoomView isPasswordProtected={true} />} />
+              <Route path="/room/:roomId/presenter" element={<PresenterView isPasswordProtected={true} />} />
               <Route path="/" element={<RoomView />} />
             </Routes>
           </GovUkLayout>
