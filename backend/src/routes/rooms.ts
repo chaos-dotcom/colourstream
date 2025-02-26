@@ -30,34 +30,45 @@ const generateStreamKey = (): string => {
 // Utility function to generate MiroTalk token
 const generateMiroTalkToken = async (roomId: string): Promise<string> => {
   try {
-    if (!process.env.JWT_KEY) {
-      throw new Error('JWT_KEY environment variable is not set');
+    if (!process.env.COLOURSTREAM_MIROTALK_JWT_KEY) {
+      throw new Error('COLOURSTREAM_MIROTALK_JWT_KEY environment variable is not set');
     }
     
-    const JWT_KEY = process.env.JWT_KEY;
+    // Use the same JWT_KEY as configured in MiroTalk
+    const JWT_KEY = process.env.COLOURSTREAM_MIROTALK_JWT_KEY;
+    
+    // Format username as expected by MiroTalk
     const username = `room_${roomId}`;
+    
+    // Get password from environment or use default
     const password = process.env.HOST_USERS ? 
       JSON.parse(process.env.HOST_USERS)[0].password : 
       'globalPassword';
 
-    // Constructing payload
+    // Constructing payload - MiroTalk expects presenter as a string "true" or "1"
     const payload = {
       username: username,
       password: password,
-      presenter: "1", // MiroTalk expects "1" or "true" as a string
-      expire: "1d"  // Match MiroTalk's expected format
+      presenter: "true", // MiroTalk expects "true" or "1" as a string
+      expire: "24h"  // Match MiroTalk's expected format
     };
 
     // Encrypt payload using AES encryption
     const payloadString = JSON.stringify(payload);
     const encryptedPayload = CryptoJS.AES.encrypt(payloadString, JWT_KEY).toString();
 
-    // Constructing JWT token with numeric expiration
+    // Constructing JWT token with string expiration format as expected by MiroTalk
     const jwtToken = jwt.sign(
       { data: encryptedPayload },
       JWT_KEY,
-      { expiresIn: 24 * 60 * 60 } // 24 hours in seconds
+      { expiresIn: "24h" } // Use string format as expected by MiroTalk
     );
+
+    logger.info('Generated MiroTalk token', {
+      roomId,
+      username,
+      tokenExpiry: "24h"
+    });
 
     return jwtToken;
   } catch (error) {

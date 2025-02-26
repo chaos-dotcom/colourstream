@@ -4,8 +4,8 @@ import jwt from 'jsonwebtoken';
 import WebSocket from 'ws';
 
 // API Settings from MiroTalk .env file
-const API_KEY_SECRET = 'colourstream_api_secret_key_2024_secure_production';
-const JWT_KEY = 'colourstream_jwt_secret_key_2024_secure_production';
+const API_KEY_SECRET = process.env.MIROTALK_API_KEY_SECRET || 'MIROTALK_API_SECRET_KEY_2024';
+const JWT_KEY = process.env.MIROTALK_JWT_KEY || 'MIROTALK_JWT_SECRET_KEY_2024';
 const HOST_USERS = [{ username: 'globalUsername', password: 'globalPassword' }];
 
 interface MiroTalkMeetingResponse {
@@ -18,6 +18,20 @@ interface JwtTokenData {
 
 async function generateMiroTalkToken(payload: any) {
     try {
+        // Ensure presenter is a string "true" or "false"
+        if (payload.presenter === true || payload.presenter === "1" || payload.presenter === "true") {
+            payload.presenter = "true";
+        } else {
+            payload.presenter = "false";
+        }
+        
+        // Ensure expire is a string in the format expected by MiroTalk
+        if (!payload.expire) {
+            payload.expire = "24h";
+        }
+        
+        console.log('Generating token with payload:', payload);
+        
         // Encrypt payload using AES encryption
         const payloadString = JSON.stringify(payload);
         const encryptedPayload = CryptoJS.AES.encrypt(payloadString, JWT_KEY).toString();
@@ -36,7 +50,7 @@ async function createMiroTalkMeeting() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': API_KEY_SECRET // No Bearer prefix
+                'Authorization': API_KEY_SECRET // Using environment variable
             }
         });
 

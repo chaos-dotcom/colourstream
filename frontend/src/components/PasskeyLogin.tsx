@@ -22,7 +22,7 @@ const PasskeyLogin: React.FC = () => {
 
     try {
       await authenticateWithPasskey();
-      navigate('/admin');
+      navigate('/admin/dashboard');
     } catch (error: any) {
       setError(error.message || 'Failed to authenticate with passkey');
     } finally {

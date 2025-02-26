@@ -1,16 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import {
-    Accordion,
-    AccordionSummary,
-    AccordionDetails,
-    Typography,
     Box,
     CircularProgress,
     Alert,
+    Grid,
 } from '@mui/material';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { OvenMediaEngineApi, OvenStatistics } from '../../lib/oven-api';
 import { ApplicationList } from './ApplicationList';
+import { 
+    SectionHeading, 
+    Button, 
+    Table, 
+    TableHead, 
+    TableBody, 
+    TableRow, 
+    TableCell 
+} from '../GovUkComponents';
 
 interface VirtualHostListProps {
     api: OvenMediaEngineApi;
@@ -21,6 +27,7 @@ interface VHostData {
     stats?: OvenStatistics;
     error?: string;
     loading: boolean;
+    showApplications: boolean;
 }
 
 const formatBytes = (bytes: number): string => {
@@ -35,7 +42,6 @@ export const VirtualHostList: React.FC<VirtualHostListProps> = ({ api }) => {
     const [vhosts, setVhosts] = useState<VHostData[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [expanded, setExpanded] = useState<string | false>(false);
 
     useEffect(() => {
         loadVirtualHosts();
@@ -43,8 +49,30 @@ export const VirtualHostList: React.FC<VirtualHostListProps> = ({ api }) => {
 
     const loadVirtualHosts = async () => {
         try {
+            setLoading(true);
             const names = await api.getVirtualHosts();
-            setVhosts(names.map(name => ({ name, loading: false })));
+            
+            // Initialize vhosts with loading state
+            const initialVhosts = names.map(name => ({ 
+                name, 
+                loading: true,
+                showApplications: true // Show all applications by default
+            }));
+            setVhosts(initialVhosts);
+            
+            // Load stats for all vhosts in parallel
+            const statsPromises = names.map(async (name) => {
+                try {
+                    const stats = await api.getVirtualHostStats(name);
+                    return { name, stats, loading: false, showApplications: true };
+                } catch (err) {
+                    console.error(`Error loading stats for ${name}:`, err);
+                    return { name, error: 'Failed to load statistics', loading: false, showApplications: true };
+                }
+            });
+            
+            const vhostsWithStats = await Promise.all(statsPromises);
+            setVhosts(vhostsWithStats);
             setError(null);
         } catch (err) {
             setError('Failed to load virtual hosts');
@@ -54,70 +82,101 @@ export const VirtualHostList: React.FC<VirtualHostListProps> = ({ api }) => {
         }
     };
 
-    const handleAccordionChange = (vhost: string) => async (_event: React.SyntheticEvent, isExpanded: boolean) => {
-        setExpanded(isExpanded ? vhost : false);
-        
-        if (isExpanded) {
-            const vhostIndex = vhosts.findIndex(v => v.name === vhost);
-            if (vhostIndex === -1 || vhosts[vhostIndex].stats) return;
-
-            setVhosts(prev => prev.map(v => 
-                v.name === vhost ? { ...v, loading: true } : v
-            ));
-
-            try {
-                const stats = await api.getVirtualHostStats(vhost);
-                setVhosts(prev => prev.map(v => 
-                    v.name === vhost ? { ...v, stats, loading: false } : v
-                ));
-            } catch (err) {
-                setVhosts(prev => prev.map(v => 
-                    v.name === vhost ? { ...v, error: 'Failed to load statistics', loading: false } : v
-                ));
-                console.error(`Error loading stats for ${vhost}:`, err);
-            }
-        }
+    const handleRefresh = () => {
+        loadVirtualHosts();
     };
 
-    if (loading) {
+    if (loading && vhosts.length === 0) {
         return <CircularProgress />;
     }
 
-    if (error) {
+    if (error && vhosts.length === 0) {
         return <Alert severity="error">{error}</Alert>;
     }
 
     return (
         <Box>
-            {vhosts.map(vhost => (
-                <Accordion
-                    key={vhost.name}
-                    expanded={expanded === vhost.name}
-                    onChange={handleAccordionChange(vhost.name)}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <SectionHeading>Virtual Hosts</SectionHeading>
+                <Button 
+                    onClick={handleRefresh}
+                    variant="primary"
                 >
-                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                        <Typography sx={{ width: '33%', flexShrink: 0 }}>
-                            {vhost.name}
-                        </Typography>
-                        {vhost.loading ? (
-                            <CircularProgress size={20} />
-                        ) : vhost.stats ? (
-                            <Typography sx={{ color: 'text.secondary' }}>
-                                Connections: {vhost.stats.totalConnections} | 
-                                Throughput In: {formatBytes(vhost.stats.lastThroughputIn)}/s | 
-                                Out: {formatBytes(vhost.stats.lastThroughputOut)}/s
-                            </Typography>
-                        ) : null}
-                    </AccordionSummary>
-                    <AccordionDetails>
-                        {vhost.error ? (
-                            <Alert severity="error">{vhost.error}</Alert>
-                        ) : (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <RefreshIcon fontSize="small" />
+                        Refresh
+                    </Box>
+                </Button>
+            </Box>
+            
+            <Box sx={{ border: '1px solid #b1b4b6', mb: 4 }}>
+                <Table>
+                    <TableHead>
+                        <TableRow>
+                            <TableCell header>Virtual Host</TableCell>
+                            <TableCell header>Connections</TableCell>
+                            <TableCell header>Throughput In</TableCell>
+                            <TableCell header>Throughput Out</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {vhosts.map(vhost => (
+                            <TableRow key={vhost.name}>
+                                <TableCell>
+                                    <Box sx={{ fontWeight: 600 }}>
+                                        {vhost.name}
+                                    </Box>
+                                </TableCell>
+                                <TableCell>
+                                    {vhost.loading ? (
+                                        <CircularProgress size={20} />
+                                    ) : vhost.stats ? (
+                                        vhost.stats.totalConnections
+                                    ) : (
+                                        'N/A'
+                                    )}
+                                </TableCell>
+                                <TableCell>
+                                    {vhost.loading ? (
+                                        <CircularProgress size={20} />
+                                    ) : vhost.stats ? (
+                                        `${formatBytes(vhost.stats.lastThroughputIn)}/s`
+                                    ) : (
+                                        'N/A'
+                                    )}
+                                </TableCell>
+                                <TableCell>
+                                    {vhost.loading ? (
+                                        <CircularProgress size={20} />
+                                    ) : vhost.stats ? (
+                                        `${formatBytes(vhost.stats.lastThroughputOut)}/s`
+                                    ) : (
+                                        'N/A'
+                                    )}
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </Box>
+            
+            <SectionHeading>Applications</SectionHeading>
+            
+            <Grid container spacing={3}>
+                {vhosts.map(vhost => (
+                    !vhost.error ? (
+                        <Grid item xs={12} key={vhost.name}>
                             <ApplicationList api={api} vhost={vhost.name} />
-                        )}
-                    </AccordionDetails>
-                </Accordion>
-            ))}
+                        </Grid>
+                    ) : (
+                        <Grid item xs={12} key={vhost.name}>
+                            <Alert severity="error">
+                                Error loading applications for {vhost.name}: {vhost.error}
+                            </Alert>
+                        </Grid>
+                    )
+                ))}
+            </Grid>
         </Box>
     );
 }; 

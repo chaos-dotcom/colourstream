@@ -3,9 +3,6 @@ import {
   Box,
   Button,
   TextField,
-  Typography,
-  Card,
-  CardContent,
   Alert,
   CircularProgress,
   Switch,
@@ -21,6 +18,7 @@ import {
 } from '@mui/material';
 import { getOBSSettings, updateOBSSettings, OBSSettings as OBSSettingsType, getOBSConnectionStatus } from '../../utils/api';
 import OBSWebSocket from 'obs-websocket-js';
+import { SectionHeading } from '../GovUkComponents';
 
 const defaultSettings: OBSSettingsType = {
   host: 'localhost',
@@ -384,214 +382,210 @@ export const OBSSettings: React.FC = () => {
   };
 
   return (
-    <Card>
-      <CardContent>
-        <Typography variant="h6" gutterBottom>
-          OBS WebSocket Settings
-        </Typography>
-        <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%' }}>
-          <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-              Status: 
-            </Typography>
-            <Box sx={{ 
-              width: 10,
-              height: 10,
-              borderRadius: '50%',
-              backgroundColor: 
-                connectionStatus === 'connected' ? '#4caf50' :
-                connectionStatus === 'connecting' ? '#ff9800' :
-                connectionStatus === 'error' ? '#f44336' :
-                '#9e9e9e',
-              transition: 'background-color 0.3s ease',
-              boxShadow: (theme) => `0 0 8px ${
-                connectionStatus === 'connected' ? theme.palette.success.main :
-                connectionStatus === 'connecting' ? theme.palette.warning.main :
-                connectionStatus === 'error' ? theme.palette.error.main :
-                'transparent'
-              }`
-            }} />
-            <Typography variant="body2" sx={{ 
-              color: (theme) => 
-                connectionStatus === 'connected' ? theme.palette.success.main :
-                connectionStatus === 'connecting' ? theme.palette.warning.main :
-                connectionStatus === 'error' ? theme.palette.error.main :
-                theme.palette.text.secondary,
-              fontWeight: 'medium'
-            }}>
-              {connectionStatus.charAt(0).toUpperCase() + connectionStatus.slice(1)}
-            </Typography>
+    <Box sx={{ width: '100%', mb: 4 }}>
+      <SectionHeading>OBS WebSocket Settings</SectionHeading>
+      <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%' }}>
+        <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box component="span" sx={{ fontWeight: 'medium' }}>
+            Status: 
           </Box>
+          <Box sx={{ 
+            width: 10,
+            height: 10,
+            borderRadius: '50%',
+            backgroundColor: 
+              connectionStatus === 'connected' ? '#4caf50' :
+              connectionStatus === 'connecting' ? '#ff9800' :
+              connectionStatus === 'error' ? '#f44336' :
+              '#9e9e9e',
+            transition: 'background-color 0.3s ease',
+            boxShadow: (theme) => `0 0 8px ${
+              connectionStatus === 'connected' ? theme.palette.success.main :
+              connectionStatus === 'connecting' ? theme.palette.warning.main :
+              connectionStatus === 'error' ? theme.palette.error.main :
+              'transparent'
+            }`
+          }} />
+          <Box component="span" sx={{ 
+            color: (theme) => 
+              connectionStatus === 'connected' ? theme.palette.success.main :
+              connectionStatus === 'connecting' ? theme.palette.warning.main :
+              connectionStatus === 'error' ? theme.palette.error.main :
+              theme.palette.text.secondary,
+            fontWeight: 'medium'
+          }}>
+            {connectionStatus.charAt(0).toUpperCase() + connectionStatus.slice(1)}
+          </Box>
+        </Box>
 
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
-          {success && (
-            <Alert severity="success" sx={{ mb: 2 }}>
-              {success}
-            </Alert>
-          )}
-          <FormControlLabel
-            control={
-              <Switch
-                checked={settings.enabled}
-                disabled={loading}
-                onChange={(e) => {
-                  setSettings(prev => ({
-                    ...prev,
-                    enabled: e.target.checked
-                  }));
-                }}
-              />
-            }
-            label="Enable OBS Integration"
-            sx={{ mb: 2 }}
-          />
-
-          <FormControl fullWidth margin="normal">
-            <InputLabel>Connection Mode</InputLabel>
-            <Select
-              value={settings.localNetworkMode}
-              label="Connection Mode"
-              onChange={(e) => {
-                const mode = e.target.value as 'frontend' | 'backend';
-                setSettings(prev => ({
-                  ...prev,
-                  localNetworkMode: mode,
-                  useLocalNetwork: true,
-                  // Keep existing values or set defaults
-                  localNetworkHost: prev.localNetworkHost || 'localhost',
-                  localNetworkPort: prev.localNetworkPort || 4455,
-                  // Also update the main host/port to match
-                  host: prev.localNetworkHost || 'localhost',
-                  port: prev.localNetworkPort || 4455
-                }));
-              }}
-              disabled={loading || !settings.enabled}
-            >
-              <MenuItem value="frontend">Browser to OBS Connection</MenuItem>
-              <MenuItem value="backend">Server to OBS Connection</MenuItem>
-            </Select>
-            <FormHelperText>
-              {settings.localNetworkMode === 'frontend' && "Connect directly from your browser to OBS (OBS must be running on your local machine)"}
-              {settings.localNetworkMode === 'backend' && "Connect from the server to OBS (OBS can be running anywhere the server can reach)"}
-            </FormHelperText>
-          </FormControl>
-
-          <TextField
-            margin="normal"
-            fullWidth
-            required
-            label={settings.localNetworkMode === 'frontend' ? "OBS WebSocket Host" : "OBS Host"}
-            value={settings.localNetworkHost || 'localhost'}
-            onChange={(e) => {
-              const newHost = e.target.value;
-              setSettings(prev => ({
-                ...prev,
-                localNetworkHost: newHost,
-                host: newHost // Keep both in sync
-              }));
-            }}
-            disabled={loading || !settings.enabled}
-            helperText={
-              settings.localNetworkMode === 'frontend' 
-                ? "The hostname or IP address where OBS is running (usually localhost)"
-                : "The hostname or IP address where OBS is running relative to the server"
-            }
-          />
-          <TextField
-            margin="normal"
-            fullWidth
-            required
-            type="number"
-            label={settings.localNetworkMode === 'frontend' ? "OBS WebSocket Port" : "OBS Port"}
-            value={settings.localNetworkPort || 4455}
-            onChange={(e) => {
-              const newPort = parseInt(e.target.value) || 4455;
-              setSettings(prev => ({
-                ...prev,
-                localNetworkPort: newPort,
-                port: newPort // Keep both in sync
-              }));
-            }}
-            disabled={loading || !settings.enabled}
-            helperText="The WebSocket port configured in OBS (default: 4455)"
-          />
-
-          <TextField
-            margin="normal"
-            fullWidth
-            label="Password"
-            type="password"
-            value={settings.password || ''}
-            onChange={(e) => {
-              const newPassword = e.target.value.trim();
-              setSettings(prev => ({
-                ...prev,
-                password: newPassword || undefined // Only set if not empty
-              }));
-            }}
-            disabled={loading || !settings.enabled}
-            helperText={
-              settings.localNetworkMode === 'frontend' 
-                ? "The password configured in OBS WebSocket settings (leave blank if authentication is disabled in OBS)"
-                : "The password configured in OBS WebSocket settings for the remote OBS instance"
-            }
-          />
-          
-          <FormControl component="fieldset" sx={{ mb: 2, mt: 2, width: '100%' }}>
-            <FormLabel component="legend">Stream Protocol</FormLabel>
-            <RadioGroup
-              row
-              value={settings.protocol}
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+        {success && (
+          <Alert severity="success" sx={{ mb: 2 }}>
+            {success}
+          </Alert>
+        )}
+        <FormControlLabel
+          control={
+            <Switch
+              checked={settings.enabled}
+              disabled={loading}
               onChange={(e) => {
                 setSettings(prev => ({
                   ...prev,
-                  protocol: e.target.value as 'rtmp' | 'srt',
-                  streamType: 'rtmp_custom'  // Always rtmp_custom
+                  enabled: e.target.checked
                 }));
               }}
-            >
-              <FormControlLabel 
-                value="rtmp" 
-                control={<Radio />} 
-                label="RTMP" 
-                disabled={loading || !settings.enabled}
-              />
-              <FormControlLabel 
-                value="srt" 
-                control={<Radio />} 
-                label="SRT" 
-                disabled={loading || !settings.enabled}
-              />
-            </RadioGroup>
-          </FormControl>
+            />
+          }
+          label="Enable OBS Integration"
+          sx={{ mb: 2 }}
+        />
 
-          {settings.protocol === 'srt' && (
-            <Alert severity="info" sx={{ mb: 2 }}>
-              Using SRT URL format:
-              <br />
-              <code style={{ wordBreak: 'break-all' }}>
-                srt://live.colourstream.johnrogerscolour.co.uk:9999?streamid=[encoded-stream-id]&latency=2000000
-              </code>
-              <br />
-              <small>The stream-id will be automatically URL encoded and include the full path with your stream key. Leave the Stream Key field blank in OBS.</small>
-            </Alert>
-          )}
-          
-          <Button
-            type="submit"
-            fullWidth
-            variant="contained"
-            sx={{ mt: 3 }}
+        <FormControl fullWidth margin="normal">
+          <InputLabel>Connection Mode</InputLabel>
+          <Select
+            value={settings.localNetworkMode}
+            label="Connection Mode"
+            onChange={(e) => {
+              const mode = e.target.value as 'frontend' | 'backend';
+              setSettings(prev => ({
+                ...prev,
+                localNetworkMode: mode,
+                useLocalNetwork: true,
+                // Keep existing values or set defaults
+                localNetworkHost: prev.localNetworkHost || 'localhost',
+                localNetworkPort: prev.localNetworkPort || 4455,
+                // Also update the main host/port to match
+                host: prev.localNetworkHost || 'localhost',
+                port: prev.localNetworkPort || 4455
+              }));
+            }}
             disabled={loading || !settings.enabled}
           >
-            {loading ? <CircularProgress size={24} /> : 'Save Settings'}
-          </Button>
-        </Box>
-      </CardContent>
-    </Card>
+            <MenuItem value="frontend">Browser to OBS Connection</MenuItem>
+            <MenuItem value="backend">Server to OBS Connection</MenuItem>
+          </Select>
+          <FormHelperText>
+            {settings.localNetworkMode === 'frontend' && "Connect directly from your browser to OBS (OBS must be running on your local machine)"}
+            {settings.localNetworkMode === 'backend' && "Connect from the server to OBS (OBS can be running anywhere the server can reach)"}
+          </FormHelperText>
+        </FormControl>
+
+        <TextField
+          margin="normal"
+          fullWidth
+          required
+          label={settings.localNetworkMode === 'frontend' ? "OBS WebSocket Host" : "OBS Host"}
+          value={settings.localNetworkHost || 'localhost'}
+          onChange={(e) => {
+            const newHost = e.target.value;
+            setSettings(prev => ({
+              ...prev,
+              localNetworkHost: newHost,
+              host: newHost // Keep both in sync
+            }));
+          }}
+          disabled={loading || !settings.enabled}
+          helperText={
+            settings.localNetworkMode === 'frontend' 
+              ? "The hostname or IP address where OBS is running (usually localhost)"
+              : "The hostname or IP address where OBS is running relative to the server"
+          }
+        />
+        <TextField
+          margin="normal"
+          fullWidth
+          required
+          type="number"
+          label={settings.localNetworkMode === 'frontend' ? "OBS WebSocket Port" : "OBS Port"}
+          value={settings.localNetworkPort || 4455}
+          onChange={(e) => {
+            const newPort = parseInt(e.target.value) || 4455;
+            setSettings(prev => ({
+              ...prev,
+              localNetworkPort: newPort,
+              port: newPort // Keep both in sync
+            }));
+          }}
+          disabled={loading || !settings.enabled}
+          helperText="The WebSocket port configured in OBS (default: 4455)"
+        />
+
+        <TextField
+          margin="normal"
+          fullWidth
+          label="Password"
+          type="password"
+          value={settings.password || ''}
+          onChange={(e) => {
+            const newPassword = e.target.value.trim();
+            setSettings(prev => ({
+              ...prev,
+              password: newPassword || undefined // Only set if not empty
+            }));
+          }}
+          disabled={loading || !settings.enabled}
+          helperText={
+            settings.localNetworkMode === 'frontend' 
+              ? "The password configured in OBS WebSocket settings (leave blank if authentication is disabled in OBS)"
+              : "The password configured in OBS WebSocket settings for the remote OBS instance"
+          }
+        />
+        
+        <FormControl component="fieldset" sx={{ mb: 2, mt: 2, width: '100%' }}>
+          <FormLabel component="legend">Stream Protocol</FormLabel>
+          <RadioGroup
+            row
+            value={settings.protocol}
+            onChange={(e) => {
+              setSettings(prev => ({
+                ...prev,
+                protocol: e.target.value as 'rtmp' | 'srt',
+                streamType: 'rtmp_custom'  // Always rtmp_custom
+              }));
+            }}
+          >
+            <FormControlLabel 
+              value="rtmp" 
+              control={<Radio />} 
+              label="RTMP" 
+              disabled={loading || !settings.enabled}
+            />
+            <FormControlLabel 
+              value="srt" 
+              control={<Radio />} 
+              label="SRT" 
+              disabled={loading || !settings.enabled}
+            />
+          </RadioGroup>
+        </FormControl>
+
+        {settings.protocol === 'srt' && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Using SRT URL format:
+            <br />
+            <code style={{ wordBreak: 'break-all' }}>
+              srt://live.colourstream.johnrogerscolour.co.uk:9999?streamid=[encoded-stream-id]&latency=2000000
+            </code>
+            <br />
+            <small>The stream-id will be automatically URL encoded and include the full path with your stream key. Leave the Stream Key field blank in OBS.</small>
+          </Alert>
+        )}
+        
+        <Button
+          type="submit"
+          fullWidth
+          variant="contained"
+          sx={{ mt: 3 }}
+          disabled={loading || !settings.enabled}
+        >
+          {loading ? <CircularProgress size={24} color="inherit" /> : 'Save Settings'}
+        </Button>
+      </Box>
+    </Box>
   );
 }; 

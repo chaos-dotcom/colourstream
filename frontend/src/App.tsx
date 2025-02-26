@@ -4,7 +4,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import './App.css';
 import './govuk.css';
-import AdminLogin from './components/AdminLogin';
+import Login from './pages/Login';
 import AdminDashboard from './components/AdminDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 import RoomView from './components/RoomView';
@@ -20,7 +20,8 @@ function App() {
           <GovUkLayout serviceName="ColourStream">
             <Routes>
               <Route path="/login" element={<Navigate to="/admin/login" replace />} />
-              <Route path="/admin/login" element={<AdminLogin />} />
+              <Route path="/admin/login" element={<Login />} />
+              <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
               <Route
                 path="/admin/dashboard"
                 element={

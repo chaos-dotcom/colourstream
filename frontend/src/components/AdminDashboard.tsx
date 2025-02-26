@@ -1,47 +1,41 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box,
-  Button,
-  TextField,
-  Typography,
-  Container,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
+  Tabs,
+  Tab,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
+  TextField,
+  CircularProgress,
+  Alert,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
-  CircularProgress,
-  Snackbar,
-  Alert,
-  Tab,
-  Tabs,
   IconButton,
   Tooltip,
-  Card,
-  CardContent,
-  CardActions,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemSecondaryAction,
-  Divider,
-  TablePagination,
+  Container,
+  Snackbar,
 } from '@mui/material';
-import { Visibility, VisibilityOff, ContentCopy, PlayArrow, OpenInNew, Videocam, Key, Delete, Logout, Block } from '@mui/icons-material';
-import { createRoom, getRooms, deleteRoom, cleanupExpiredRooms, Room, CreateRoomData, setOBSStreamKey, registerPasskey, PasskeyInfo, getPasskeys, removePasskey, adminLogout, stopOBSStream } from '../utils/api';
-import { api } from '../utils/api';
+import { Delete, ContentCopy, Visibility, VisibilityOff, PlayArrow, OpenInNew, Link } from '@mui/icons-material';
 import { OBSSettings } from './settings/OBSSettings';
 import { OvenMediaConfig } from './OvenMediaConfig';
+import {
+  Button as GovUkButton,
+  PageHeading,
+  SectionHeading,
+  InsetText,
+  WarningText,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell
+} from './GovUkComponents';
+import { createRoom, getRooms, deleteRoom, cleanupExpiredRooms, Room, CreateRoomData, setOBSStreamKey, registerPasskey, PasskeyInfo, getPasskeys, removePasskey, adminLogout, stopOBSStream, generateMirotalkToken, TokenGenerationRequest } from '../utils/api';
+import { api } from '../utils/api';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -111,6 +105,12 @@ const AdminDashboard: React.FC = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [blockDialogOpen, setBlockDialogOpen] = useState(false);
+  const [tokenDialogOpen, setTokenDialogOpen] = useState(false);
+  const [selectedRoom, setSelectedRoom] = useState<ExtendedRoom | null>(null);
+  const [tokenName, setTokenName] = useState('');
+  const [tokenExpiry, setTokenExpiry] = useState('1d');
+  const [generatedUrl, setGeneratedUrl] = useState('');
+  const [isGeneratingToken, setIsGeneratingToken] = useState(false);
 
   const handleMainTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setMainTabValue(newValue);
@@ -346,6 +346,44 @@ const AdminDashboard: React.FC = () => {
     }
   }, [mainTabValue, page, rowsPerPage]);
 
+  const handleOpenTokenDialog = (room: ExtendedRoom) => {
+    setSelectedRoom(room);
+    setTokenName('');
+    setTokenExpiry('1d');
+    setGeneratedUrl('');
+    setTokenDialogOpen(true);
+  };
+
+  const handleCloseTokenDialog = () => {
+    setTokenDialogOpen(false);
+    setSelectedRoom(null);
+    setGeneratedUrl('');
+  };
+
+  const handleGenerateToken = async (isPresenter: boolean) => {
+    if (!selectedRoom) return;
+    
+    try {
+      setIsGeneratingToken(true);
+      setError(null);
+      
+      const request: TokenGenerationRequest = {
+        roomId: selectedRoom.mirotalkRoomId,
+        name: tokenName || 'Guest',
+        isPresenter,
+        expireTime: tokenExpiry
+      };
+      
+      const response = await generateMirotalkToken(request);
+      setGeneratedUrl(response.data.url);
+      setSuccess(`${isPresenter ? 'Presenter' : 'Guest'} link generated successfully`);
+    } catch (error: any) {
+      setError(error.response?.data?.message || `Failed to generate ${isPresenter ? 'presenter' : 'guest'} link`);
+    } finally {
+      setIsGeneratingToken(false);
+    }
+  };
+
   return (
     <Container 
       sx={{ 
@@ -363,10 +401,8 @@ const AdminDashboard: React.FC = () => {
         padding: 1,
         borderRadius: 1,
       }}>
-        <Button
-          variant="contained"
-          color="error"
-          size="large"
+        <GovUkButton 
+          variant="warning"
           onClick={async () => {
             try {
               await stopOBSStream();
@@ -375,35 +411,20 @@ const AdminDashboard: React.FC = () => {
               setError(error.response?.data?.message || 'Failed to stop stream');
             }
           }}
-          sx={{ 
-            height: 48,
-            fontSize: '1rem',
-            fontWeight: 'bold',
-            minWidth: '160px'
-          }}
         >
           Stop Stream
-        </Button>
-        <Button
-          variant="contained"
-          color="error"
-          size="large"
-          startIcon={<Logout />}
+        </GovUkButton>
+        <GovUkButton
+          variant="grey"
           onClick={handleLogout}
-          sx={{ 
-            height: 48,
-            fontSize: '1rem',
-            fontWeight: 'bold',
-            minWidth: '160px'
-          }}
         >
           Logout
-        </Button>
+        </GovUkButton>
       </Box>
 
-      <Typography variant="h4" component="h1" gutterBottom>
+      <PageHeading caption="Silly But Secure Administration Portal">
         Admin Dashboard
-      </Typography>
+      </PageHeading>
 
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
         <Tabs value={mainTabValue} onChange={handleMainTabChange} aria-label="admin dashboard tabs">
@@ -415,191 +436,199 @@ const AdminDashboard: React.FC = () => {
       </Box>
 
       <TabPanel value={mainTabValue} index={0}>
-        <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={() => setOpenDialog(true)}
-            disabled={loading}
-          >
-            Create New Room
-          </Button>
-          <Button
-            variant="outlined"
-            color="secondary"
-            onClick={handleCleanupExpired}
-            disabled={loading}
-          >
-            Cleanup Expired Rooms
-          </Button>
-        </Box>
+        <Box sx={{ maxWidth: 1200, mx: 'auto', display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <Box>
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
+              <SectionHeading>Room Management</SectionHeading>
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <GovUkButton
+                  variant="primary"
+                  onClick={() => setOpenDialog(true)}
+                  disabled={loading}
+                >
+                  Create New Room
+                </GovUkButton>
+                <GovUkButton
+                  variant="purple"
+                  onClick={handleCleanupExpired}
+                  disabled={loading}
+                >
+                  Cleanup Expired Rooms
+                </GovUkButton>
+              </Box>
+            </Box>
 
-        {loading && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
-            <CircularProgress />
+            {loading && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+                <CircularProgress />
+              </Box>
+            )}
+
+            <Box sx={{ 
+              mb: 4,
+              border: '1px solid #b1b4b6'
+            }}>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell header={true}>Name</TableCell>
+                    <TableCell header={true}>Link</TableCell>
+                    <TableCell header={true}>Mirotalk Room ID</TableCell>
+                    <TableCell header={true}>Stream Key</TableCell>
+                    <TableCell header={true}>Password</TableCell>
+                    <TableCell header={true}>Expiry Date</TableCell>
+                    <TableCell header={true}>Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {rooms.map((room) => (
+                    <TableRow key={room.id}>
+                      <TableCell>{room.name}</TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Tooltip title="Copy link">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleCopy(`${window.location.origin}/room/${room.id}`, 'Room link')}
+                            >
+                              <ContentCopy fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Open in new tab">
+                            <IconButton
+                              size="small"
+                              component="a"
+                              href={`/room/${room.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <OpenInNew fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          {visibleMirotalkIds[room.id] ? (
+                            <>
+                              {room.mirotalkRoomId}
+                              <IconButton
+                                size="small"
+                                onClick={() => toggleMirotalkIdVisibility(room.id)}
+                              >
+                                <VisibilityOff fontSize="small" />
+                              </IconButton>
+                            </>
+                          ) : (
+                            <IconButton
+                              size="small"
+                              onClick={() => toggleMirotalkIdVisibility(room.id)}
+                            >
+                              <Visibility fontSize="small" />
+                            </IconButton>
+                          )}
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          {visibleStreamKeys[room.id] ? (
+                            <>
+                              {room.streamKey}
+                              <IconButton
+                                size="small"
+                                onClick={() => toggleStreamKeyVisibility(room.id)}
+                              >
+                                <VisibilityOff fontSize="small" />
+                              </IconButton>
+                              <Tooltip title="Copy stream key">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleCopy(room.streamKey, 'Stream key')}
+                                >
+                                  <ContentCopy fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </>
+                          ) : (
+                            <IconButton
+                              size="small"
+                              onClick={() => toggleStreamKeyVisibility(room.id)}
+                            >
+                              <Visibility fontSize="small" />
+                            </IconButton>
+                          )}
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          {visiblePasswords[room.id] ? (
+                            <>
+                              {room.displayPassword}
+                              <IconButton
+                                size="small"
+                                onClick={() => togglePasswordVisibility(room.id)}
+                              >
+                                <VisibilityOff fontSize="small" />
+                              </IconButton>
+                              <Tooltip title="Copy password">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleCopy(room.displayPassword, 'Password')}
+                                >
+                                  <ContentCopy fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </>
+                          ) : (
+                            <IconButton
+                              size="small"
+                              onClick={() => togglePasswordVisibility(room.id)}
+                            >
+                              <Visibility fontSize="small" />
+                            </IconButton>
+                          )}
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        {room.expiryDate ? new Date(room.expiryDate).toLocaleString() : 'Never'}
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <Tooltip title="Go live">
+                            <IconButton
+                              size="small"
+                              color="primary"
+                              onClick={() => handleGoLive(room)}
+                            >
+                              <PlayArrow />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Delete room">
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={() => handleDeleteRoom(room.id)}
+                            >
+                              <Delete />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Generate Token Links">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleOpenTokenDialog(room)}
+                            >
+                              <Link fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Box>
           </Box>
-        )}
-
-        <TableContainer component={Paper}>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Name</TableCell>
-                <TableCell>Link</TableCell>
-                <TableCell>Mirotalk Room ID</TableCell>
-                <TableCell>Stream Key</TableCell>
-                <TableCell>Password</TableCell>
-                <TableCell>Expiry Date</TableCell>
-                <TableCell>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {rooms.map((room) => (
-                <TableRow key={room.id}>
-                  <TableCell>{room.name}</TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Tooltip title="Copy link">
-                        <IconButton size="small" onClick={() => handleCopy(room.link, 'Link')}>
-                          <ContentCopy fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Copy link with password">
-                        <IconButton 
-                          size="small" 
-                          onClick={() => handleCopy(`${room.link}?password=${encodeURIComponent(room.displayPassword)}`, 'Link with password')}
-                        >
-                          <ContentCopy color="primary" fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Copy formatted template">
-                        <IconButton 
-                          size="small" 
-                          onClick={() => handleCopy(`Link:   ${room.link}\nPassword: ${room.displayPassword}\n`, 'Formatted template')}
-                        >
-                          <ContentCopy color="secondary" fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Open in new tab">
-                        <IconButton 
-                          size="small" 
-                          onClick={() => window.open(room.link, '_blank')}
-                        >
-                          <OpenInNew fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography>
-                        {visibleMirotalkIds[room.id] ? room.mirotalkRoomId : '••••••'}
-                      </Typography>
-                      <Tooltip title={visibleMirotalkIds[room.id] ? "Hide Mirotalk Room ID" : "Show Mirotalk Room ID"}>
-                        <IconButton
-                          size="small"
-                          onClick={() => toggleMirotalkIdVisibility(room.id)}
-                        >
-                          {visibleMirotalkIds[room.id] ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Copy Mirotalk Room ID">
-                        <IconButton size="small" onClick={() => handleCopy(room.mirotalkRoomId, 'Mirotalk Room ID')}>
-                          <ContentCopy fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography>
-                        {visibleStreamKeys[room.id] ? room.streamKey : '••••••'}
-                      </Typography>
-                      <Tooltip title={visibleStreamKeys[room.id] ? "Hide Stream Key" : "Show Stream Key"}>
-                        <IconButton
-                          size="small"
-                          onClick={() => toggleStreamKeyVisibility(room.id)}
-                        >
-                          {visibleStreamKeys[room.id] ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Copy Stream Key">
-                        <IconButton size="small" onClick={() => handleCopy(room.streamKey, 'Stream Key')}>
-                          <ContentCopy fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Set in OBS">
-                        <IconButton
-                          size="small"
-                          onClick={async () => {
-                            try {
-                              setLoading(true);
-                              await setOBSStreamKey(room.streamKey);
-                              setSuccess('Stream key set in OBS successfully');
-                            } catch (error: any) {
-                              setError(error.response?.data?.message || 'Failed to set stream key in OBS');
-                            } finally {
-                              setLoading(false);
-                            }
-                          }}
-                        >
-                          <PlayArrow fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography>
-                        {visiblePasswords[room.id] ? room.displayPassword : '••••••'}
-                      </Typography>
-                      <Tooltip title={visiblePasswords[room.id] ? "Hide password" : "Show password"}>
-                        <IconButton
-                          size="small"
-                          onClick={() => togglePasswordVisibility(room.id)}
-                        >
-                          {visiblePasswords[room.id] ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Copy password">
-                        <IconButton 
-                          size="small" 
-                          onClick={() => handleCopy(room.displayPassword, 'Password')}
-                        >
-                          <ContentCopy fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </Box>
-                  </TableCell>
-                  <TableCell>{new Date(room.expiryDate).toLocaleDateString()}</TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', gap: 1 }}>
-                      <Button
-                        variant="outlined"
-                        color="secondary"
-                        onClick={() => handleDeleteRoom(room.id)}
-                        disabled={loading}
-                      >
-                        Delete
-                      </Button>
-                      <Tooltip title="Set OBS and open room">
-                        <Button
-                          variant="contained"
-                          color="primary"
-                          onClick={() => handleGoLive(room)}
-                          disabled={loading}
-                          startIcon={<Videocam />}
-                        >
-                          Go Live
-                        </Button>
-                      </Tooltip>
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+        </Box>
       </TabPanel>
 
       <TabPanel value={mainTabValue} index={1}>
@@ -607,129 +636,167 @@ const AdminDashboard: React.FC = () => {
       </TabPanel>
 
       <TabPanel value={mainTabValue} index={2}>
-        <Box sx={{ maxWidth: 600, mx: 'auto', display: 'flex', flexDirection: 'column', gap: 3 }}>
-          <Card>
-            <CardContent>
-              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                <Typography variant="h6">IP Security</Typography>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  startIcon={<Block />}
-                  onClick={() => setBlockDialogOpen(true)}
-                >
-                  Block IP
-                </Button>
-              </Box>
+        <Box sx={{ maxWidth: 1200, mx: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+              <SectionHeading>IP Security</SectionHeading>
+              <GovUkButton
+                variant="primary"
+                onClick={() => setBlockDialogOpen(true)}
+              >
+                Block IP
+              </GovUkButton>
+            </Box>
 
-              <TableContainer component={Paper}>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>IP Address</TableCell>
-                      <TableCell>Reason</TableCell>
-                      <TableCell>Blocked At</TableCell>
-                      <TableCell>Unblock At</TableCell>
-                      <TableCell>Failed Attempts</TableCell>
-                      <TableCell>Actions</TableCell>
+            {loading && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+                <CircularProgress />
+              </Box>
+            )}
+
+            <Box sx={{ mb: 4 }}>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell header={true}>IP Address</TableCell>
+                    <TableCell header={true}>Reason</TableCell>
+                    <TableCell header={true}>Blocked At</TableCell>
+                    <TableCell header={true}>Unblock At</TableCell>
+                    <TableCell header={true}>Failed Attempts</TableCell>
+                    <TableCell header={true}>Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {blockedIPs.map((ip) => (
+                    <TableRow key={ip.id}>
+                      <TableCell>{ip.ip || ip.hashedIP}</TableCell>
+                      <TableCell>{ip.reason}</TableCell>
+                      <TableCell>{new Date(ip.blockedAt).toLocaleString()}</TableCell>
+                      <TableCell>
+                        {ip.unblockAt ? new Date(ip.unblockAt).toLocaleString() : 'Never'}
+                      </TableCell>
+                      <TableCell>{ip.failedAttempts}</TableCell>
+                      <TableCell>
+                        <GovUkButton
+                          variant="warning"
+                          onClick={() => handleUnblockIP(ip.ip || ip.hashedIP)}
+                        >
+                          Unblock
+                        </GovUkButton>
+                      </TableCell>
                     </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {blockedIPs.map((ip) => (
-                      <TableRow key={ip.id}>
-                        <TableCell>{ip.ip || ip.hashedIP}</TableCell>
-                        <TableCell>{ip.reason}</TableCell>
-                        <TableCell>{new Date(ip.blockedAt).toLocaleString()}</TableCell>
-                        <TableCell>
-                          {ip.unblockAt ? new Date(ip.unblockAt).toLocaleString() : 'Never'}
-                        </TableCell>
-                        <TableCell>{ip.failedAttempts}</TableCell>
-                        <TableCell>
-                          <Tooltip title="Unblock IP">
-                            <IconButton
-                              size="small"
-                              color="error"
-                              onClick={() => handleUnblockIP(ip.ip || ip.hashedIP)}
-                            >
-                              <Delete />
-                            </IconButton>
-                          </Tooltip>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                <TablePagination
-                  component="div"
-                  count={total}
-                  page={page}
-                  onPageChange={handleChangePage}
-                  rowsPerPage={rowsPerPage}
-                  onRowsPerPageChange={handleChangeRowsPerPage}
-                />
-              </TableContainer>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h6" gutterBottom>
-                  Passkey Management
-                </Typography>
-              </Box>
+                  ))}
+                </TableBody>
+              </Table>
               
-              <Typography variant="body1" color="text.secondary" paragraph>
-                Passkeys provide a more secure way to authenticate without passwords. They use biometric authentication or device PIN.
-              </Typography>
-
-              {loadingPasskeys ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', my: 2 }}>
-                  <CircularProgress />
+              <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'flex-end', 
+                alignItems: 'center', 
+                mt: 2,
+                p: 2,
+                borderTop: '1px solid #b1b4b6'
+              }}>
+                <Box sx={{ mr: 2, color: '#0b0c0c' }}>
+                  Rows per page:
+                  <select
+                    value={rowsPerPage}
+                    onChange={(e) => handleChangeRowsPerPage({ target: { value: e.target.value } } as React.ChangeEvent<HTMLInputElement>)}
+                    style={{ 
+                      marginLeft: '8px',
+                      padding: '4px 8px',
+                      border: '2px solid #0b0c0c',
+                      backgroundColor: '#ffffff'
+                    }}
+                  >
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                  </select>
                 </Box>
-              ) : (
-                <>
-                  {passkeys.length > 0 && (
-                    <List>
-                      {passkeys.map((passkey, index) => (
-                        <React.Fragment key={passkey.id}>
-                          {index > 0 && <Divider />}
-                          <ListItem>
-                            <ListItemText
-                              primary={`Passkey ${index + 1}`}
-                              secondary={`Last used: ${new Date(passkey.lastUsed).toLocaleString()}`}
-                            />
-                            <ListItemSecondaryAction>
-                              <Tooltip title="Remove passkey">
-                                <IconButton
-                                  edge="end"
-                                  onClick={() => handleRemovePasskey(passkey.credentialId)}
-                                  disabled={loading}
-                                >
-                                  <Delete />
-                                </IconButton>
-                              </Tooltip>
-                            </ListItemSecondaryAction>
-                          </ListItem>
-                        </React.Fragment>
-                      ))}
-                    </List>
-                  )}
-                </>
-              )}
-            </CardContent>
-            <CardActions>
-              <Button
-                variant="contained"
-                color="primary"
-                startIcon={<Key />}
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Box sx={{ mr: 2, color: '#0b0c0c' }}>
+                    {page * rowsPerPage + 1}-{Math.min((page + 1) * rowsPerPage, total)} of {total}
+                  </Box>
+                  <GovUkButton
+                    variant="secondary"
+                    onClick={() => handleChangePage(null, page - 1)}
+                    disabled={page === 0}
+                  >
+                    Previous
+                  </GovUkButton>
+                  <GovUkButton
+                    variant="secondary"
+                    onClick={() => handleChangePage(null, page + 1)}
+                    disabled={page >= Math.ceil(total / rowsPerPage) - 1}
+                  >
+                    Next
+                  </GovUkButton>
+                </Box>
+              </Box>
+            </Box>
+          </Box>
+
+          <Box sx={{ borderTop: '1px solid #b1b4b6', pt: 6 }}>
+            <SectionHeading>Passkey Management</SectionHeading>
+            
+            <InsetText>
+              Passkeys provide a more secure way to authenticate without passwords. They use biometric authentication or device PIN.
+            </InsetText>
+
+            {loadingPasskeys ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : (
+              <>
+                {passkeys.length > 0 ? (
+                  <Box sx={{ mb: 4, border: '1px solid #b1b4b6' }}>
+                    <Table>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell header={true}>Passkey</TableCell>
+                          <TableCell header={true}>Last Used</TableCell>
+                          <TableCell header={true}>Actions</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {passkeys.map((passkey, index) => (
+                          <TableRow key={passkey.id}>
+                            <TableCell>Passkey {index + 1}</TableCell>
+                            <TableCell>{new Date(passkey.lastUsed).toLocaleString()}</TableCell>
+                            <TableCell>
+                              <GovUkButton
+                                variant="warning"
+                                onClick={() => handleRemovePasskey(passkey.credentialId)}
+                                disabled={loading}
+                              >
+                                Remove
+                              </GovUkButton>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </Box>
+                ) : (
+                  <WarningText>
+                    No passkeys registered. Register a passkey to enhance security.
+                  </WarningText>
+                )}
+              </>
+            )}
+            
+            <Box sx={{ mt: 4 }}>
+              <GovUkButton
+                variant="primary"
                 onClick={handleRegisterPasskey}
                 disabled={registering || loading}
               >
-                {registering ? 'Registering...' : 'Register New Passkey'}
-              </Button>
-            </CardActions>
-          </Card>
+                {registering ? <CircularProgress size={24} color="inherit" /> : 'Register New Passkey'}
+              </GovUkButton>
+            </Box>
+          </Box>
         </Box>
       </TabPanel>
 
@@ -782,17 +849,20 @@ const AdminDashboard: React.FC = () => {
           </FormControl>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleDialogClose} disabled={loading}>
+          <GovUkButton 
+            variant="secondary" 
+            onClick={handleDialogClose} 
+            disabled={loading}
+          >
             Cancel
-          </Button>
-          <Button 
+          </GovUkButton>
+          <GovUkButton 
+            variant="primary" 
             onClick={handleCreateRoom} 
-            variant="contained" 
-            color="primary" 
             disabled={loading || !newRoom.name || !newRoom.password}
           >
-            {loading ? <CircularProgress size={24} /> : 'Create'}
-          </Button>
+            {loading ? <CircularProgress size={24} color="inherit" /> : 'Create'}
+          </GovUkButton>
         </DialogActions>
       </Dialog>
 
@@ -801,6 +871,105 @@ const AdminDashboard: React.FC = () => {
         onClose={() => setBlockDialogOpen(false)}
         onBlock={handleBlockIP}
       />
+
+      <Dialog open={tokenDialogOpen} onClose={handleCloseTokenDialog} maxWidth="md" fullWidth>
+        <DialogTitle>Generate Token Links for {selectedRoom?.name}</DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            <TextField
+              label="Participant Name"
+              fullWidth
+              value={tokenName}
+              onChange={(e) => setTokenName(e.target.value)}
+              margin="normal"
+              placeholder="Enter participant name (optional)"
+            />
+            
+            <FormControl fullWidth margin="normal">
+              <InputLabel>Token Expiry</InputLabel>
+              <Select
+                value={tokenExpiry}
+                onChange={(e) => setTokenExpiry(e.target.value)}
+                label="Token Expiry"
+              >
+                <MenuItem value="1h">1 Hour</MenuItem>
+                <MenuItem value="6h">6 Hours</MenuItem>
+                <MenuItem value="12h">12 Hours</MenuItem>
+                <MenuItem value="1d">1 Day</MenuItem>
+                <MenuItem value="7d">7 Days</MenuItem>
+              </Select>
+            </FormControl>
+            
+            <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+              <GovUkButton
+                variant="primary"
+                onClick={() => handleGenerateToken(true)}
+                disabled={isGeneratingToken}
+              >
+                Generate Presenter Link
+              </GovUkButton>
+              
+              <GovUkButton
+                variant="secondary"
+                onClick={() => handleGenerateToken(false)}
+                disabled={isGeneratingToken}
+              >
+                Generate Guest Link
+              </GovUkButton>
+            </Box>
+            
+            {isGeneratingToken && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', my: 2 }}>
+                <CircularProgress />
+              </Box>
+            )}
+            
+            {generatedUrl && (
+              <Box sx={{ mt: 3, p: 2, bgcolor: '#f3f2f1', borderLeft: '5px solid #1d70b8' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <TextField
+                    fullWidth
+                    value={generatedUrl}
+                    InputProps={{ readOnly: true }}
+                    variant="outlined"
+                  />
+                  <Tooltip title="Copy link">
+                    <IconButton
+                      onClick={() => {
+                        navigator.clipboard.writeText(generatedUrl);
+                        setSuccess('Link copied to clipboard');
+                      }}
+                    >
+                      <ContentCopy />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Open in new tab">
+                    <IconButton
+                      component="a"
+                      href={generatedUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <OpenInNew />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+                <Box sx={{ mt: 2 }}>
+                  <InsetText>
+                    This is a one-time token link that will expire after {tokenExpiry}. 
+                    Share this link with the participant to give them access to the meeting.
+                  </InsetText>
+                </Box>
+              </Box>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <GovUkButton variant="secondary" onClick={handleCloseTokenDialog}>
+            Close
+          </GovUkButton>
+        </DialogActions>
+      </Dialog>
 
       {error && (
         <Snackbar open={!!error} autoHideDuration={6000} onClose={() => setError(null)}>
@@ -866,8 +1035,8 @@ function BlockIPDialog({ open, onClose, onBlock }: BlockIPDialogProps): JSX.Elem
         />
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button onClick={handleSubmit} disabled={!ip || !reason}>Block</Button>
+        <GovUkButton variant="secondary" onClick={onClose}>Cancel</GovUkButton>
+        <GovUkButton variant="primary" onClick={handleSubmit} disabled={!ip || !reason}>Block</GovUkButton>
       </DialogActions>
     </Dialog>
   );
