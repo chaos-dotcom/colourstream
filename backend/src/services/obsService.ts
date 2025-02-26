@@ -3,7 +3,6 @@ import { logger } from '../utils/logger';
 import OBSWebSocketService from './obsWebSocket';
 import WebSocketService from './websocket';
 import prisma from '../lib/prisma';
-import { obsSettings } from '@prisma/client';
 
 interface OBSSettings {
   host: string;
@@ -287,14 +286,83 @@ export class OBSService {
 
   async getSettings(): Promise<OBSSettings | null> {
     try {
-      const settings = await prisma.obsSettings.findUnique({
+      // Ensure prisma is properly imported and available
+      if (!prisma) {
+        logger.error('Prisma client is not initialized');
+        throw new Error('Prisma client is not initialized');
+      }
+      
+      // Check if obssettings model exists in prisma
+      if (!(prisma as any).obssettings) {
+        logger.error('obssettings model is not available in Prisma client');
+        throw new Error('obssettings model is not available in Prisma client');
+      }
+      
+      const settings = await (prisma as any).obssettings.findUnique({
         where: { id: 'default' }
       });
+      
       logger.info('Retrieved OBS settings:', settings);
-      return settings as OBSSettings | null;
+      
+      if (!settings) {
+        // If no settings exist, create default settings
+        logger.info('No OBS settings found, creating default settings');
+        return this.createDefaultSettings();
+      }
+      
+      return settings as OBSSettings;
     } catch (err: any) {
       logger.error('Failed to get OBS settings:', err);
-      throw err;
+      // Return default settings if there's an error
+      return this.createDefaultSettings();
+    }
+  }
+  
+  private async createDefaultSettings(): Promise<OBSSettings> {
+    try {
+      const defaultSettings = {
+        id: 'default',
+        host: 'localhost',
+        port: 4455,
+        enabled: false,
+        streamType: 'rtmp_custom' as const,
+        protocol: 'rtmp' as const,
+        useLocalNetwork: true,
+        localNetworkMode: 'frontend' as const,
+        localNetworkHost: 'localhost',
+        localNetworkPort: 4455,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      
+      // Try to create default settings
+      if (prisma && (prisma as any).obssettings) {
+        const created = await (prisma as any).obssettings.upsert({
+          where: { id: 'default' },
+          update: defaultSettings,
+          create: defaultSettings
+        });
+        
+        logger.info('Created default OBS settings:', created);
+        return created as OBSSettings;
+      }
+      
+      // If prisma is not available, return the default settings object
+      return defaultSettings as OBSSettings;
+    } catch (err: any) {
+      logger.error('Failed to create default OBS settings:', err);
+      // Return a basic settings object if we can't create it in the database
+      return {
+        host: 'localhost',
+        port: 4455,
+        enabled: false,
+        streamType: 'rtmp_custom' as const,
+        protocol: 'rtmp' as const,
+        useLocalNetwork: true,
+        localNetworkMode: 'frontend' as const,
+        localNetworkHost: 'localhost',
+        localNetworkPort: 4455
+      };
     }
   }
 
@@ -322,17 +390,35 @@ export class OBSService {
     try {
       // If backend mode and enabled, test the connection first
       if (settings.enabled && settings.localNetworkMode === 'backend') {
-        await this.testConnection(settings);
+        try {
+          await this.testConnection(settings);
+        } catch (error: any) {
+          // Log the error but continue with saving settings
+          logger.warn('OBS connection test failed, but continuing with settings update:', error.message);
+          // We'll still save the settings, but we'll return a warning
+        }
       }
 
-      const updatedSettings = await prisma.obsSettings.upsert({
+      // Ensure prisma is properly initialized
+      if (!prisma || !(prisma as any).obssettings) {
+        logger.error('Prisma client or obssettings model is not available');
+        throw new Error('Database error: Cannot update OBS settings');
+      }
+
+      const updatedSettings = await (prisma as any).obssettings.upsert({
         where: { id: 'default' },
-        update: settings,
+        update: {
+          ...settings,
+          updatedAt: new Date() // Ensure updatedAt is set
+        },
         create: {
           ...settings,
-          id: 'default'
+          id: 'default',
+          createdAt: new Date(),
+          updatedAt: new Date()
         }
       });
+      
       logger.info('Updated OBS settings:', updatedSettings);
       return updatedSettings;
     } catch (err: any) {

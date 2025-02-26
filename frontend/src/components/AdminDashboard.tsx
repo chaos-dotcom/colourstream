@@ -18,7 +18,10 @@ import {
   Tooltip,
   Container,
   Snackbar,
+  Typography,
+  Divider,
 } from '@mui/material';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { Delete, ContentCopy, Visibility, VisibilityOff, PlayArrow, OpenInNew, Link } from '@mui/icons-material';
 import { OBSSettings } from './settings/OBSSettings';
 import { OvenMediaConfig } from './OvenMediaConfig';
@@ -34,7 +37,24 @@ import {
   TableRow,
   TableCell
 } from './GovUkComponents';
-import { createRoom, getRooms, deleteRoom, cleanupExpiredRooms, Room, CreateRoomData, setOBSStreamKey, registerPasskey, PasskeyInfo, getPasskeys, removePasskey, adminLogout, stopOBSStream, generateMirotalkToken, TokenGenerationRequest } from '../utils/api';
+import { 
+  createRoom, 
+  getRooms, 
+  deleteRoom, 
+  cleanupExpiredRooms, 
+  Room, 
+  CreateRoomData, 
+  setOBSStreamKey, 
+  registerPasskey, 
+  PasskeyInfo, 
+  getPasskeys, 
+  removePasskey, 
+  adminLogout, 
+  stopOBSStream, 
+  generateMirotalkToken, 
+  TokenGenerationRequest,
+  getDefaultMiroTalkCredentials 
+} from '../utils/api';
 import { api } from '../utils/api';
 
 interface TabPanelProps {
@@ -95,7 +115,7 @@ const AdminDashboard: React.FC = () => {
   const [newRoom, setNewRoom] = useState<CreateRoomData>({
     name: '',
     password: '',
-    expiryDays: 30,
+    expiryDays: 30
   });
   const [registering, setRegistering] = useState(false);
   const [passkeys, setPasskeys] = useState<PasskeyInfo[]>([]);
@@ -111,6 +131,10 @@ const AdminDashboard: React.FC = () => {
   const [tokenExpiry, setTokenExpiry] = useState('1d');
   const [generatedUrl, setGeneratedUrl] = useState('');
   const [isGeneratingToken, setIsGeneratingToken] = useState(false);
+  const [defaultCredentials, setDefaultCredentials] = useState<{ username: string, password: string }>({
+    username: '',
+    password: ''
+  });
 
   const handleMainTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setMainTabValue(newValue);
@@ -138,8 +162,18 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleCopy = (text: string, type: string) => {
-    navigator.clipboard.writeText(text);
-    setSuccess(`${type} copied to clipboard`);
+    if (!text) {
+      setError(`Failed to copy ${type}: value is empty`);
+      return;
+    }
+    
+    try {
+      navigator.clipboard.writeText(text);
+      setSuccess(`${type} copied to clipboard`);
+    } catch (err) {
+      console.error('Copy failed:', err);
+      setError(`Failed to copy ${type} to clipboard`);
+    }
   };
 
   const fetchRooms = async () => {
@@ -159,27 +193,46 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    fetchRooms();
-  }, []);
+  const fetchPasskeys = async () => {
+    try {
+      setLoadingPasskeys(true);
+      const fetchedPasskeys = await getPasskeys();
+      setPasskeys(fetchedPasskeys);
+    } catch (error: any) {
+      setError(error.response?.data?.message || 'Failed to fetch passkeys');
+    } finally {
+      setLoadingPasskeys(false);
+    }
+  };
+
+  const fetchBlockedIPs = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get(`/security/blocked-ips?page=${page + 1}&limit=${rowsPerPage}`);
+      setBlockedIPs(response.data.data.blockedIPs);
+      setTotal(response.data.data.pagination.total);
+    } catch (error: any) {
+      setError(error.response?.data?.message || 'Failed to fetch blocked IPs');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchDefaultCredentials = async () => {
+    try {
+      const credentials = await getDefaultMiroTalkCredentials();
+      setDefaultCredentials(credentials);
+    } catch (error) {
+      console.error('Failed to fetch default credentials:', error);
+    }
+  };
 
   useEffect(() => {
-    const fetchPasskeys = async () => {
-      try {
-        setLoadingPasskeys(true);
-        const fetchedPasskeys = await getPasskeys();
-        setPasskeys(fetchedPasskeys);
-      } catch (error: any) {
-        setError(error.response?.data?.message || 'Failed to fetch passkeys');
-      } finally {
-        setLoadingPasskeys(false);
-      }
-    };
-    
-    if (mainTabValue === 3) {
-      fetchPasskeys();
-    }
-  }, [mainTabValue]);
+    fetchRooms();
+    fetchPasskeys();
+    fetchBlockedIPs();
+    fetchDefaultCredentials();
+  }, [page, rowsPerPage]);
 
   const handleCreateRoom = async () => {
     if (!newRoom.name || !newRoom.password) {
@@ -196,7 +249,7 @@ const AdminDashboard: React.FC = () => {
       setNewRoom({
         name: '',
         password: '',
-        expiryDays: 30,
+        expiryDays: 30
       });
       await fetchRooms();
     } catch (error: any) {
@@ -214,7 +267,7 @@ const AdminDashboard: React.FC = () => {
       setNewRoom({
         name: '',
         password: '',
-        expiryDays: 30,
+        expiryDays: 30
       });
     }
   };
@@ -327,25 +380,7 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const fetchBlockedIPs = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get(`/security/blocked-ips?page=${page + 1}&limit=${rowsPerPage}`);
-      setBlockedIPs(response.data.data.blockedIPs);
-      setTotal(response.data.data.pagination.total);
-    } catch (error: any) {
-      setError(error.response?.data?.message || 'Failed to fetch blocked IPs');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (mainTabValue === 3) {
-      fetchBlockedIPs();
-    }
-  }, [mainTabValue, page, rowsPerPage]);
-
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleOpenTokenDialog = (room: ExtendedRoom) => {
     setSelectedRoom(room);
     setTokenName('');
@@ -468,164 +503,223 @@ const AdminDashboard: React.FC = () => {
               mb: 4,
               border: '1px solid #b1b4b6'
             }}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell header={true}>Name</TableCell>
-                    <TableCell header={true}>Link</TableCell>
-                    <TableCell header={true}>Mirotalk Room ID</TableCell>
-                    <TableCell header={true}>Stream Key</TableCell>
-                    <TableCell header={true}>Password</TableCell>
-                    <TableCell header={true}>Expiry Date</TableCell>
-                    <TableCell header={true}>Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {rooms.map((room) => (
-                    <TableRow key={room.id}>
-                      <TableCell>{room.name}</TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Tooltip title="Copy link">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleCopy(`${window.location.origin}/room/${room.id}`, 'Room link')}
-                            >
-                              <ContentCopy fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Open in new tab">
-                            <IconButton
-                              size="small"
-                              component="a"
-                              href={`/room/${room.id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <OpenInNew fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          {visibleMirotalkIds[room.id] ? (
-                            <>
-                              {room.mirotalkRoomId}
+              <Box sx={{ p: 3, backgroundColor: '#f3f2f1', borderBottom: '1px solid #b1b4b6' }}>
+                <Typography variant="h6" gutterBottom>How Room Links Work</Typography>
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="body1">
+                    <strong>Guest Link:</strong> Share this link with viewers who only need to watch the stream.
+                  </Typography>
+                  <Typography variant="body1">
+                    <strong>Presenter Link:</strong> Share this link with presenters who need to control the stream and share their screen.
+                  </Typography>
+                  <Typography variant="body1" sx={{ mt: 1 }}>
+                    Both links automatically use the room's token with appropriate permissions. Users will be prompted to enter their name when they access the link.
+                  </Typography>
+                </Box>
+              </Box>
+              <Box sx={{ overflowX: 'auto', width: '100%' }}>
+                <Table sx={{ tableLayout: 'fixed', width: '100%', minWidth: '1200px' }}>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell header={true}>Name</TableCell>
+                      <TableCell header={true}>Guest Link</TableCell>
+                      <TableCell header={true}>Presenter Link</TableCell>
+                      <TableCell header={true}>Mirotalk Room ID</TableCell>
+                      <TableCell header={true} sx={{ minWidth: '300px' }}>Stream Key</TableCell>
+                      <TableCell header={true}>Password</TableCell>
+                      <TableCell header={true}>Expiry Date</TableCell>
+                      <TableCell header={true}>Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {rooms.map((room) => (
+                      <TableRow key={room.id}>
+                        <TableCell>{room.name}</TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Tooltip title="Copy guest link">
+                              <IconButton
+                                size="small"
+                                onClick={() => handleCopy(`${window.location.origin}/room/${room.id}`, 'Guest link')}
+                              >
+                                <ContentCopy fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Open guest link in new tab">
+                              <IconButton
+                                size="small"
+                                component="a"
+                                href={`/room/${room.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <OpenInNew fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Tooltip title="Copy presenter link">
+                              <IconButton
+                                size="small"
+                                onClick={() => handleCopy(`${window.location.origin}/room/${room.id}?access=p`, 'Presenter link')}
+                              >
+                                <ContentCopy fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Open presenter link in new tab">
+                              <IconButton
+                                size="small"
+                                component="a"
+                                href={`/room/${room.id}?access=p`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <OpenInNew fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            {visibleMirotalkIds[room.id] ? (
+                              <>
+                                {room.mirotalkRoomId}
+                                <IconButton
+                                  size="small"
+                                  onClick={() => toggleMirotalkIdVisibility(room.id)}
+                                >
+                                  <VisibilityOff fontSize="small" />
+                                </IconButton>
+                                <Tooltip title="Copy MiroTalk room ID">
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleCopy(room.mirotalkRoomId, 'MiroTalk room ID')}
+                                  >
+                                    <ContentCopy fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              </>
+                            ) : (
                               <IconButton
                                 size="small"
                                 onClick={() => toggleMirotalkIdVisibility(room.id)}
                               >
-                                <VisibilityOff fontSize="small" />
+                                <Visibility fontSize="small" />
                               </IconButton>
-                            </>
-                          ) : (
-                            <IconButton
-                              size="small"
-                              onClick={() => toggleMirotalkIdVisibility(room.id)}
-                            >
-                              <Visibility fontSize="small" />
-                            </IconButton>
-                          )}
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          {visibleStreamKeys[room.id] ? (
-                            <>
-                              {room.streamKey}
+                            )}
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, maxWidth: '300px' }}>
+                            {visibleStreamKeys[room.id] ? (
+                              <>
+                                <Typography 
+                                  component="span" 
+                                  sx={{ 
+                                    wordBreak: 'break-all', 
+                                    fontFamily: 'monospace',
+                                    fontSize: '0.875rem',
+                                    maxWidth: '250px',
+                                    overflowWrap: 'break-word'
+                                  }}
+                                >
+                                  {room.streamKey}
+                                </Typography>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => toggleStreamKeyVisibility(room.id)}
+                                >
+                                  <VisibilityOff fontSize="small" />
+                                </IconButton>
+                                <Tooltip title="Copy stream key">
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleCopy(room.streamKey, 'Stream key')}
+                                  >
+                                    <ContentCopy fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              </>
+                            ) : (
                               <IconButton
                                 size="small"
                                 onClick={() => toggleStreamKeyVisibility(room.id)}
                               >
-                                <VisibilityOff fontSize="small" />
+                                <Visibility fontSize="small" />
                               </IconButton>
-                              <Tooltip title="Copy stream key">
+                            )}
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            {visiblePasswords[room.id] ? (
+                              <>
+                                {room.displayPassword}
                                 <IconButton
                                   size="small"
-                                  onClick={() => handleCopy(room.streamKey, 'Stream key')}
+                                  onClick={() => togglePasswordVisibility(room.id)}
                                 >
-                                  <ContentCopy fontSize="small" />
+                                  <VisibilityOff fontSize="small" />
                                 </IconButton>
-                              </Tooltip>
-                            </>
-                          ) : (
-                            <IconButton
-                              size="small"
-                              onClick={() => toggleStreamKeyVisibility(room.id)}
-                            >
-                              <Visibility fontSize="small" />
-                            </IconButton>
-                          )}
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          {visiblePasswords[room.id] ? (
-                            <>
-                              {room.displayPassword}
+                                <Tooltip title="Copy password">
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleCopy(room.password, 'Password')}
+                                  >
+                                    <ContentCopy fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              </>
+                            ) : (
                               <IconButton
                                 size="small"
                                 onClick={() => togglePasswordVisibility(room.id)}
                               >
-                                <VisibilityOff fontSize="small" />
+                                <Visibility fontSize="small" />
                               </IconButton>
-                              <Tooltip title="Copy password">
-                                <IconButton
-                                  size="small"
-                                  onClick={() => handleCopy(room.displayPassword, 'Password')}
-                                >
-                                  <ContentCopy fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                            </>
-                          ) : (
-                            <IconButton
-                              size="small"
-                              onClick={() => togglePasswordVisibility(room.id)}
-                            >
-                              <Visibility fontSize="small" />
-                            </IconButton>
-                          )}
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        {room.expiryDate ? new Date(room.expiryDate).toLocaleString() : 'Never'}
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', gap: 1 }}>
-                          <Tooltip title="Go live">
-                            <IconButton
-                              size="small"
-                              color="primary"
-                              onClick={() => handleGoLive(room)}
-                            >
-                              <PlayArrow />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Delete room">
-                            <IconButton
-                              size="small"
-                              color="error"
-                              onClick={() => handleDeleteRoom(room.id)}
-                            >
-                              <Delete />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Generate Token Links">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleOpenTokenDialog(room)}
-                            >
-                              <Link fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                            )}
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          {room.expiryDate ? new Date(room.expiryDate).toLocaleString() : 'Never'}
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', gap: 1 }}>
+                            <Tooltip title="Go live">
+                              <IconButton
+                                size="small"
+                                color="primary"
+                                onClick={() => handleGoLive(room)}
+                              >
+                                <PlayArrow />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Delete room">
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => handleDeleteRoom(room.id)}
+                              >
+                                <Delete />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Generate Token Links">
+                              <IconButton
+                                size="small"
+                                onClick={() => handleOpenTokenDialog(room)}
+                              >
+                                <Link fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Box>
             </Box>
           </Box>
         </Box>
@@ -847,6 +941,14 @@ const AdminDashboard: React.FC = () => {
               <MenuItem value={180}>6 Months</MenuItem>
             </Select>
           </FormControl>
+          
+          <Divider sx={{ my: 2 }} />
+          <Typography variant="subtitle1" sx={{ mb: 1 }}>
+            MiroTalk Credentials
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
+            Using default credentials: {defaultCredentials.username}/{defaultCredentials.password}
+          </Typography>
         </DialogContent>
         <DialogActions>
           <GovUkButton 

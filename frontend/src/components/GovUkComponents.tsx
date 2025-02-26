@@ -489,9 +489,10 @@ export const SummaryList: React.FC<SummaryListProps> = ({ items }) => {
 interface TableProps {
   children: ReactNode;
   caption?: string;
+  sx?: object;
 }
 
-export const Table: React.FC<TableProps> = ({ children, caption }) => {
+export const Table: React.FC<TableProps> = ({ children, caption, sx = {} }) => {
   return (
     <Box
       component="table"
@@ -500,6 +501,7 @@ export const Table: React.FC<TableProps> = ({ children, caption }) => {
         borderCollapse: 'collapse',
         marginBottom: 4,
         fontFamily: '"GDS Transport", Arial, sans-serif',
+        ...sx
       }}
     >
       {caption && (
@@ -574,13 +576,15 @@ interface TableCellProps {
   header?: boolean;
   colSpan?: number;
   align?: 'left' | 'center' | 'right';
+  sx?: object;
 }
 
 export const TableCell: React.FC<TableCellProps> = ({ 
   children, 
   header = false, 
   colSpan,
-  align = 'left'
+  align = 'left',
+  sx = {}
 }) => {
   return (
     <Box
@@ -595,6 +599,7 @@ export const TableCell: React.FC<TableCellProps> = ({
         ...(header && {
           fontSize: '1rem',
         }),
+        ...sx
       }}
     >
       {children}

@@ -31,39 +31,133 @@ DOCKER COMPOSE FILE:
 - DECLARE HOSTNAME IN THE DOCKER COMPOSE FILE
 
 
-
-
-# Environment Variable Management Rule
-
+# Traefik Configuration Rule
+IF You need to break this rule, explain clearly and exactly why and wait for a confirmation 
 ## Purpose
-This rule ensures consistent management of environment variables across the ColourStream application.
+This rule ensures consistent Traefik routing configuration across the ColourStream application by using container labels instead of external Traefik configurations.
 
 ## Procedure
-1. Determine if the variable is used by multiple services:
-   - If YES: Add to global.env
-   - If NO: Add to the specific service's .env file
+1. Always use container labels in docker-compose.yml for Traefik routing:
+   - DO NOT use external Traefik configuration files (e.g., traefik.toml, traefik.yaml)
+   - DO USE DOCKER COMPOSE LABELS
+   - DO use service-level labels for all routing configuration
 
-2. When adding a variable to global.env:
-   - Place it in the appropriate section (Domain, Security, etc.)
-   - Add a descriptive comment if needed
-   - Use consistent naming conventions
-   - Use ${GLOBAL_VAR} syntax to reference global variables when needed
-   - Use Clear non generic, service specific names, e.g. JWT_SECRET is not clear, COLOURSTREAM_JWT_SECRET_KEY is clear
+2. Required label structure for Traefik routing:
+   - Define router rules using `traefik.http.routers.[service-name].rule`
+   - Define entrypoints using `traefik.http.routers.[service-name].entrypoints`
+   - Define TLS configuration using `traefik.http.routers.[service-name].tls`
+   - Define middlewares using `traefik.http.routers.[service-name].middlewares`
+   - Define services using `traefik.http.services.[service-name].loadbalancer.server.port`
 
-3. When adding a service-specific variable:
-   - Ensure it doesn't duplicate a global variable
-   - Use ${GLOBAL_VAR} syntax to reference global variables when needed
+3. Example of correct implementation:
+   ```yaml
+   services:
+     frontend:
+       # ... other configuration
+       labels:
+         - "traefik.enable=true"
+         - "traefik.http.routers.frontend.rule=Host(`app.colourstream.example.com`)"
+         - "traefik.http.routers.frontend.entrypoints=websecure"
+         - "traefik.http.routers.frontend.tls=true"
+         - "traefik.http.services.frontend.loadbalancer.server.port=3000"
+   ```
 
-4. When modifying docker-compose.yml:
-   - Always include both global.env and service-specific .env files
-   - List global.env first, then service-specific .env
+4. When adding a new service:
+   - Always include appropriate traefik labels
+   - Ensure unique router and service names
+   - Document the routing configuration in service comments
 
-5. After making environment variable changes:
-   - Validate with docker-compose config
-   - Rebuild affected containers with docker-compose up -d --build [service]
-   - Check logs for any environment-related errors
+5. When modifying existing services:
+   - Maintain the same label structure
+   - Update labels as needed for new routing requirements
+   - Test routing changes before deployment
 
-## Security Guidelines
-- Never commit sensitive values to version control
-- Use strong, unique values for security keys and secrets
-- Rotate security keys periodically
+## Benefits
+- Centralized configuration in docker-compose.yml
+- Easier maintenance and troubleshooting
+- Consistent deployment across environments
+- Better visibility of routing configuration
+- Simplified CI/CD pipeline
+
+
+
+# Casing and Naming Conventions Rule
+
+## Purpose
+This rule ensures consistent naming conventions across the ColourStream codebase, improving readability, maintainability, and reducing errors related to inconsistent casing.
+
+## General Principles
+- Be consistent within each file and across related files
+- Choose meaningful, descriptive names that indicate purpose
+- Avoid abbreviations unless they are widely understood
+- Prioritize readability over brevity
+
+## TypeScript/JavaScript Conventions
+
+### Variables and Functions
+- Use camelCase for variables, function names, method names, and instance properties
+  - Example: `getUserData`, `isAuthenticated`, `roomConfig`
+- Use PascalCase for class names, interfaces, types, and React components
+  - Example: `UserProfile`, `AuthService`, `RoomConfig`
+- Use UPPER_SNAKE_CASE for constants and environment variables
+  - Example: `MAX_RETRY_ATTEMPTS`, `API_BASE_URL`
+
+### Files and Directories
+- Use PascalCase for React component files
+  - Example: `AdminDashboard.tsx`, `ProtectedRoute.tsx`
+- Use camelCase for utility and service files
+  - Example: `api.ts`, `websocket.ts`
+- Use camelCase for directory names in the src folder
+  - Example: `components`, `utils`, `hooks`
+
+### React Components
+- Use PascalCase for component file names and the component itself
+  - Example: `UserProfile.tsx` contains `const UserProfile: React.FC = () => {...}`
+- Use camelCase for custom hooks, starting with "use"
+  - Example: `useAuth`, `useRoomData`
+
+## Database and Prisma Conventions
+
+### Model Names
+- Use mixed casing for model names in Prisma schema based on entity type:
+  - Use PascalCase for primary entities (e.g., `Room`, `WebAuthnCredential`)
+  - Use camelCase for configuration or settings entities (e.g., `obssettings`, `blockedIP`)
+- Ensure consistency between Prisma model names and their usage in code
+
+### Field Names
+- Use camelCase for field names in database models
+  - Example: `userId`, `createdAt`, `streamKey`
+- Use consistent naming patterns for related fields across models
+
+## API Conventions
+
+### Endpoints
+- Use kebab-case for API endpoints
+  - Example: `/api/user-profile`, `/api/room-settings`
+- Use RESTful naming conventions for CRUD operations
+
+### Request/Response Objects
+- Use PascalCase for interface/type names
+  - Example: `UserProfileResponse`, `RoomCreateRequest`
+- Use camelCase for properties within these objects
+  - Example: `{ userId: string, displayName: string }`
+
+## Implementation
+1. When creating new code:
+   - Follow these conventions from the start
+   - Reference existing code with consistent naming
+
+2. When modifying existing code:
+   - Match the existing style if it's consistent
+   - If inconsistent, consider refactoring for consistency
+   - Document any necessary deviations
+
+3. When refactoring for consistency:
+   - Make focused changes in a dedicated PR
+   - Update all references to renamed entities
+   - Test thoroughly to ensure no regressions
+
+## Exceptions
+- External libraries or frameworks may require different conventions
+- Legacy code may maintain its conventions until scheduled refactoring
+- Document any exceptions in comments for clarity

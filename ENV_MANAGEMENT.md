@@ -27,6 +27,23 @@ Each service has its own .env file with variables specific to that service:
 - **backend/.env**: Backend-specific variables
 - **mirotalk/.env**: MiroTalk-specific variables
 
+## Naming Convention
+
+Environment variables follow a specific naming convention to improve clarity and maintainability:
+
+### JWT Keys and Security Tokens
+
+JWT keys and security tokens follow the pattern: `{SOURCE}_{PURPOSE}_{DESTINATION}`
+
+Examples:
+- `COLOURSTREAM_AUTH_JWT_MIROTALK`: JWT key used by ColourStream for authenticating with MiroTalk
+- `MIROTALK_AUTH_JWT_INTERNAL`: JWT key used internally by MiroTalk for authentication
+
+This naming convention makes it clear:
+1. Where the key is coming from (SOURCE)
+2. What it's used for (PURPOSE)
+3. Where it's being used (DESTINATION)
+
 ## Docker Compose Configuration
 
 The `docker-compose.yml` file is configured to load both the global.env file and the service-specific .env file for each service:

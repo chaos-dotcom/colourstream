@@ -16,6 +16,7 @@ export type RoomCreateInput = {
   displayPassword: string;
   expiryDate: Date;
   link: string;
+  presenterLink?: string;
   mirotalkToken?: string;
 };
 
@@ -33,6 +34,7 @@ export type RoomSelect = {
   displayPassword?: boolean;
   expiryDate?: boolean;
   link?: boolean;
+  presenterLink?: boolean;
   mirotalkToken?: boolean;
   createdAt?: boolean;
 };
@@ -41,4 +43,5 @@ export type RoomValidationResponse = {
   mirotalkRoomId: string;
   streamKey: string;
   mirotalkToken?: string;
+  isPresenter?: boolean;
 }; 

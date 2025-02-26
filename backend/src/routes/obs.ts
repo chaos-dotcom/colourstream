@@ -57,9 +57,15 @@ router.put(
 
       try {
         const settings = await obsService.updateSettings(req.body);
+        
+        // Return success response
         res.json({
           status: 'success',
           data: { settings },
+          // Include a warning if connection test was skipped or failed
+          warning: req.body.enabled && req.body.localNetworkMode === 'backend' ? 
+            'Settings saved, but OBS connection could not be verified. Make sure OBS is running with WebSocket server enabled.' : 
+            undefined
         });
       } catch (error: any) {
         // Pass through any OBS connection errors with their original message

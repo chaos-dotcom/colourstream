@@ -3,19 +3,22 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.obsService = void 0;
+exports.OBSService = void 0;
 const obs_websocket_js_1 = __importDefault(require("obs-websocket-js"));
-const prisma_1 = __importDefault(require("../lib/prisma"));
 const logger_1 = require("../utils/logger");
+const obsWebSocket_1 = __importDefault(require("./obsWebSocket"));
+const prisma_1 = __importDefault(require("../lib/prisma"));
 class OBSService {
-    constructor() {
+    constructor(wsService) {
         this.isConnected = false;
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 5;
         this.reconnectTimeout = null;
         this.lastConnectionSettings = null;
+        this.wsService = wsService;
+        this.obsWebSocket = new obsWebSocket_1.default(wsService);
         this.obs = new obs_websocket_js_1.default();
-        this.rtmpServer = process.env.RTMP_SERVER_URL || 'rtmp://live.johnrogerscolour.co.uk/live';
+        this.rtmpServer = process.env.RTMP_SERVER_URL || 'rtmp://live.colourstream.johnrogerscolour.co.uk:1935/app';
         this.srtServer = process.env.SRT_SERVER_URL || 'srt://live.colourstream.johnrogerscolour.co.uk:9999';
         this.srtLatency = parseInt(process.env.SRT_LATENCY || '2000000', 10);
         logger_1.logger.info(`Initialized service with OME RTMP endpoint: ${this.rtmpServer}`);
@@ -243,15 +246,76 @@ class OBSService {
     }
     async getSettings() {
         try {
-            const settings = await prisma_1.default.obsSettings.findUnique({
+            // Ensure prisma is properly imported and available
+            if (!prisma_1.default) {
+                logger_1.logger.error('Prisma client is not initialized');
+                throw new Error('Prisma client is not initialized');
+            }
+            // Check if obssettings model exists in prisma
+            if (!prisma_1.default.obssettings) {
+                logger_1.logger.error('obssettings model is not available in Prisma client');
+                throw new Error('obssettings model is not available in Prisma client');
+            }
+            const settings = await prisma_1.default.obssettings.findUnique({
                 where: { id: 'default' }
             });
             logger_1.logger.info('Retrieved OBS settings:', settings);
+            if (!settings) {
+                // If no settings exist, create default settings
+                logger_1.logger.info('No OBS settings found, creating default settings');
+                return this.createDefaultSettings();
+            }
             return settings;
         }
         catch (err) {
             logger_1.logger.error('Failed to get OBS settings:', err);
-            throw err;
+            // Return default settings if there's an error
+            return this.createDefaultSettings();
+        }
+    }
+    async createDefaultSettings() {
+        try {
+            const defaultSettings = {
+                id: 'default',
+                host: 'localhost',
+                port: 4455,
+                enabled: false,
+                streamType: 'rtmp_custom',
+                protocol: 'rtmp',
+                useLocalNetwork: true,
+                localNetworkMode: 'frontend',
+                localNetworkHost: 'localhost',
+                localNetworkPort: 4455,
+                createdAt: new Date(),
+                updatedAt: new Date()
+            };
+            // Try to create default settings
+            if (prisma_1.default && prisma_1.default.obssettings) {
+                const created = await prisma_1.default.obssettings.upsert({
+                    where: { id: 'default' },
+                    update: defaultSettings,
+                    create: defaultSettings
+                });
+                logger_1.logger.info('Created default OBS settings:', created);
+                return created;
+            }
+            // If prisma is not available, return the default settings object
+            return defaultSettings;
+        }
+        catch (err) {
+            logger_1.logger.error('Failed to create default OBS settings:', err);
+            // Return a basic settings object if we can't create it in the database
+            return {
+                host: 'localhost',
+                port: 4455,
+                enabled: false,
+                streamType: 'rtmp_custom',
+                protocol: 'rtmp',
+                useLocalNetwork: true,
+                localNetworkMode: 'frontend',
+                localNetworkHost: 'localhost',
+                localNetworkPort: 4455
+            };
         }
     }
     async testConnection(settings) {
@@ -278,12 +342,22 @@ class OBSService {
             if (settings.enabled && settings.localNetworkMode === 'backend') {
                 await this.testConnection(settings);
             }
-            const updatedSettings = await prisma_1.default.obsSettings.upsert({
+            // Ensure prisma is properly initialized
+            if (!prisma_1.default || !prisma_1.default.obssettings) {
+                logger_1.logger.error('Prisma client or obssettings model is not available');
+                throw new Error('Database error: Cannot update OBS settings');
+            }
+            const updatedSettings = await prisma_1.default.obssettings.upsert({
                 where: { id: 'default' },
-                update: settings,
+                update: {
+                    ...settings,
+                    updatedAt: new Date() // Ensure updatedAt is set
+                },
                 create: {
                     ...settings,
-                    id: 'default'
+                    id: 'default',
+                    createdAt: new Date(),
+                    updatedAt: new Date()
                 }
             });
             logger_1.logger.info('Updated OBS settings:', updatedSettings);
@@ -294,5 +368,13 @@ class OBSService {
             throw err;
         }
     }
+    getWebSocketStatus() {
+        return this.obsWebSocket.getStatus();
+    }
+    cleanup() {
+        this.obsWebSocket.cleanup();
+    }
 }
-exports.obsService = new OBSService();
+exports.OBSService = OBSService;
+// Export the class only - the instance will be created in index.ts
+exports.default = OBSService;

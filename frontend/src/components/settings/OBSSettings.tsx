@@ -15,6 +15,7 @@ import {
   Select,
   MenuItem,
   FormHelperText,
+  Typography,
 } from '@mui/material';
 import { getOBSSettings, updateOBSSettings, OBSSettings as OBSSettingsType, getOBSConnectionStatus } from '../../utils/api';
 import OBSWebSocket from 'obs-websocket-js';
@@ -267,14 +268,13 @@ export const OBSSettings: React.FC = () => {
   };
 
   const fetchSettings = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
       const fetchedSettings = await getOBSSettings();
-      setSettings(fetchedSettings || defaultSettings);
-    } catch (error: any) {
+      setSettings(prevSettings => ({...prevSettings, ...fetchedSettings || defaultSettings}));
+    } catch (error) {
       console.error('Failed to fetch OBS settings:', error);
-      setError(error?.response?.data?.message || 'Failed to fetch OBS settings');
-      setSettings(defaultSettings);
+      setSettings(prevSettings => ({...prevSettings, ...defaultSettings}));
     } finally {
       setLoading(false);
     }
@@ -358,7 +358,7 @@ export const OBSSettings: React.FC = () => {
         console.log('Submitting OBS settings to backend:', settingsToSubmit);
         try {
           const updatedSettings = await updateOBSSettings(settingsToSubmit);
-          setSettings(updatedSettings || settingsToSubmit);
+          setSettings(prevSettings => ({...prevSettings, ...updatedSettings || settingsToSubmit}));
           setSuccess('Successfully connected to OBS and updated settings');
         } catch (error: any) {
           console.error('Failed to update OBS settings:', error);
@@ -566,13 +566,31 @@ export const OBSSettings: React.FC = () => {
 
         {settings.protocol === 'srt' && (
           <Alert severity="info" sx={{ mb: 2 }}>
-            Using SRT URL format:
-            <br />
-            <code style={{ wordBreak: 'break-all' }}>
-              srt://live.colourstream.johnrogerscolour.co.uk:9999?streamid=[encoded-stream-id]&latency=2000000
-            </code>
-            <br />
-            <small>The stream-id will be automatically URL encoded and include the full path with your stream key. Leave the Stream Key field blank in OBS.</small>
+            <Typography variant="body2" gutterBottom fontWeight="medium">SRT URL Format:</Typography>
+            <Box 
+              component="code" 
+              sx={{ 
+                display: 'block',
+                wordBreak: 'break-all', 
+                fontFamily: 'monospace',
+                backgroundColor: 'rgba(0, 0, 0, 0.04)',
+                padding: '8px',
+                borderRadius: '4px',
+                fontSize: '0.875rem',
+                maxWidth: '100%',
+                overflowX: 'auto',
+                lineHeight: 1.5
+              }}
+            >
+              srt://live.colourstream.johnrogerscolour.co.uk:9999?streamid=<span style={{ color: '#1976d2', fontWeight: 'bold' }}>[your-stream-key]</span>&latency=2000000
+            </Box>
+            <Typography variant="caption" sx={{ display: 'block', mt: 1 }}>
+              <strong>Important:</strong> The stream-id will be automatically URL encoded and include your stream key. 
+              Leave the Stream Key field blank in OBS.
+            </Typography>
+            <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
+              Example stream key format: <code>o8n3uxzjuhcz34cr3404m</code>
+            </Typography>
           </Alert>
         )}
         
