@@ -135,13 +135,33 @@ router.post('/webauthn/register/verify', authenticateToken, async (req: Request,
         throw new AppError(400, 'This passkey is already registered');
       }
 
+      // Ensure transports is stored as a valid JSON string
+      let transportsJson = null;
+      if (req.body.response.transports) {
+        // If it's already an array, stringify it
+        if (Array.isArray(req.body.response.transports)) {
+          transportsJson = JSON.stringify(req.body.response.transports);
+        } 
+        // If it's a string but not JSON, convert it to an array and stringify
+        else if (typeof req.body.response.transports === 'string') {
+          try {
+            // Try parsing it first in case it's already JSON
+            JSON.parse(req.body.response.transports);
+            transportsJson = req.body.response.transports;
+          } catch (e) {
+            // If parsing fails, treat it as a single transport
+            transportsJson = JSON.stringify([req.body.response.transports]);
+          }
+        }
+      }
+
       await prisma.webAuthnCredential.create({
         data: {
           credentialId: credentialIdString,
           publicKey: publicKeyString,
           counter: counter,
           userId: 'admin',
-          transports: req.body.response.transports ? JSON.stringify(req.body.response.transports) : null
+          transports: transportsJson
         }
       });
 
@@ -177,11 +197,29 @@ router.post('/webauthn/authenticate', async (req: Request, res: Response, next: 
 
     const options = await generateAuthenticationOptions({
       rpID,
-      allowCredentials: credentials.map(cred => ({
-        id: base64url.toBuffer(cred.credentialId),
-        type: 'public-key' as const,
-        transports: cred.transports ? JSON.parse(cred.transports) : undefined,
-      })),
+      allowCredentials: credentials.map(cred => {
+        let transports;
+        try {
+          transports = cred.transports ? JSON.parse(cred.transports) : undefined;
+        } catch (error: any) {
+          logger.warn(`Failed to parse transports for credential ${cred.id}: ${error.message}`);
+          // If parsing fails, try to handle common cases
+          if (cred.transports === 'internal') {
+            transports = ['internal'];
+          } else if (cred.transports) {
+            // Try to split by comma if it's a comma-separated string
+            transports = cred.transports.split(',').map(t => t.trim());
+          } else {
+            transports = undefined;
+          }
+        }
+        
+        return {
+          id: base64url.toBuffer(cred.credentialId),
+          type: 'public-key' as const,
+          transports,
+        };
+      }),
       userVerification: 'preferred',
     });
 
@@ -252,6 +290,143 @@ router.post('/webauthn/authenticate/verify', async (req: Request, res: Response,
     next(error);
   } finally {
     currentChallenge = undefined;
+  }
+});
+
+// First-time setup registration endpoint (no auth required)
+router.post('/webauthn/first-time-setup', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    logger.info('Starting first-time setup passkey registration process', {
+      userAgent: req.headers['user-agent'],
+      ip: req.ip
+    });
+
+    // Only allow registration if no credentials exist yet
+    const existingCredentials = await prisma.webAuthnCredential.findMany({
+      where: { userId: 'admin' }
+    });
+
+    if (existingCredentials.length > 0) {
+      throw new AppError(400, 'Setup already completed. Use regular registration endpoint.');
+    }
+
+    // Generate registration options
+    const options = await generateRegistrationOptions({
+      rpName,
+      rpID,
+      userID: 'admin',
+      userName: 'Administrator',
+      attestationType: 'none',
+      authenticatorSelection: {
+        residentKey: 'preferred',
+        userVerification: 'preferred',
+        authenticatorAttachment: 'platform',
+      },
+    });
+
+    // Store challenge for verification
+    currentChallenge = options.challenge;
+
+    res.json(options);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// First-time setup verification endpoint (no auth required)
+router.post('/webauthn/first-time-setup/verify', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    logger.info('Verifying first-time setup passkey registration', {
+      userAgent: req.headers['user-agent'],
+      ip: req.ip
+    });
+
+    // Only allow verification if no credentials exist yet
+    const existingCredentials = await prisma.webAuthnCredential.findMany({
+      where: { userId: 'admin' }
+    });
+
+    if (existingCredentials.length > 0) {
+      throw new AppError(400, 'Setup already completed. Use regular registration endpoint.');
+    }
+
+    if (!currentChallenge) {
+      throw new AppError(400, 'Registration session expired');
+    }
+
+    // Verify the registration response
+    const verification = await verifyRegistrationResponse({
+      response: req.body,
+      expectedChallenge: currentChallenge,
+      expectedOrigin: origin,
+      expectedRPID: rpID,
+    });
+
+    if (!verification.verified) {
+      throw new AppError(400, 'Passkey verification failed');
+    }
+
+    // Store the credential in the database
+    const { credentialID, credentialPublicKey, counter } = verification.registrationInfo!;
+
+    // Ensure transports is stored as a valid JSON string
+    let transportsJson = null;
+    if (req.body.response.transports) {
+      // If it's already an array, stringify it
+      if (Array.isArray(req.body.response.transports)) {
+        transportsJson = JSON.stringify(req.body.response.transports);
+      } 
+      // If it's a string but not JSON, convert it to an array and stringify
+      else if (typeof req.body.response.transports === 'string') {
+        try {
+          // Try parsing it first in case it's already JSON
+          JSON.parse(req.body.response.transports);
+          transportsJson = req.body.response.transports;
+        } catch (e) {
+          // If parsing fails, treat it as a single transport
+          transportsJson = JSON.stringify([req.body.response.transports]);
+        }
+      }
+    }
+
+    const credential = await prisma.webAuthnCredential.create({
+      data: {
+        userId: 'admin',
+        credentialId: uint8ArrayToBase64url(credentialID),
+        publicKey: uint8ArrayToBase64url(credentialPublicKey),
+        counter: counter,
+        transports: transportsJson,
+        createdAt: new Date(),
+        lastUsed: new Date(),
+      },
+    });
+
+    // Clear the challenge
+    currentChallenge = undefined;
+
+    // Generate a token for the admin user
+    const token = jwt.sign(
+      { userId: 'admin', type: 'admin' },
+      process.env.COLOURSTREAM_JWT_SECRET!,
+      { expiresIn: '7d' }
+    );
+
+    logger.info('First-time setup passkey registered successfully');
+
+    res.json({
+      status: 'success',
+      data: {
+        verified: true,
+        message: 'First-time setup completed successfully',
+        credential: {
+          id: credential.id,
+          createdAt: credential.createdAt,
+        },
+        token,
+      },
+    });
+  } catch (error) {
+    next(error);
   }
 });
 

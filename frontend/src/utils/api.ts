@@ -102,6 +102,19 @@ export interface OBSConnectionStatus {
   error?: string;
 }
 
+export interface TokenGenerationRequest {
+  roomId: string;
+  name: string;
+  isPresenter: boolean;
+  expireTime?: string;
+}
+
+export interface TokenGenerationResponse {
+  url: string;
+  token: string;
+  expiresIn: number;
+}
+
 export const adminLogin = async (password: string): Promise<ApiResponse<AuthResponse>> => {
   const response = await api.post('/auth/login', { password });
   const result = response.data as ApiResponse<AuthResponse>;
@@ -173,6 +186,31 @@ export const stopOBSStream = async (): Promise<void> => {
 export const checkSetupRequired = async (): Promise<ApiResponse<SetupStatus>> => {
   const response = await api.get('/auth/setup-required');
   return response.data;
+};
+
+export const firstTimeSetup = async (): Promise<any> => {
+  try {
+    const response = await api.post('/auth/webauthn/first-time-setup');
+    const options = response.data as WebAuthnRegistrationOptions;
+    
+    const credential = await startRegistration(options) as WebAuthnRegistrationResponse;
+    const verificationResponse = await api.post('/auth/webauthn/first-time-setup/verify', credential);
+    
+    // Set the token from the response
+    if (verificationResponse.data?.data?.token) {
+      localStorage.setItem('adminToken', verificationResponse.data.data.token);
+      localStorage.setItem('isAdminAuthenticated', 'true');
+    }
+    
+    return verificationResponse.data;
+  } catch (error: any) {
+    if (error.name === 'NotAllowedError') {
+      throw new Error('User declined to register passkey');
+    } else if (error.response?.status === 400 && error.response.data?.message?.includes('Setup already completed')) {
+      throw new Error('Setup already completed. Please use the login page.');
+    }
+    throw error;
+  }
 };
 
 export const registerPasskey = async (): Promise<any> => {
@@ -270,4 +308,11 @@ export const getOBSConnectionStatus = async (): Promise<OBSConnectionStatus> => 
   const response = await api.get('/obs/status');
   const result = response.data as ApiResponse<OBSConnectionStatus>;
   return result.data;
+};
+
+export const generateMirotalkToken = async (
+  request: TokenGenerationRequest
+): Promise<ApiResponse<TokenGenerationResponse>> => {
+  const response = await api.post('/mirotalk/generate-token', request);
+  return response.data as ApiResponse<TokenGenerationResponse>;
 }; 

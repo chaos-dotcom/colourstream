@@ -76,7 +76,7 @@ const AdminLogin: React.FC = () => {
       <Container component="main" maxWidth="md">
         <Box sx={{ mt: 6 }}>
           <PageHeading>Admin Login</PageHeading>
-          <Paper sx={{ p: 4, backgroundColor: '#f3f2f1', borderRadius: 0 }}>
+          <Paper sx={{ p: 4, backgroundColor: '#ffffff', borderRadius: 0 }}>
             <WarningText>
               Your device or browser does not support passkey authentication.
             </WarningText>
@@ -105,7 +105,7 @@ const AdminLogin: React.FC = () => {
           </Box>
         )}
 
-        <Paper sx={{ p: 4, backgroundColor: '#f3f2f1', borderRadius: 0, mb: 4 }}>
+        <Paper sx={{ p: 4, backgroundColor: '#ffffff', borderRadius: 0, mb: 4 }}>
           <Typography variant="body1" sx={{ mb: 4 }}>
             Sign in to the admin dashboard using your registered passkey.
           </Typography>

@@ -1,6 +1,15 @@
 db-data
+data
 node_modules
-.env
+.   
+ssl
+# Environment Variables
+global.env
+backend/.env
+frontend/.env
+mirotalk/.env
+ovenmediaengine/.env
+# Certificates
 certs
 certs/certs
 certs/private
@@ -8,4 +17,4 @@ certs/acme.json
 certs/chain.pem
 certs/fullchain.pem
 certs/privkey.pem
-certs/extract_certs.sh
+node_modules

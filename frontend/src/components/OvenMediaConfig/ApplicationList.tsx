@@ -1,27 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import {
-    Accordion,
-    AccordionSummary,
-    AccordionDetails,
-    Typography,
     Box,
     CircularProgress,
     Alert,
-    Tabs,
-    Tab,
+    Chip,
 } from '@mui/material';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { OvenMediaEngineApi, OvenStatistics } from '../../lib/oven-api';
+import { Table, TableHead, TableBody, TableRow, TableCell } from '../GovUkComponents';
 
 interface ApplicationListProps {
     api: OvenMediaEngineApi;
     vhost: string;
-}
-
-interface TabPanelProps {
-    children?: React.ReactNode;
-    index: number;
-    value: number;
 }
 
 interface AppData {
@@ -30,21 +19,6 @@ interface AppData {
     stats?: OvenStatistics;
     error?: string;
     loading: boolean;
-}
-
-function TabPanel(props: TabPanelProps) {
-    const { children, value, index, ...other } = props;
-    return (
-        <div
-            role="tabpanel"
-            hidden={value !== index}
-            id={`simple-tabpanel-${index}`}
-            aria-labelledby={`simple-tab-${index}`}
-            {...other}
-        >
-            {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
-        </div>
-    );
 }
 
 const formatBytes = (bytes: number): string => {
@@ -59,8 +33,6 @@ export const ApplicationList: React.FC<ApplicationListProps> = ({ api, vhost }) 
     const [apps, setApps] = useState<AppData[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [expanded, setExpanded] = useState<string | false>(false);
-    const [tabValue, setTabValue] = useState(0);
 
     useEffect(() => {
         loadApplications();
@@ -68,18 +40,33 @@ export const ApplicationList: React.FC<ApplicationListProps> = ({ api, vhost }) 
 
     const loadApplications = async () => {
         try {
+            setLoading(true);
             const applications = await api.getApplications(vhost);
-            console.log('Received applications:', applications); // Debug log
+            console.log('Received applications:', applications);
             
             // Ensure each application has the correct structure
             const formattedApps = applications.map(app => ({
                 name: typeof app === 'string' ? app : app.name,
                 type: typeof app === 'string' ? 'default' : (app.type || 'default'),
-                loading: false
+                loading: true
             }));
             
-            console.log('Formatted applications:', formattedApps); // Debug log
             setApps(formattedApps);
+            
+            // Load stats for all applications in parallel
+            const statsPromises = formattedApps.map(async (app) => {
+                try {
+                    const stats = await api.getApplicationStats(vhost, app.name);
+                    return { ...app, stats, loading: false };
+                } catch (err: any) {
+                    console.error(`Error loading stats for ${app.name}:`, err);
+                    const errorMessage = err.response?.data?.message || err.message || 'Failed to load statistics';
+                    return { ...app, error: errorMessage, loading: false };
+                }
+            });
+            
+            const appsWithStats = await Promise.all(statsPromises);
+            setApps(appsWithStats);
             setError(null);
         } catch (err) {
             setError('Failed to load applications');
@@ -89,138 +76,107 @@ export const ApplicationList: React.FC<ApplicationListProps> = ({ api, vhost }) 
         }
     };
 
-    const handleAccordionChange = (app: AppData) => async (_event: React.SyntheticEvent, isExpanded: boolean) => {
-        console.log('handleAccordionChange called with:', { app, vhost, isExpanded }); // Debug log
-
-        // Ensure app is an object with a name property
-        const appName = typeof app === 'string' ? app : app.name;
-        
-        if (!appName) {
-            console.error('App name is missing:', app);
-            return;
-        }
-        if (!vhost) {
-            console.error('Vhost is missing:', vhost);
-            return;
-        }
-
-        setExpanded(isExpanded ? appName : false);
-        
-        if (isExpanded) {
-            const appIndex = apps.findIndex(a => a.name === appName);
-            if (appIndex === -1) {
-                console.error('App not found in apps array:', app);
-                return;
-            }
-
-            // Skip if stats already loaded
-            if (apps[appIndex].stats) {
-                console.log('Stats already loaded for:', appName);
-                return;
-            }
-
-            // Set loading state
-            setApps(prev => prev.map(a => 
-                a.name === appName ? { ...a, loading: true, error: undefined } : a
-            ));
-
-            try {
-                console.log('Fetching stats for:', { vhost, appName });
-                const stats = await api.getApplicationStats(vhost, appName);
-                console.log('Received stats:', stats); // Debug log
-                
-                setApps(prev => prev.map(a => 
-                    a.name === appName ? { ...a, stats, loading: false } : a
-                ));
-            } catch (err: any) {
-                console.error('Error fetching stats:', { 
-                    error: err, 
-                    response: err.response,
-                    app: appName, 
-                    vhost 
-                });
-                
-                const errorMessage = err.response?.data?.message || err.message || 'Failed to load statistics';
-                setApps(prev => prev.map(a => 
-                    a.name === appName ? { ...a, error: errorMessage, loading: false } : a
-                ));
-            }
-        }
-    };
-
-    const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
-        setTabValue(newValue);
-    };
-
-    if (loading) {
+    if (loading && apps.length === 0) {
         return <CircularProgress />;
     }
 
-    if (error) {
+    if (error && apps.length === 0) {
         return <Alert severity="error">{error}</Alert>;
     }
 
     return (
-        <Box>
-            {apps.map(app => (
-                <Accordion
-                    key={app.name}
-                    expanded={expanded === app.name}
-                    onChange={handleAccordionChange(app)}
-                >
-                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                        <Typography sx={{ width: '33%', flexShrink: 0 }}>
-                            {app.name} ({app.type})
-                        </Typography>
-                        {app.loading ? (
-                            <CircularProgress size={20} />
-                        ) : app.stats ? (
-                            <Typography sx={{ color: 'text.secondary' }}>
-                                Connections: {app.stats.totalConnections} | 
-                                Throughput In: {formatBytes(app.stats.lastThroughputIn)}/s | 
-                                Out: {formatBytes(app.stats.lastThroughputOut)}/s
-                            </Typography>
-                        ) : null}
-                    </AccordionSummary>
-                    <AccordionDetails>
-                        {app.error ? (
-                            <Alert severity="error">{app.error}</Alert>
-                        ) : (
-                            <Box>
-                                <Tabs value={tabValue} onChange={handleTabChange}>
-                                    <Tab label="Statistics" />
-                                    <Tab label="Connections" />
-                                </Tabs>
-                                <TabPanel value={tabValue} index={0}>
-                                    {app.stats && (
-                                        <Box>
-                                            <Typography variant="h6">Throughput</Typography>
-                                            <Typography>
-                                                Input: {formatBytes(app.stats.lastThroughputIn)}/s
-                                            </Typography>
-                                            <Typography>
-                                                Output: {formatBytes(app.stats.lastThroughputOut)}/s
-                                            </Typography>
-                                        </Box>
+        <Box sx={{ border: '1px solid #b1b4b6', mb: 3 }}>
+            <Box sx={{ p: 2, backgroundColor: '#f3f2f1', borderBottom: '1px solid #b1b4b6' }}>
+                <Box sx={{ fontWeight: 700, fontSize: '1.125rem' }}>
+                    {vhost} Applications
+                </Box>
+            </Box>
+            
+            <Box sx={{ p: 2 }}>
+                <Table>
+                    <TableHead>
+                        <TableRow>
+                            <TableCell header>Application</TableCell>
+                            <TableCell header>Type</TableCell>
+                            <TableCell header>Connections</TableCell>
+                            <TableCell header>Throughput In/Out</TableCell>
+                            <TableCell header>Connection Types</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {apps.map(app => (
+                            <TableRow key={app.name}>
+                                <TableCell>
+                                    <Box sx={{ fontWeight: 600 }}>
+                                        {app.name}
+                                    </Box>
+                                </TableCell>
+                                <TableCell>{app.type}</TableCell>
+                                <TableCell>
+                                    {app.loading ? (
+                                        <CircularProgress size={20} />
+                                    ) : app.error ? (
+                                        <Box sx={{ color: '#d4351c' }}>Error</Box>
+                                    ) : app.stats ? (
+                                        app.stats.totalConnections
+                                    ) : (
+                                        'N/A'
                                     )}
-                                </TabPanel>
-                                <TabPanel value={tabValue} index={1}>
-                                    {app.stats && (
+                                </TableCell>
+                                <TableCell>
+                                    {app.loading ? (
+                                        <CircularProgress size={20} />
+                                    ) : app.error ? (
+                                        <Box sx={{ color: '#d4351c' }}>Error</Box>
+                                    ) : app.stats ? (
                                         <Box>
-                                            <Typography variant="h6">Connection Types</Typography>
+                                            <Box>In: {formatBytes(app.stats.lastThroughputIn)}/s</Box>
+                                            <Box>Out: {formatBytes(app.stats.lastThroughputOut)}/s</Box>
+                                        </Box>
+                                    ) : (
+                                        'N/A'
+                                    )}
+                                </TableCell>
+                                <TableCell>
+                                    {app.loading ? (
+                                        <CircularProgress size={20} />
+                                    ) : app.error ? (
+                                        <Box sx={{ color: '#d4351c' }}>Error</Box>
+                                    ) : app.stats ? (
+                                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                                             {Object.entries(app.stats.connections).map(([type, count]) => (
-                                                <Typography key={type}>
-                                                    {type}: {count}
-                                                </Typography>
+                                                count > 0 && (
+                                                    <Chip 
+                                                        key={`${app.name}-${type}`}
+                                                        label={`${type}: ${count}`}
+                                                        size="small"
+                                                        sx={{ 
+                                                            backgroundColor: '#1d70b8', 
+                                                            color: 'white',
+                                                            fontWeight: 600
+                                                        }}
+                                                    />
+                                                )
                                             ))}
+                                            {Object.values(app.stats.connections).every(count => count === 0) && (
+                                                <Box sx={{ color: '#505a5f' }}>No active connections</Box>
+                                            )}
                                         </Box>
+                                    ) : (
+                                        'N/A'
                                     )}
-                                </TabPanel>
-                            </Box>
-                        )}
-                    </AccordionDetails>
-                </Accordion>
-            ))}
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+                
+                {apps.map(app => app.error && (
+                    <Alert severity="error" sx={{ mt: 2 }} key={`${app.name}-error`}>
+                        Error loading stats for {app.name}: {app.error}
+                    </Alert>
+                ))}
+            </Box>
         </Box>
     );
 }; 

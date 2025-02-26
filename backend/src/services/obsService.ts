@@ -36,7 +36,7 @@ export class OBSService {
     this.wsService = wsService;
     this.obsWebSocket = new OBSWebSocketService(wsService);
     this.obs = new OBSWebSocket();
-    this.rtmpServer = process.env.RTMP_SERVER_URL || 'rtmp://live.johnrogerscolour.co.uk/live';
+    this.rtmpServer = process.env.RTMP_SERVER_URL || 'rtmp://live.colourstream.johnrogerscolour.co.uk:1935/app';
     this.srtServer = process.env.SRT_SERVER_URL || 'srt://live.colourstream.johnrogerscolour.co.uk:9999';
     this.srtLatency = parseInt(process.env.SRT_LATENCY || '2000000', 10);
     

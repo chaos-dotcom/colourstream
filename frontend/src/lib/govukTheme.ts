@@ -57,7 +57,7 @@ const govukTheme = createTheme({
       contrastText: govukColors.black,
     },
     background: {
-      default: govukColors.lightGrey,
+      default: govukColors.white,
       paper: govukColors.white,
     },
     text: {

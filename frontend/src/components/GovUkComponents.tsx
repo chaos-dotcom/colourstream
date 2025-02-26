@@ -69,7 +69,7 @@ export const SectionHeading: React.FC<SectionHeadingProps> = ({ children }) => {
 interface ButtonProps {
   children: ReactNode;
   onClick?: () => void;
-  variant?: 'primary' | 'secondary' | 'warning';
+  variant?: 'primary' | 'secondary' | 'warning' | 'grey' | 'purple';
   disabled?: boolean;
   type?: 'button' | 'submit' | 'reset';
   fullWidth?: boolean;
@@ -93,14 +93,26 @@ export const Button: React.FC<ButtonProps> = ({
         };
       case 'secondary':
         return {
-          bg: '#f3f2f1',
-          hoverBg: '#dbdad9',
+          bg: '#ffffff',
+          hoverBg: '#f3f2f1',
           color: '#0b0c0c'
         };
       case 'warning':
         return {
           bg: '#d4351c',
           hoverBg: '#aa2a16',
+          color: '#ffffff'
+        };
+      case 'grey':
+        return {
+          bg: '#505a5f',
+          hoverBg: '#383f43',
+          color: '#ffffff'
+        };
+      case 'purple':
+        return {
+          bg: '#4c2c92',
+          hoverBg: '#3e2376',
           color: '#ffffff'
         };
       default:
@@ -277,7 +289,7 @@ export const InsetText: React.FC<InsetTextProps> = ({ children }) => {
         borderLeft: '10px solid #b1b4b6',
         padding: '15px',
         marginBottom: 3,
-        backgroundColor: '#f3f2f1',
+        backgroundColor: '#ffffff',
       }}
     >
       <Typography variant="body1">{children}</Typography>
@@ -469,6 +481,123 @@ export const SummaryList: React.FC<SummaryListProps> = ({ items }) => {
           )}
         </Box>
       ))}
+    </Box>
+  );
+};
+
+// GOV.UK styled table
+interface TableProps {
+  children: ReactNode;
+  caption?: string;
+}
+
+export const Table: React.FC<TableProps> = ({ children, caption }) => {
+  return (
+    <Box
+      component="table"
+      sx={{
+        width: '100%',
+        borderCollapse: 'collapse',
+        marginBottom: 4,
+        fontFamily: '"GDS Transport", Arial, sans-serif',
+      }}
+    >
+      {caption && (
+        <Box
+          component="caption"
+          sx={{
+            fontSize: '1.125rem',
+            fontWeight: 700,
+            textAlign: 'left',
+            marginBottom: 2,
+            color: '#0b0c0c',
+          }}
+        >
+          {caption}
+        </Box>
+      )}
+      {children}
+    </Box>
+  );
+};
+
+interface TableHeadProps {
+  children: ReactNode;
+}
+
+export const TableHead: React.FC<TableHeadProps> = ({ children }) => {
+  return (
+    <Box
+      component="thead"
+      sx={{
+        backgroundColor: '#f3f2f1',
+      }}
+    >
+      {children}
+    </Box>
+  );
+};
+
+interface TableBodyProps {
+  children: ReactNode;
+}
+
+export const TableBody: React.FC<TableBodyProps> = ({ children }) => {
+  return <Box component="tbody">{children}</Box>;
+};
+
+interface TableRowProps {
+  children: ReactNode;
+  onClick?: () => void;
+  selected?: boolean;
+}
+
+export const TableRow: React.FC<TableRowProps> = ({ children, onClick, selected }) => {
+  return (
+    <Box
+      component="tr"
+      onClick={onClick}
+      sx={{
+        cursor: onClick ? 'pointer' : 'default',
+        backgroundColor: selected ? '#e6f3ff' : 'inherit',
+        '&:hover': onClick ? { backgroundColor: '#f8f8f8' } : {},
+        borderBottom: '1px solid #b1b4b6',
+      }}
+    >
+      {children}
+    </Box>
+  );
+};
+
+interface TableCellProps {
+  children: ReactNode;
+  header?: boolean;
+  colSpan?: number;
+  align?: 'left' | 'center' | 'right';
+}
+
+export const TableCell: React.FC<TableCellProps> = ({ 
+  children, 
+  header = false, 
+  colSpan,
+  align = 'left'
+}) => {
+  return (
+    <Box
+      component={header ? 'th' : 'td'}
+      colSpan={colSpan}
+      sx={{
+        padding: '0.75rem 1rem',
+        textAlign: align,
+        borderBottom: header ? '1px solid #b1b4b6' : 'none',
+        fontWeight: header ? 700 : 400,
+        color: '#0b0c0c',
+        ...(header && {
+          fontSize: '1rem',
+        }),
+      }}
+    >
+      {children}
     </Box>
   );
 }; 

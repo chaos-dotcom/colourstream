@@ -8,7 +8,7 @@ import {
   Paper,
 } from '@mui/material';
 import KeyIcon from '@mui/icons-material/Key';
-import { registerPasskey } from '../utils/api';
+import { firstTimeSetup } from '../utils/api';
 import { useNavigate } from 'react-router-dom';
 
 const FirstTimeSetup: React.FC = () => {
@@ -21,10 +21,10 @@ const FirstTimeSetup: React.FC = () => {
     setLoading(true);
 
     try {
-      const result = await registerPasskey();
-      if (result.verified) {
+      const result = await firstTimeSetup();
+      if (result.data.verified) {
         localStorage.setItem('isAdminAuthenticated', 'true');
-        navigate('/admin');
+        navigate('/admin/dashboard');
       }
     } catch (error: any) {
       setError(error.message || 'Failed to set up passkey');

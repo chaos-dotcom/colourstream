@@ -16,7 +16,7 @@ const Login: React.FC = () => {
         // Check if user is already authenticated
         const isAuthenticated = localStorage.getItem('isAdminAuthenticated') === 'true';
         if (isAuthenticated) {
-          navigate('/admin');
+          navigate('/admin/dashboard');
           return;
         }
 

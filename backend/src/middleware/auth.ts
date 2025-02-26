@@ -20,7 +20,7 @@ export const verifyToken = async (token: string): Promise<JwtPayload> => {
   try {
     const decoded = jwt.verify(
       token,
-      process.env.JWT_SECRET!
+      process.env.COLOURSTREAM_JWT_SECRET!
     ) as JwtPayload;
     return decoded;
   } catch (error) {

@@ -14,3 +14,56 @@ FRONTEND CHANGE VERIFICATION RULE:
    - For Docker deployments, which this repository is, run the following command to rebuild the frontend container:
      * Rebuild the frontend container: `docker-compose up -d --build frontend`
      * Check container logs for any errors
+
+
+DOCKER COMPOSE FILE:
+- DECLARE ENV FILES IN THE DOCKER COMPOSE FILE
+- DECLARE ENV VARIABLES IN THE ENV FILES
+- DECLARE NETWORK IN THE DOCKER COMPOSE FILE
+- DECLARE LABELS IN THE DOCKER COMPOSE FILE
+- DECLARE VOLUMES IN THE DOCKER COMPOSE FILE
+- DECLARE SERVICES IN THE DOCKER COMPOSE FILE
+- DECLARE TRAEFIK IN THE DOCKER COMPOSE FILE
+- DECLARE BUILD IN THE DOCKER COMPOSE FILE
+- DECLARE RESTART IN THE DOCKER COMPOSE FILE
+- DECLARE EXPOSE IN THE DOCKER COMPOSE FILE
+- DECLARE PORTS IN THE DOCKER COMPOSE FILE
+- DECLARE HOSTNAME IN THE DOCKER COMPOSE FILE
+
+
+
+
+# Environment Variable Management Rule
+
+## Purpose
+This rule ensures consistent management of environment variables across the ColourStream application.
+
+## Procedure
+1. Determine if the variable is used by multiple services:
+   - If YES: Add to global.env
+   - If NO: Add to the specific service's .env file
+
+2. When adding a variable to global.env:
+   - Place it in the appropriate section (Domain, Security, etc.)
+   - Add a descriptive comment if needed
+   - Use consistent naming conventions
+   - Use ${GLOBAL_VAR} syntax to reference global variables when needed
+   - Use Clear non generic, service specific names, e.g. JWT_SECRET is not clear, COLOURSTREAM_JWT_SECRET_KEY is clear
+
+3. When adding a service-specific variable:
+   - Ensure it doesn't duplicate a global variable
+   - Use ${GLOBAL_VAR} syntax to reference global variables when needed
+
+4. When modifying docker-compose.yml:
+   - Always include both global.env and service-specific .env files
+   - List global.env first, then service-specific .env
+
+5. After making environment variable changes:
+   - Validate with docker-compose config
+   - Rebuild affected containers with docker-compose up -d --build [service]
+   - Check logs for any environment-related errors
+
+## Security Guidelines
+- Never commit sensitive values to version control
+- Use strong, unique values for security keys and secrets
+- Rotate security keys periodically
