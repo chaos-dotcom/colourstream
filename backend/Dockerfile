@@ -24,8 +24,8 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install curl for debugging
-RUN apk add --no-cache curl
+# Install curl for debugging and PostgreSQL client for migrations and netcat for wait script
+RUN apk add --no-cache curl postgresql-client netcat-openbsd
 
 # Copy package files and install production dependencies
 COPY package*.json ./
@@ -34,15 +34,21 @@ COPY package*.json ./
 COPY prisma ./prisma/
 RUN npm ci --production
 
-# Generate Prisma client in production
-RUN npx prisma generate
-
-# Copy built files and Prisma client
+# Copy built files from builder stage
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
-# Create data directory and set permissions
-RUN mkdir -p /app/data && chown -R node:node /app && chmod -R 777 /app
+# Create directories with appropriate permissions
+RUN mkdir -p /app/data /app/uploads /app/logs \
+    && chown -R node:node /app/data /app/uploads /app/logs \
+    && chmod 755 /app \
+    && chmod 755 /app/prisma \
+    && chmod 755 /app/dist \
+    && chmod 755 /app/node_modules \
+    && chmod 775 /app/data \
+    && chmod 775 /app/uploads \
+    && chmod 775 /app/logs
 
 # Copy entrypoint script and set permissions
 COPY --chown=node:node docker-entrypoint.sh /app/

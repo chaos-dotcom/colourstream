@@ -31,8 +31,24 @@ function bigIntToNumber(value) {
     }
     return number;
 }
-// Initialize OIDC on startup
-(0, oidc_1.initializeOIDC)().catch(error => {
+// Initialize OIDC from environment variables first, then fall back to database config
+(0, oidc_1.initializeOIDCFromEnv)()
+    .then(success => {
+    if (!success) {
+        // If environment initialization fails, try database initialization
+        return (0, oidc_1.initializeOIDC)();
+    }
+    return success;
+})
+    .then(success => {
+    if (success) {
+        logger_1.logger.info('OIDC initialized successfully');
+    }
+    else {
+        logger_1.logger.warn('OIDC initialization failed, authentication will be limited to passkeys');
+    }
+})
+    .catch(error => {
     logger_1.logger.error('Failed to initialize OIDC', error);
 });
 // OIDC configuration endpoint
@@ -85,6 +101,10 @@ router.post('/oidc/config', async (req, res, next) => {
 router.get('/oidc/login', async (req, res, next) => {
     try {
         const redirectUrl = req.query.redirectUrl;
+        // Ensure redirectUrl is provided
+        if (!redirectUrl) {
+            throw new errorHandler_1.AppError(400, 'Missing redirectUrl parameter');
+        }
         const authUrlData = await (0, oidc_1.getAuthorizationUrl)(redirectUrl);
         if (!authUrlData) {
             throw new errorHandler_1.AppError(500, 'OIDC is not configured or initialized');
