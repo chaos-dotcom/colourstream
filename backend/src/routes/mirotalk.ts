@@ -8,7 +8,7 @@ import prisma from '../lib/prisma';
 
 const router = express.Router();
 
-type StringValue = string & { __brand: 'StringValue' };
+type StringValue = string & { __brand: '_StringValue' };
 
 interface MiroTalkJoinRequest {
   room: string;
@@ -364,7 +364,7 @@ router.post('/generate-token', authenticateToken, async (req: Request<{}, {}, Ge
 });
 
 // Add a new endpoint to get default MiroTalk credentials
-router.get('/default-credentials', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
+router.get('/default-credentials', authenticateToken, async (_req: Request, res: Response, next: NextFunction) => {
   try {
     // Default values if environment variable is not set or cannot be parsed
     let defaultCredentials = {

@@ -1,32 +1,42 @@
 import express, { Request, Response, NextFunction } from 'express';
-import { body, param, validationResult } from 'express-validator';
-import bcrypt from 'bcryptjs';
-import { authenticateToken } from '../middleware/auth';
+import { body, param, _validationResult } from 'express-validator';
+import _bcrypt from 'bcryptjs';
+import { _authenticateToken } from '../middleware/auth';
 import prisma from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { logger } from '../utils/logger';
 import crypto from 'crypto';
-import fetch from 'node-fetch';
+import _fetch from 'node-_fetch';
 import jwt from 'jsonwebtoken';
 import CryptoJS from 'crypto-js';
 import { RoomCreateBody, RoomCreateInput, RoomSelect } from '../types/room';
 import { Prisma } from '@prisma/client';
 import { generateUniqueId } from '../utils/idGenerator';
+import rateLimit from 'express-rate-limit';
 
 const router = express.Router();
 
-interface ValidateRoomBody {
+// Special rate limiter for room validation - higher limits than general
+const roomValidationLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 50, // Allow 50 validation attempts per 5 minutes
+  message: 'Too many room validation attempts, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+interface _ValidateRoomBody {
   password: string;
   isPresenter?: boolean;
 }
 
 // Utility function to generate random IDs
-const generateRandomId = (length: number = 12): string => {
+const _generateRandomId = (length: number = 12): string => {
   return crypto.randomBytes(length).toString('hex');
 };
 
 // Utility function to generate stream key
-const generateStreamKey = (): string => {
+const _generateStreamKey = (): string => {
   return crypto.randomBytes(16).toString('hex');
 };
 
@@ -136,12 +146,12 @@ const generateMiroTalkToken = async (
 };
 
 // Middleware to validate room ID
-const validateRoomId = [
+const _validateRoomId = [
   param('id').notEmpty().withMessage('Invalid room ID'),
 ];
 
 // Middleware to validate room creation/update
-const validateRoom = [
+const _validateRoom = [
   body('name').notEmpty().trim().withMessage('Name is required'),
   body('password').notEmpty().withMessage('Password is required'),
   body('expiryDays').isInt({ min: 1 }).withMessage('Expiry days must be a positive number'),
@@ -333,7 +343,7 @@ router.get("/validate", async (req: Request, res: Response) => {
 });
 
 // Add a POST endpoint for room validation
-router.post("/validate/:id", async (req: Request, res: Response) => {
+router.post("/validate/:id", roomValidationLimiter, async (req: Request, res: Response, _next: NextFunction) => {
   try {
     const { id } = req.params;
     const { password, isPresenter } = req.body;

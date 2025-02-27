@@ -1,164 +1,195 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
-  Button,
   TextField,
-  Alert,
-  CircularProgress,
-  Switch,
   FormControlLabel,
-  RadioGroup,
-  Radio,
+  Switch,
+  CircularProgress,
+  Alert,
+  Snackbar,
+  Grid,
+  Paper,
   FormControl,
-  FormLabel,
   InputLabel,
   Select,
   MenuItem,
-  FormHelperText,
-  Typography,
 } from '@mui/material';
-import { getOBSSettings, updateOBSSettings, OBSSettings as OBSSettingsType, getOBSConnectionStatus } from '../../utils/api';
-import OBSWebSocket from 'obs-websocket-js';
-import { SectionHeading } from '../GovUkComponents';
+import { getOBSSettings, updateOBSSettings, getOBSConnectionStatus } from '../../utils/api';
+import { SectionHeading, InsetText, Button } from '../GovUkComponents';
+
+// Updated OBS Settings interface to match backend
+interface OBSSettingsType {
+  host: string;
+  port: number;
+  password?: string;
+  enabled: boolean;
+  streamType: 'rtmp_custom';
+  protocol?: 'rtmp' | 'srt';
+  srtUrl?: string;
+}
 
 const defaultSettings: OBSSettingsType = {
-  host: 'localhost',
+  host: '192.168.69.186',
   port: 4455,
-  password: '',
+  password: '123456',
   enabled: false,
   streamType: 'rtmp_custom',
-  protocol: 'rtmp',
-  useLocalNetwork: true,
-  localNetworkMode: 'frontend',
-  localNetworkHost: 'localhost',
-  localNetworkPort: 4455,
-  srtUrl: undefined
+  protocol: 'rtmp'
 };
 
 export const OBSSettings: React.FC = () => {
   const [settings, setSettings] = useState<OBSSettingsType>(defaultSettings);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [obsInstance, setObsInstance] = useState<OBSWebSocket | null>(null);
+  const [loading, setLoading] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connected' | 'connecting' | 'error'>('disconnected');
   const [lastError, setLastError] = useState<string | null>(null);
   const [backendWebSocket, setBackendWebSocket] = useState<WebSocket | null>(null);
+  const wsReconnectTimeout = useRef<number | null>(null);
+  const wsConnectionAttempts = useRef<number>(0);
+  const MAX_RECONNECT_ATTEMPTS = 3;
 
   useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        setLoading(true);
+        const fetchedSettings = await getOBSSettings();
+        if (fetchedSettings) {
+          // Map the fetched settings to our structure, ensuring all required fields are present
+          setSettings({
+            host: fetchedSettings.host || '192.168.69.186',
+            port: fetchedSettings.port || 4455,
+            password: fetchedSettings.password || '',
+            enabled: fetchedSettings.enabled || false,
+            streamType: 'rtmp_custom',
+            protocol: fetchedSettings.protocol || 'rtmp',
+            srtUrl: fetchedSettings.srtUrl
+          });
+        }
+      } catch (error: any) {
+        setError(error.response?.data?.message || 'Failed to fetch OBS settings');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchSettings();
+    
+    // Cleanup function to clear any timeouts
     return () => {
-      cleanupConnections();
+      if (wsReconnectTimeout.current) {
+        window.clearTimeout(wsReconnectTimeout.current);
+      }
     };
   }, []);
 
   // Add effect to handle backend WebSocket connection
   useEffect(() => {
     const setupBackendWebSocket = () => {
-      if (settings.localNetworkMode === 'backend' && settings.enabled) {
-        const token = localStorage.getItem('adminToken');
-        if (!token) {
-          console.error('No admin token found');
-          return;
-        }
-
-        // Get the base URL from the environment or window location
-        const apiUrl = import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.host}/api`;
-        console.log('API URL:', apiUrl);
-        
-        // Convert HTTP(S) to WS(S)
-        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        console.log('WebSocket protocol:', wsProtocol);
-        
-        // Parse the API URL to extract host and path
-        let wsBaseUrl = '';
-        try {
-          // Handle both full URLs and relative paths
-          if (apiUrl.startsWith('http')) {
-            const apiUrlObj = new URL(apiUrl);
-            wsBaseUrl = apiUrlObj.host + apiUrlObj.pathname.replace(/\/+$/, '');
-            console.log('Parsed API URL object:', {
-              host: apiUrlObj.host,
-              pathname: apiUrlObj.pathname,
-              protocol: apiUrlObj.protocol
-            });
-          } else {
-            wsBaseUrl = window.location.host + apiUrl.replace(/\/+$/, '');
-            console.log('Using window.location.host:', window.location.host);
-          }
-          
-          console.log('Initial wsBaseUrl:', wsBaseUrl);
-          
-          // Remove 'api' from the end if it exists to get the base path
-          wsBaseUrl = wsBaseUrl.replace(/\/api$/, '');
-          console.log('Final wsBaseUrl after removing /api:', wsBaseUrl);
-          
-          const wsUrl = `${wsProtocol}//${wsBaseUrl}/api/ws/obs-status?token=${token}`;
-          console.log('Connecting to WebSocket URL:', wsUrl);
-
-          // Close any existing connection before creating a new one
-          if (backendWebSocket && backendWebSocket.readyState === WebSocket.OPEN) {
-            console.log('Closing existing WebSocket connection');
-            backendWebSocket.close();
-          }
-
-          console.log('Creating new WebSocket connection');
-          const ws = new WebSocket(wsUrl);
-
-          ws.onopen = () => {
-            console.log('Backend WebSocket connected successfully');
-            setBackendWebSocket(ws);
-          };
-
-          ws.onmessage = (event) => {
-            try {
-              console.log('Received WebSocket message:', event.data);
-              const data = JSON.parse(event.data);
-              if (data.type === 'obs_status') {
-                console.log('Updating connection status to:', data.status);
-                setConnectionStatus(data.status);
-                if (data.error) {
-                  setLastError(data.error);
-                  setError(`OBS Connection Error: ${data.error}`);
-                } else {
-                  setLastError(null);
-                  setError(null);
-                }
-              }
-            } catch (error) {
-              console.error('Failed to parse WebSocket message:', error);
-            }
-          };
-
-          ws.onerror = (error) => {
-            console.error('Backend WebSocket error:', error);
-            setConnectionStatus('error');
-            setError('Failed to connect to backend WebSocket');
-          };
-
-          ws.onclose = (event) => {
-            console.log('Backend WebSocket closed:', {
-              code: event.code,
-              reason: event.reason,
-              wasClean: event.wasClean
-            });
-            setBackendWebSocket(null);
-            // Only attempt to reconnect if the connection was not closed intentionally
-            // and if we're still in backend mode with OBS enabled
-            if (settings.enabled && settings.localNetworkMode === 'backend') {
-              console.log('Scheduling WebSocket reconnection in 5 seconds');
-              setTimeout(setupBackendWebSocket, 5000);
-            }
-          };
-        } catch (error) {
-          console.error('Error setting up WebSocket connection:', error);
-          setError(`WebSocket connection error: ${error instanceof Error ? error.message : String(error)}`);
-        }
-      } else if (backendWebSocket) {
-        // Clean up existing connection if OBS is disabled or mode changed
-        console.log('Closing WebSocket connection due to settings change');
+      // Reset connection attempts when settings change
+      wsConnectionAttempts.current = 0;
+      
+      // Clear any existing reconnect timeout
+      if (wsReconnectTimeout.current) {
+        window.clearTimeout(wsReconnectTimeout.current);
+        wsReconnectTimeout.current = null;
+      }
+      
+      // Close any existing connection
+      if (backendWebSocket && backendWebSocket.readyState === WebSocket.OPEN) {
+        console.log('Closing existing WebSocket connection');
         backendWebSocket.close();
         setBackendWebSocket(null);
+      }
+      
+      if (!settings.enabled) {
+        console.log('OBS integration is disabled, not connecting WebSocket');
+        return;
+      }
+      
+      const token = localStorage.getItem('adminToken');
+      if (!token) {
+        console.error('No admin token found');
+        setError('Authentication error: No admin token found');
+        return;
+      }
+
+      // Don't attempt to reconnect if we've exceeded the maximum attempts
+      if (wsConnectionAttempts.current >= MAX_RECONNECT_ATTEMPTS) {
+        console.warn(`Maximum reconnection attempts (${MAX_RECONNECT_ATTEMPTS}) reached, stopping reconnection`);
+        setError(`Failed to establish a stable WebSocket connection after ${MAX_RECONNECT_ATTEMPTS} attempts. Please check your network and try again.`);
+        return;
+      }
+      
+      wsConnectionAttempts.current++;
+      console.log(`WebSocket connection attempt ${wsConnectionAttempts.current} of ${MAX_RECONNECT_ATTEMPTS}`);
+
+      try {
+        // Simplify the WebSocket URL construction
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const host = window.location.host;
+        const wsUrl = `${wsProtocol}//${host}/api/ws/obs-status?token=${token}`;
+        console.log('Connecting to WebSocket URL:', wsUrl);
+
+        setConnectionStatus('connecting');
+        const ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+          console.log('Backend WebSocket connected successfully');
+          setBackendWebSocket(ws);
+          setError(null); // Clear any previous errors
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            console.log('Received WebSocket message:', event.data);
+            const data = JSON.parse(event.data);
+            if (data.type === 'obs_status') {
+              console.log('Updating connection status to:', data.status);
+              setConnectionStatus(data.status);
+              if (data.error) {
+                setLastError(data.error);
+                setError(`OBS Connection Error: ${data.error}`);
+              } else {
+                setLastError(null);
+                setError(null);
+              }
+            }
+          } catch (error) {
+            console.error('Failed to parse WebSocket message:', error);
+          }
+        };
+
+        ws.onerror = (error) => {
+          console.error('Backend WebSocket error:', error);
+          setConnectionStatus('error');
+          setError('Failed to connect to backend WebSocket');
+        };
+
+        ws.onclose = (event) => {
+          console.log('Backend WebSocket closed:', {
+            code: event.code,
+            reason: event.reason,
+            wasClean: event.wasClean
+          });
+          
+          setBackendWebSocket(null);
+          
+          // Only attempt to reconnect if the connection was not closed intentionally
+          // and we haven't exceeded the maximum attempts
+          if (settings.enabled && wsConnectionAttempts.current < MAX_RECONNECT_ATTEMPTS) {
+            const delay = Math.min(1000 * Math.pow(2, wsConnectionAttempts.current), 10000);
+            console.log(`Scheduling WebSocket reconnection in ${delay}ms`);
+            
+            wsReconnectTimeout.current = window.setTimeout(() => {
+              setupBackendWebSocket();
+            }, delay);
+          }
+        };
+      } catch (error) {
+        console.error('Error setting up WebSocket connection:', error);
+        setError(`WebSocket connection error: ${error instanceof Error ? error.message : String(error)}`);
+        setConnectionStatus('error');
       }
     };
 
@@ -171,13 +202,17 @@ export const OBSSettings: React.FC = () => {
         backendWebSocket.close();
         setBackendWebSocket(null);
       }
+      
+      if (wsReconnectTimeout.current) {
+        window.clearTimeout(wsReconnectTimeout.current);
+      }
     };
-  }, [settings.localNetworkMode, settings.enabled, backendWebSocket, setConnectionStatus, setLastError, setError, setBackendWebSocket]);
+  }, [settings.enabled]); // Only re-run when enabled state changes
 
-  // Add effect to fetch initial connection status for backend mode
+  // Add effect to fetch initial connection status
   useEffect(() => {
     const fetchConnectionStatus = async () => {
-      if (settings.localNetworkMode === 'backend' && settings.enabled) {
+      if (settings.enabled) {
         try {
           const status = await getOBSConnectionStatus();
           setConnectionStatus(status.status);
@@ -194,119 +229,7 @@ export const OBSSettings: React.FC = () => {
     };
 
     fetchConnectionStatus();
-  }, [settings.localNetworkMode, settings.enabled]);
-
-  const cleanupConnections = () => {
-    cleanupOBSConnection();
-    if (backendWebSocket) {
-      backendWebSocket.close();
-      setBackendWebSocket(null);
-    }
-  };
-
-  const cleanupOBSConnection = () => {
-    if (obsInstance) {
-      try {
-        obsInstance.disconnect();
-        setObsInstance(null);
-        setConnectionStatus('disconnected');
-      } catch (error) {
-        console.error('Error during cleanup:', error);
-      }
-    }
-  };
-
-  const setupOBSEventHandlers = (obs: OBSWebSocket) => {
-    obs.on('Hello', (data) => {
-      console.log('Received Hello from OBS:', data);
-    });
-
-    obs.on('Identified', () => {
-      if (settings.localNetworkMode === 'frontend') {
-        setConnectionStatus('connected');
-        setError(null);
-        setSuccess('Connected to OBS successfully');
-      }
-    });
-
-    obs.on('ConnectionOpened', () => {
-      console.log('WebSocket connection opened');
-    });
-
-    obs.on('ConnectionClosed', () => {
-      if (settings.localNetworkMode === 'frontend') {
-        setConnectionStatus('disconnected');
-        if (lastError) {
-          setError(`Connection closed: ${lastError}`);
-        }
-      }
-    });
-
-    obs.on('ConnectionError', (err: Error) => {
-      if (settings.localNetworkMode === 'frontend') {
-        setConnectionStatus('error');
-        setLastError(err.message);
-        setError(`Connection error: ${err.message}`);
-      }
-    });
-
-    // Add periodic connection check only for frontend mode
-    const checkInterval = setInterval(async () => {
-      if (obs && connectionStatus === 'connected' && settings.localNetworkMode === 'frontend') {
-        try {
-          const { obsVersion } = await obs.call('GetVersion');
-          console.debug('Connection check successful - OBS version:', obsVersion);
-        } catch (error) {
-          setConnectionStatus('error');
-          setError('Lost connection to OBS');
-          cleanupOBSConnection();
-        }
-      }
-    }, 30000);
-
-    return () => clearInterval(checkInterval);
-  };
-
-  const fetchSettings = async () => {
-    setLoading(true);
-    try {
-      const fetchedSettings = await getOBSSettings();
-      setSettings(prevSettings => ({...prevSettings, ...fetchedSettings || defaultSettings}));
-    } catch (error) {
-      console.error('Failed to fetch OBS settings:', error);
-      setSettings(prevSettings => ({...prevSettings, ...defaultSettings}));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const testFrontendConnection = async (settingsToTest: OBSSettingsType) => {
-    try {
-      setConnectionStatus('connecting');
-      const obs = new OBSWebSocket();
-      
-      // Setup event handlers before connecting
-      setupOBSEventHandlers(obs);
-      
-      // Try to connect with proper identification
-      await obs.connect(
-        `ws://${settingsToTest.localNetworkHost}:${settingsToTest.localNetworkPort}`,
-        settingsToTest.password,
-        {
-          eventSubscriptions: 0xFFFFFFFF, // Subscribe to all events
-          rpcVersion: 1
-        }
-      );
-      
-      setObsInstance(obs);
-      return true;
-    } catch (error: any) {
-      setConnectionStatus('error');
-      setLastError(error.message);
-      console.error('Failed to connect to OBS:', error);
-      throw new Error(`Failed to connect to OBS: ${error.message}`);
-    }
-  };
+  }, [settings.enabled]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -319,58 +242,36 @@ export const OBSSettings: React.FC = () => {
     setLoading(true);
 
     try {
-      // Create a clean settings object
+      // Create a clean settings object with all required properties
       const settingsToSubmit: OBSSettingsType = {
-        host: settings.localNetworkHost || 'localhost',
-        port: settings.localNetworkPort || 4455,
+        host: settings.host || '192.168.69.186',
+        port: settings.port || 4455,
         enabled: settings.enabled,
-        streamType: 'rtmp_custom',  // Always rtmp_custom for OBS
-        protocol: settings.protocol || 'rtmp',  // Track actual protocol separately
-        useLocalNetwork: true,
-        localNetworkMode: settings.localNetworkMode || 'frontend',
+        streamType: 'rtmp_custom',
+        protocol: settings.protocol || 'rtmp',
         ...(settings.password ? { password: settings.password } : {}),
-        ...(settings.localNetworkHost ? { localNetworkHost: settings.localNetworkHost } : {}),
-        ...(settings.localNetworkPort ? { localNetworkPort: settings.localNetworkPort } : {}),
         ...(settings.srtUrl ? { srtUrl: settings.srtUrl } : {})
       };
 
-      if (settings.localNetworkMode === 'frontend') {
-        // For frontend mode, just test if we can connect to OBS
-        try {
-          await testFrontendConnection(settingsToSubmit);
-          setSuccess('Successfully connected to OBS. You can now control OBS directly from your browser.');
-          
-          // We still need to save the stream settings (RTMP/SRT) to the backend
-          await updateOBSSettings({
-            ...settingsToSubmit,
-            // For frontend mode, we don't send connection details to backend
-            host: 'localhost',
-            port: 4455,
-            password: '',
-            localNetworkHost: 'localhost',
-            localNetworkPort: 4455
-          });
-        } catch (error: any) {
-          setError(`Failed to connect to OBS: ${error.message}`);
-        }
-      } else {
-        // For backend mode, send all settings to server
-        console.log('Submitting OBS settings to backend:', settingsToSubmit);
-        try {
-          const updatedSettings = await updateOBSSettings(settingsToSubmit);
-          setSettings(prevSettings => ({...prevSettings, ...updatedSettings || settingsToSubmit}));
-          setSuccess('Successfully connected to OBS and updated settings');
-        } catch (error: any) {
-          console.error('Failed to update OBS settings:', error);
-          console.error('Error response:', error.response?.data);
-          
-          // Extract the actual error message from the response
-          const errorMessage = error.response?.data?.message || 
-            'Failed to update OBS settings. Please check all required fields are filled correctly.';
-          
-          setError(`Connection test failed: ${errorMessage}`);
-          return;
-        }
+      // Send settings to server
+      console.log('Submitting OBS settings to backend:', settingsToSubmit);
+      try {
+        const updatedSettings = await updateOBSSettings(settingsToSubmit);
+        setSettings(prevSettings => ({...prevSettings, ...updatedSettings || settingsToSubmit}));
+        setSuccess('Successfully updated OBS settings');
+        
+        // Reset connection attempts to trigger a fresh connection
+        wsConnectionAttempts.current = 0;
+      } catch (error: any) {
+        console.error('Failed to update OBS settings:', error);
+        console.error('Error response:', error.response?.data);
+        
+        // Extract the actual error message from the response
+        const errorMessage = error.response?.data?.message || 
+          'Failed to update OBS settings. Please check all required fields are filled correctly.';
+        
+        setError(`Connection test failed: ${errorMessage}`);
+        return;
       }
     } catch (error: any) {
       console.error('Failed to update OBS settings:', error);
@@ -381,229 +282,163 @@ export const OBSSettings: React.FC = () => {
     }
   };
 
+  const handleChange = (field: keyof OBSSettingsType, value: any) => {
+    setSettings(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   return (
-    <Box sx={{ width: '100%', mb: 4 }}>
-      <SectionHeading>OBS WebSocket Settings</SectionHeading>
-      <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%' }}>
-        <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Box component="span" sx={{ fontWeight: 'medium' }}>
-            Status: 
-          </Box>
-          <Box sx={{ 
-            width: 10,
-            height: 10,
-            borderRadius: '50%',
-            backgroundColor: 
-              connectionStatus === 'connected' ? '#4caf50' :
-              connectionStatus === 'connecting' ? '#ff9800' :
-              connectionStatus === 'error' ? '#f44336' :
-              '#9e9e9e',
-            transition: 'background-color 0.3s ease',
-            boxShadow: (theme) => `0 0 8px ${
-              connectionStatus === 'connected' ? theme.palette.success.main :
-              connectionStatus === 'connecting' ? theme.palette.warning.main :
-              connectionStatus === 'error' ? theme.palette.error.main :
-              'transparent'
-            }`
-          }} />
-          <Box component="span" sx={{ 
-            color: (theme) => 
-              connectionStatus === 'connected' ? theme.palette.success.main :
-              connectionStatus === 'connecting' ? theme.palette.warning.main :
-              connectionStatus === 'error' ? theme.palette.error.main :
-              theme.palette.text.secondary,
-            fontWeight: 'medium'
-          }}>
-            {connectionStatus.charAt(0).toUpperCase() + connectionStatus.slice(1)}
-          </Box>
+    <Box sx={{ maxWidth: '100%', mx: 'auto' }}>
+      <SectionHeading>OBS Studio Integration</SectionHeading>
+      
+      <InsetText>
+        Connect to OBS Studio to control streaming directly from the admin dashboard.
+        This allows you to start and stop streams for rooms without having to manually configure OBS.
+      </InsetText>
+      
+      {connectionStatus === 'connected' && (
+        <Alert severity="success" sx={{ mb: 3 }}>
+          Connected to OBS Studio
+        </Alert>
+      )}
+      
+      {connectionStatus === 'connecting' && (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          Connecting to OBS Studio...
+        </Alert>
+      )}
+      
+      {connectionStatus === 'disconnected' && (
+        <Alert severity="warning" sx={{ mb: 3 }}>
+          Not connected to OBS Studio. Please check your settings and ensure OBS is running with the WebSocket server enabled.
+        </Alert>
+      )}
+      
+      {connectionStatus === 'error' && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          Error connecting to OBS Studio: {lastError}
+        </Alert>
+      )}
+      
+      <Paper sx={{ p: 3, mb: 4 }}>
+        <Box sx={{ mb: 3 }}>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={settings.enabled}
+                onChange={(e) => handleChange('enabled', e.target.checked)}
+              />
+            }
+            label="Enable OBS Integration"
+          />
         </Box>
-
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
+        
+        {settings && (
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="OBS Host"
+                fullWidth
+                value={settings.host || '192.168.69.186'}
+                onChange={(e) => handleChange('host', e.target.value)}
+                helperText="OBS WebSocket server host (IP address or hostname)"
+                disabled={loading || !settings.enabled}
+              />
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="OBS Port"
+                fullWidth
+                type="number"
+                value={settings.port || 4455}
+                onChange={(e) => handleChange('port', parseInt(e.target.value))}
+                helperText="OBS WebSocket server port (default: 4455)"
+                disabled={loading || !settings.enabled}
+              />
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="OBS Password"
+                fullWidth
+                type="password"
+                value={settings.password || ''}
+                onChange={(e) => handleChange('password', e.target.value)}
+                helperText="OBS WebSocket server password (if required)"
+                disabled={loading || !settings.enabled}
+              />
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth disabled={loading || !settings.enabled}>
+                <InputLabel>Stream Type</InputLabel>
+                <Select
+                  value={settings.streamType || 'rtmp_custom'}
+                  onChange={(e) => handleChange('streamType', e.target.value)}
+                  label="Stream Type"
+                >
+                  <MenuItem value="rtmp_custom">RTMP Custom</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            
+            <Grid item xs={12}>
+              <FormControl fullWidth disabled={loading || !settings.enabled}>
+                <InputLabel>Protocol</InputLabel>
+                <Select
+                  value={settings.protocol || 'rtmp'}
+                  onChange={(e) => handleChange('protocol', e.target.value)}
+                  label="Protocol"
+                >
+                  <MenuItem value="rtmp">RTMP</MenuItem>
+                  <MenuItem value="srt">SRT</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            
+            {settings.protocol === 'srt' && (
+              <Grid item xs={12}>
+                <TextField
+                  label="SRT URL"
+                  fullWidth
+                  value={settings.srtUrl || ''}
+                  onChange={(e) => handleChange('srtUrl', e.target.value)}
+                  helperText="SRT URL for streaming (e.g., srt://hostname:port)"
+                  disabled={loading || !settings.enabled}
+                />
+              </Grid>
+            )}
+          </Grid>
         )}
-        {success && (
-          <Alert severity="success" sx={{ mb: 2 }}>
-            {success}
-          </Alert>
-        )}
-        <FormControlLabel
-          control={
-            <Switch
-              checked={settings.enabled}
-              disabled={loading}
-              onChange={(e) => {
-                setSettings(prev => ({
-                  ...prev,
-                  enabled: e.target.checked
-                }));
-              }}
-            />
-          }
-          label="Enable OBS Integration"
-          sx={{ mb: 2 }}
-        />
-
-        <FormControl fullWidth margin="normal">
-          <InputLabel>Connection Mode</InputLabel>
-          <Select
-            value={settings.localNetworkMode}
-            label="Connection Mode"
-            onChange={(e) => {
-              const mode = e.target.value as 'frontend' | 'backend';
-              setSettings(prev => ({
-                ...prev,
-                localNetworkMode: mode,
-                useLocalNetwork: true,
-                // Keep existing values or set defaults
-                localNetworkHost: prev.localNetworkHost || 'localhost',
-                localNetworkPort: prev.localNetworkPort || 4455,
-                // Also update the main host/port to match
-                host: prev.localNetworkHost || 'localhost',
-                port: prev.localNetworkPort || 4455
-              }));
-            }}
+        
+        <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
+          <Button
+            variant="primary"
+            onClick={() => handleSubmit(new Event('click') as unknown as React.FormEvent)}
             disabled={loading || !settings.enabled}
           >
-            <MenuItem value="frontend">Browser to OBS Connection</MenuItem>
-            <MenuItem value="backend">Server to OBS Connection</MenuItem>
-          </Select>
-          <FormHelperText>
-            {settings.localNetworkMode === 'frontend' && "Connect directly from your browser to OBS (OBS must be running on your local machine)"}
-            {settings.localNetworkMode === 'backend' && "Connect from the server to OBS (OBS can be running anywhere the server can reach)"}
-          </FormHelperText>
-        </FormControl>
-
-        <TextField
-          margin="normal"
-          fullWidth
-          required
-          label={settings.localNetworkMode === 'frontend' ? "OBS WebSocket Host" : "OBS Host"}
-          value={settings.localNetworkHost || 'localhost'}
-          onChange={(e) => {
-            const newHost = e.target.value;
-            setSettings(prev => ({
-              ...prev,
-              localNetworkHost: newHost,
-              host: newHost // Keep both in sync
-            }));
-          }}
-          disabled={loading || !settings.enabled}
-          helperText={
-            settings.localNetworkMode === 'frontend' 
-              ? "The hostname or IP address where OBS is running (usually localhost)"
-              : "The hostname or IP address where OBS is running relative to the server"
-          }
-        />
-        <TextField
-          margin="normal"
-          fullWidth
-          required
-          type="number"
-          label={settings.localNetworkMode === 'frontend' ? "OBS WebSocket Port" : "OBS Port"}
-          value={settings.localNetworkPort || 4455}
-          onChange={(e) => {
-            const newPort = parseInt(e.target.value) || 4455;
-            setSettings(prev => ({
-              ...prev,
-              localNetworkPort: newPort,
-              port: newPort // Keep both in sync
-            }));
-          }}
-          disabled={loading || !settings.enabled}
-          helperText="The WebSocket port configured in OBS (default: 4455)"
-        />
-
-        <TextField
-          margin="normal"
-          fullWidth
-          label="Password"
-          type="password"
-          value={settings.password || ''}
-          onChange={(e) => {
-            const newPassword = e.target.value.trim();
-            setSettings(prev => ({
-              ...prev,
-              password: newPassword || undefined // Only set if not empty
-            }));
-          }}
-          disabled={loading || !settings.enabled}
-          helperText={
-            settings.localNetworkMode === 'frontend' 
-              ? "The password configured in OBS WebSocket settings (leave blank if authentication is disabled in OBS)"
-              : "The password configured in OBS WebSocket settings for the remote OBS instance"
-          }
-        />
-        
-        <FormControl component="fieldset" sx={{ mb: 2, mt: 2, width: '100%' }}>
-          <FormLabel component="legend">Stream Protocol</FormLabel>
-          <RadioGroup
-            row
-            value={settings.protocol}
-            onChange={(e) => {
-              setSettings(prev => ({
-                ...prev,
-                protocol: e.target.value as 'rtmp' | 'srt',
-                streamType: 'rtmp_custom'  // Always rtmp_custom
-              }));
-            }}
-          >
-            <FormControlLabel 
-              value="rtmp" 
-              control={<Radio />} 
-              label="RTMP" 
-              disabled={loading || !settings.enabled}
-            />
-            <FormControlLabel 
-              value="srt" 
-              control={<Radio />} 
-              label="SRT" 
-              disabled={loading || !settings.enabled}
-            />
-          </RadioGroup>
-        </FormControl>
-
-        {settings.protocol === 'srt' && (
-          <Alert severity="info" sx={{ mb: 2 }}>
-            <Typography variant="body2" gutterBottom fontWeight="medium">SRT URL Format:</Typography>
-            <Box 
-              component="code" 
-              sx={{ 
-                display: 'block',
-                wordBreak: 'break-all', 
-                fontFamily: 'monospace',
-                backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                padding: '8px',
-                borderRadius: '4px',
-                fontSize: '0.875rem',
-                maxWidth: '100%',
-                overflowX: 'auto',
-                lineHeight: 1.5
-              }}
-            >
-              srt://live.colourstream.johnrogerscolour.co.uk:9999?streamid=<span style={{ color: '#1976d2', fontWeight: 'bold' }}>[your-stream-key]</span>&latency=2000000
-            </Box>
-            <Typography variant="caption" sx={{ display: 'block', mt: 1 }}>
-              <strong>Important:</strong> The stream-id will be automatically URL encoded and include your stream key. 
-              Leave the Stream Key field blank in OBS.
-            </Typography>
-            <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
-              Example stream key format: <code>o8n3uxzjuhcz34cr3404m</code>
-            </Typography>
-          </Alert>
-        )}
-        
-        <Button
-          type="submit"
-          fullWidth
-          variant="contained"
-          sx={{ mt: 3 }}
-          disabled={loading || !settings.enabled}
-        >
-          {loading ? <CircularProgress size={24} color="inherit" /> : 'Save Settings'}
-        </Button>
-      </Box>
+            {loading ? <CircularProgress size={24} color="inherit" /> : 'Save Settings'}
+          </Button>
+        </Box>
+      </Paper>
+      
+      <Snackbar
+        open={!!success}
+        autoHideDuration={6000}
+        onClose={() => setSuccess(null)}
+        message={success}
+      />
     </Box>
   );
 }; 
