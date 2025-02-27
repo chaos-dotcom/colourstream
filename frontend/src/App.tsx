@@ -18,24 +18,48 @@ function App() {
       <CssBaseline />
       <SnackbarProvider maxSnack={3}>
         <Router>
-          <GovUkLayout serviceName="ColourStream">
-            <Routes>
-              <Route path="/login" element={<Navigate to="/admin/login" replace />} />
-              <Route path="/admin/login" element={<Login />} />
-              <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
-              <Route
-                path="/admin/dashboard"
-                element={
+          <Routes>
+            {/* Routes with GovUkLayout */}
+            <Route
+              path="/login"
+              element={
+                <GovUkLayout serviceName="ColourStream">
+                  <Navigate to="/admin/login" replace />
+                </GovUkLayout>
+              }
+            />
+            <Route
+              path="/admin/login"
+              element={
+                <GovUkLayout serviceName="ColourStream">
+                  <Login />
+                </GovUkLayout>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <GovUkLayout serviceName="ColourStream">
+                  <Navigate to="/admin/dashboard" replace />
+                </GovUkLayout>
+              }
+            />
+            <Route
+              path="/admin/dashboard"
+              element={
+                <GovUkLayout serviceName="ColourStream">
                   <ProtectedRoute>
                     <AdminDashboard />
                   </ProtectedRoute>
-                }
-              />
-              <Route path="/room/:roomId" element={<RoomView isPasswordProtected={true} />} />
-              <Route path="/room/:roomId/presenter" element={<PresenterView isPasswordProtected={true} />} />
-              <Route path="/" element={<RoomView />} />
-            </Routes>
-          </GovUkLayout>
+                </GovUkLayout>
+              }
+            />
+            
+            {/* Routes without GovUkLayout (no footer) */}
+            <Route path="/room/:roomId" element={<RoomView isPasswordProtected={true} />} />
+            <Route path="/room/:roomId/presenter" element={<PresenterView isPasswordProtected={true} />} />
+            <Route path="/" element={<RoomView />} />
+          </Routes>
         </Router>
       </SnackbarProvider>
     </ThemeProvider>

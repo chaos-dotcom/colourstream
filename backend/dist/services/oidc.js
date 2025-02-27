@@ -40,36 +40,79 @@ exports.getAuthorizationUrl = getAuthorizationUrl;
 exports.handleCallback = handleCallback;
 exports.isOIDCInitialized = isOIDCInitialized;
 exports.getRedirectUrlFromState = getRedirectUrlFromState;
+exports.initializeOIDCFromEnv = initializeOIDCFromEnv;
 const client_1 = require("@prisma/client");
 const logger_1 = require("../utils/logger");
+const path = __importStar(require("path"));
+const child_process = __importStar(require("child_process"));
 // We'll use a different approach for ESM modules
 const prisma = new client_1.PrismaClient();
-let oidcClient = null;
-let openidClientModule = null;
-const stateMap = new Map();
-// Function to dynamically load the openid-client module
-async function loadOpenidClient() {
-    if (openidClientModule)
-        return openidClientModule;
+// Function to start the wrapper script
+let wrapperProcess = null;
+let wrapperPort = null;
+const startWrapperProcess = async () => {
+    if (wrapperPort)
+        return wrapperPort;
+    const wrapperScriptPath = path.join(__dirname, 'oidc-wrapper.mjs');
+    return new Promise((resolve, reject) => {
+        wrapperProcess = child_process.spawn('node', [wrapperScriptPath]);
+        if (!wrapperProcess || !wrapperProcess.stdout || !wrapperProcess.stderr) {
+            reject(new Error('Failed to start wrapper process'));
+            return;
+        }
+        let dataBuffer = '';
+        wrapperProcess.stdout.on('data', (data) => {
+            dataBuffer += data.toString();
+            try {
+                const { port } = JSON.parse(dataBuffer);
+                wrapperPort = port;
+                resolve(port);
+            }
+            catch (e) {
+                // Not complete JSON yet, continue collecting
+            }
+        });
+        wrapperProcess.stderr.on('data', (data) => {
+            logger_1.logger.error(`Wrapper process error: ${data}`);
+        });
+        wrapperProcess.on('close', (code) => {
+            if (code !== 0) {
+                reject(new Error(`Wrapper process exited with code ${code}`));
+            }
+        });
+        // Set a timeout in case the process doesn't start properly
+        setTimeout(() => {
+            if (!wrapperPort) {
+                reject(new Error('Timeout waiting for wrapper process to start'));
+            }
+        }, 5000);
+    });
+};
+// Function to make a request to the wrapper process
+const callWrapper = async (action, params = {}) => {
     try {
-        // Use dynamic import with await
-        const module = await Promise.resolve().then(() => __importStar(require('openid-client')));
-        openidClientModule = module;
-        logger_1.logger.info('OpenID Client module loaded successfully');
-        return module;
+        if (!wrapperPort) {
+            wrapperPort = await startWrapperProcess();
+        }
+        const url = new URL(`http://localhost:${wrapperPort}`);
+        url.searchParams.append('action', action);
+        for (const [key, value] of Object.entries(params)) {
+            url.searchParams.append(key, value);
+        }
+        const response = await fetch(url.toString());
+        return await response.json();
     }
     catch (error) {
-        logger_1.logger.error('Failed to load OpenID Client module:', error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logger_1.logger.error(`Error calling wrapper: ${errorMessage}`);
         throw error;
     }
-}
+};
 /**
  * Initialize OIDC client based on configuration in the database
  */
 async function initializeOIDC() {
     try {
-        // Load the openid-client module
-        const openidClient = await loadOpenidClient();
         // Use type assertion to avoid TypeScript errors
         const config = await prisma.OIDCConfig.findUnique({
             where: { id: 'default' },
@@ -82,51 +125,39 @@ async function initializeOIDC() {
             logger_1.logger.error('OIDC client ID or secret is missing');
             return false;
         }
-        // If discovery URL is provided, use it to discover endpoints
-        if (config.discoveryUrl) {
-            try {
-                const issuer = await openidClient.Issuer.discover(config.discoveryUrl);
-                logger_1.logger.info(`Discovered issuer ${issuer.issuer}`);
-                oidcClient = new issuer.Client({
-                    client_id: config.clientId,
-                    client_secret: config.clientSecret,
-                    redirect_uris: [config.redirectUri || ''],
-                    response_types: ['code'],
-                });
-                logger_1.logger.info('OIDC client initialized successfully using discovery URL');
-                return true;
+        // Start the wrapper process
+        try {
+            await startWrapperProcess();
+            logger_1.logger.info('OIDC wrapper process started successfully');
+            // If we have a discovery URL, perform discovery and update the config
+            if (config.discoveryUrl) {
+                try {
+                    logger_1.logger.info(`Performing OIDC discovery from ${config.discoveryUrl}`);
+                    const discoveryResult = await callWrapper('discover', {
+                        discoveryUrl: config.discoveryUrl
+                    });
+                    logger_1.logger.info('Discovery result:', discoveryResult);
+                    // Update the config with discovered endpoints
+                    await prisma.OIDCConfig.update({
+                        where: { id: 'default' },
+                        data: {
+                            authorizationUrl: discoveryResult.authorizationUrl,
+                            tokenUrl: discoveryResult.tokenUrl,
+                            userInfoUrl: discoveryResult.userInfoUrl,
+                            updatedAt: new Date()
+                        }
+                    });
+                    logger_1.logger.info('Updated OIDC config with discovered endpoints');
+                }
+                catch (error) {
+                    logger_1.logger.error('Failed to perform OIDC discovery:', error);
+                    // Continue even if discovery fails - we'll try again later
+                }
             }
-            catch (error) {
-                logger_1.logger.error('Error discovering OIDC issuer:', error);
-                return false;
-            }
+            return true;
         }
-        // If no discovery URL, use manual configuration
-        else if (config.authorizationUrl && config.tokenUrl) {
-            try {
-                const issuer = new openidClient.Issuer({
-                    issuer: config.providerName,
-                    authorization_endpoint: config.authorizationUrl,
-                    token_endpoint: config.tokenUrl,
-                    userinfo_endpoint: config.userInfoUrl,
-                    jwks_uri: '',
-                });
-                oidcClient = new issuer.Client({
-                    client_id: config.clientId,
-                    client_secret: config.clientSecret,
-                    redirect_uris: [config.redirectUri || ''],
-                    response_types: ['code'],
-                });
-                logger_1.logger.info('OIDC client initialized successfully using manual configuration');
-                return true;
-            }
-            catch (error) {
-                logger_1.logger.error('Error creating OIDC client with manual configuration:', error);
-                return false;
-            }
-        }
-        else {
-            logger_1.logger.error('Insufficient OIDC configuration: missing discovery URL or manual endpoints');
+        catch (error) {
+            logger_1.logger.error('Error starting OIDC wrapper process:', error);
             return false;
         }
     }
@@ -149,7 +180,7 @@ async function getOIDCConfig() {
             const { clientSecret, ...safeConfig } = config;
             return {
                 config: safeConfig,
-                isInitialized: !!oidcClient,
+                isInitialized: wrapperPort !== null,
             };
         }
         // If no config exists, create a default one
@@ -195,7 +226,7 @@ async function updateOIDCConfig(configData) {
         const { clientSecret, ...safeConfig } = updatedConfig;
         return {
             config: safeConfig,
-            isInitialized: !!oidcClient,
+            isInitialized: wrapperPort !== null,
         };
     }
     catch (error) {
@@ -206,46 +237,132 @@ async function updateOIDCConfig(configData) {
 /**
  * Generate authorization URL for OIDC login
  */
-async function getAuthorizationUrl(state) {
-    if (!oidcClient) {
-        throw new Error('OIDC client not initialized');
+async function getAuthorizationUrl(redirectUrl) {
+    try {
+        // Get the OIDC configuration
+        const config = await prisma.OIDCConfig.findUnique({
+            where: { id: 'default' },
+        });
+        if (!config || !config.enabled) {
+            throw new Error('OIDC is not enabled or configured');
+        }
+        // Generate PKCE values
+        const { nonce, state, codeVerifier, codeChallenge } = await callWrapper('generate');
+        logger_1.logger.debug('Generated PKCE values', { nonce, state, codeVerifier, codeChallenge });
+        // Store PKCE values in database
+        await prisma.OIDCAuthRequest.create({
+            data: {
+                state,
+                codeVerifier,
+                nonce,
+                redirectUrl,
+                expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes expiry
+            },
+        });
+        // Construct authorization URL
+        const params = new URLSearchParams();
+        if (config.clientId)
+            params.append('client_id', config.clientId);
+        params.append('redirect_uri', `${process.env.PUBLIC_URL}/api/auth/callback`);
+        params.append('response_type', 'code');
+        params.append('state', state);
+        params.append('nonce', nonce);
+        params.append('code_challenge', codeChallenge);
+        params.append('code_challenge_method', 'S256');
+        params.append('scope', config.scope || 'openid profile email');
+        const authUrl = `${config.authorizationUrl}?${params.toString()}`;
+        logger_1.logger.debug('Generated authorization URL', { authUrl });
+        return {
+            url: authUrl,
+            codeVerifier,
+            nonce
+        };
     }
-    // Load the openid-client module
-    const openidClient = await loadOpenidClient();
-    const nonce = openidClient.generators.nonce();
-    const codeVerifier = openidClient.generators.codeVerifier();
-    const codeChallenge = openidClient.generators.codeChallenge(codeVerifier);
-    // Store these values in session or database
-    // For this example, we'll return them to be stored client-side
-    // In production, these should be stored securely server-side
-    return {
-        url: oidcClient.authorizationUrl({
-            scope: 'openid profile email',
-            response_type: 'code',
-            nonce,
-            state: state || openidClient.generators.state(),
-            code_challenge: codeChallenge,
-            code_challenge_method: 'S256',
-        }),
-        codeVerifier,
-        nonce,
-    };
+    catch (error) {
+        logger_1.logger.error('Error generating authorization URL:', error);
+        throw error;
+    }
 }
 /**
- * Handle OIDC callback and token exchange
+ * Handle OIDC callback
  */
-async function handleCallback(callbackParams, codeVerifier) {
-    if (!oidcClient) {
-        throw new Error('OIDC client not initialized');
-    }
+async function handleCallback(code, state) {
     try {
-        const tokenSet = await oidcClient.callback(callbackParams.redirect_uri || oidcClient.redirect_uris[0], callbackParams, { code_verifier: codeVerifier });
-        // Get user info
-        const userInfo = await oidcClient.userinfo(tokenSet);
-        return {
-            tokenSet,
-            userInfo,
-        };
+        // Get the OIDC configuration
+        const config = await prisma.OIDCConfig.findUnique({
+            where: { id: 'default' },
+        });
+        if (!config || !config.enabled) {
+            throw new Error('OIDC is not enabled or configured');
+        }
+        // Get the stored auth request data
+        const authRequest = await prisma.OIDCAuthRequest.findUnique({
+            where: { state },
+        });
+        if (!authRequest) {
+            throw new Error('Invalid or expired state parameter');
+        }
+        // Check if the auth request has expired
+        if (authRequest.expiresAt < new Date()) {
+            await prisma.OIDCAuthRequest.delete({
+                where: { state },
+            });
+            throw new Error('Authorization request has expired');
+        }
+        try {
+            // Exchange code for tokens
+            if (!config.tokenUrl) {
+                throw new Error('Token URL is not configured');
+            }
+            const tokenParams = new URLSearchParams();
+            tokenParams.append('grant_type', 'authorization_code');
+            if (config.clientId)
+                tokenParams.append('client_id', config.clientId);
+            if (config.clientSecret)
+                tokenParams.append('client_secret', config.clientSecret);
+            tokenParams.append('code', code);
+            tokenParams.append('redirect_uri', `${process.env.PUBLIC_URL}/api/auth/callback`);
+            tokenParams.append('code_verifier', authRequest.codeVerifier);
+            const tokenResponse = await fetch(config.tokenUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: tokenParams,
+            });
+            if (!tokenResponse.ok) {
+                const errorData = await tokenResponse.text();
+                logger_1.logger.error('Token exchange failed:', errorData);
+                throw new Error(`Failed to exchange code for tokens: ${tokenResponse.status}`);
+            }
+            const tokenSet = await tokenResponse.json();
+            // Get user info
+            if (!config.userInfoUrl) {
+                throw new Error('User info URL is not configured');
+            }
+            const userInfoResponse = await fetch(config.userInfoUrl, {
+                headers: {
+                    'Authorization': `Bearer ${tokenSet.access_token}`,
+                },
+            });
+            if (!userInfoResponse.ok) {
+                throw new Error(`Failed to get user info: ${userInfoResponse.status}`);
+            }
+            const userInfo = await userInfoResponse.json();
+            // Clean up the auth request
+            await prisma.OIDCAuthRequest.delete({
+                where: { state },
+            });
+            return {
+                tokenSet,
+                userInfo,
+                redirectUrl: authRequest.redirectUrl,
+            };
+        }
+        catch (error) {
+            logger_1.logger.error('Error during OIDC token exchange or validation:', error);
+            throw error;
+        }
     }
     catch (error) {
         logger_1.logger.error('Error handling OIDC callback:', error);
@@ -253,9 +370,63 @@ async function handleCallback(callbackParams, codeVerifier) {
     }
 }
 function isOIDCInitialized() {
-    return oidcClient !== null;
+    return wrapperPort !== null;
 }
+// Create a Map to store state to redirect URL mappings
+const stateMap = new Map();
 function getRedirectUrlFromState(state) {
     var _a;
     return (_a = stateMap.get(state)) === null || _a === void 0 ? void 0 : _a.redirectUrl;
+}
+/**
+ * Initialize OIDC configuration from environment variables
+ */
+async function initializeOIDCFromEnv() {
+    try {
+        // Check if OIDC is enabled in environment variables
+        const oidcEnabled = process.env.OIDC_ENABLED === 'true';
+        if (!oidcEnabled) {
+            logger_1.logger.info('OIDC is not enabled in environment variables');
+            return false;
+        }
+        // Get OIDC configuration from environment variables
+        const oidcConfig = {
+            id: 'default',
+            enabled: oidcEnabled,
+            providerName: process.env.OIDC_PROVIDER_NAME || 'Generic',
+            clientId: process.env.OIDC_CLIENT_ID || null,
+            clientSecret: process.env.OIDC_CLIENT_SECRET || null,
+            discoveryUrl: process.env.OIDC_DISCOVERY_URL || null,
+            redirectUri: process.env.OIDC_REDIRECT_URI || '/auth/callback',
+            scope: process.env.OIDC_SCOPE || 'openid profile email',
+            group: process.env.OIDC_GROUP || null,
+        };
+        // Check if required fields are present
+        if (!oidcConfig.clientId || !oidcConfig.clientSecret) {
+            logger_1.logger.error('OIDC client ID or secret is missing in environment variables');
+            return false;
+        }
+        if (!oidcConfig.discoveryUrl) {
+            logger_1.logger.error('OIDC discovery URL is missing in environment variables');
+            return false;
+        }
+        // Update the OIDC configuration in the database
+        await prisma.OIDCConfig.upsert({
+            where: { id: 'default' },
+            update: {
+                ...oidcConfig,
+                updatedAt: new Date(),
+            },
+            create: {
+                ...oidcConfig,
+            },
+        });
+        logger_1.logger.info('OIDC configuration initialized from environment variables');
+        // Initialize the OIDC client
+        return await initializeOIDC();
+    }
+    catch (error) {
+        logger_1.logger.error('Error initializing OIDC from environment variables:', error);
+        return false;
+    }
 }
