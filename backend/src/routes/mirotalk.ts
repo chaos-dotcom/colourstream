@@ -8,7 +8,8 @@ import prisma from '../lib/prisma';
 
 const router = express.Router();
 
-type StringValue = string & { __brand: '_StringValue' };
+// Unused type - keeping for documentation
+// type StringValue = string & { __brand: '_StringValue' };
 
 interface MiroTalkJoinRequest {
   room: string;

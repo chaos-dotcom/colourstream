@@ -53,7 +53,7 @@ router.put(
           status: 'success',
           data: { settings },
           // Include a warning if connection test was skipped or failed
-          warning: req.body.enabled ? 
+          warning: req.body.enabled && req.body.localNetworkMode === 'backend' ? 
             'Settings saved, but OBS connection could not be verified. Make sure OBS is running with WebSocket server enabled.' : 
             undefined
         });
@@ -160,7 +160,7 @@ router.post(
 );
 
 // Get OBS connection status
-router.get('/status', async (req, res) => {
+router.get('/status', async (_req, res) => {
   try {
     const status = obsService.getWebSocketStatus();
     res.json({

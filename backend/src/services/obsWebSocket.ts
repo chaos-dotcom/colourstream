@@ -12,6 +12,7 @@ export class OBSWebSocketService {
   private maxReconnectAttempts = 5;
   private reconnectDelay = 5000; // 5 seconds
   private connectionCheckInterval: NodeJS.Timeout | null = null;
+  private lastConnectionSettings: { host: string; port: number; password?: string } | null = null;
 
   constructor(wsService: WebSocketService) {
     this.obs = new OBSWebSocket();
@@ -122,7 +123,7 @@ export class OBSWebSocketService {
     }, delay);
   }
 
-  public async connect(settings?: { host: string; port: number; password?: string }) {
+  public async connect(settings?: { host: string; port: number; password?: string }): Promise<void> {
     try {
       if (settings) {
         const { host, port, password } = settings;
@@ -132,28 +133,51 @@ export class OBSWebSocketService {
         this.updateStatus('connecting');
         
         try {
-          await this.obs.connect(url, password, {
-            eventSubscriptions: 0xFFFFFFFF, // Subscribe to all events
-            rpcVersion: 1
-          });
+          // Connect to OBS WebSocket v5
+          // The library handles the authentication process internally
+          // Make sure we're passing the password correctly
+          if (password && password.trim() !== '') {
+            logger.info('Connecting with password authentication');
+            await this.obs.connect(url, password);
+          } else {
+            logger.info('Connecting without password authentication');
+            await this.obs.connect(url);
+          }
           
           logger.info('Successfully connected to OBS');
           this.updateStatus('connected');
-        } catch (error: any) {
+          
+          // Save the last successful connection settings
+          this.lastConnectionSettings = settings;
+          this.reconnectAttempts = 0;
+          
+          // Start connection check
+          this.startConnectionCheck();
+        } catch (error: unknown) {
           // Check if this is an auth error
-          if (error.code === 4009) {
+          const err = error as any;
+          if (err.code === 4009) {
             logger.error('Authentication failed - incorrect password');
             throw new Error('Authentication failed - incorrect password');
-          } else if (error.code === 4008) {
+          } else if (err.code === 4008) {
             logger.error('Authentication required but no password provided');
             throw new Error('Authentication required but no password provided');
+          } else {
+            logger.error('OBS connection error:', err);
+            throw new Error(`Failed to connect to OBS: ${err.message || 'Unknown error'}`);
           }
-          throw error;
         }
+      } else if (this.lastConnectionSettings) {
+        // Try to reconnect with last known settings
+        return this.connect(this.lastConnectionSettings);
+      } else {
+        logger.error('No connection settings provided and no previous settings available');
+        throw new Error('No connection settings provided');
       }
-    } catch (error: any) {
-      logger.error('Failed to connect to OBS:', error);
-      this.lastError = error.message;
+    } catch (error: unknown) {
+      const err = error as Error;
+      logger.error('Failed to connect to OBS:', err);
+      this.lastError = err.message;
       this.updateStatus('error');
       throw error;
     }
