@@ -9,7 +9,9 @@
     "build": "tsc && cp src/services/oidc-wrapper.mjs dist/services/",
     "test": "jest",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "migrate:sqlite-to-postgres": "node scripts/migrate-sqlite-to-postgres.js"
   },
   "dependencies": {
     "@prisma/client": "^6.4.1",
