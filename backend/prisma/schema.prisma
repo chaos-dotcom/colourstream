@@ -61,4 +61,21 @@ model WebAuthnCredential {
   transports      String?  // JSON string of allowed transports
   createdAt       DateTime @default(now())
   lastUsed        DateTime @default(now())
+}
+
+model OIDCConfig {
+  id                String   @id @default("default")
+  enabled           Boolean  @default(false)
+  providerName      String   @default("Generic")
+  clientId          String?
+  clientSecret      String?
+  discoveryUrl      String?
+  authorizationUrl  String?
+  tokenUrl          String?
+  userInfoUrl       String?
+  scope             String   @default("openid profile email")
+  redirectUri       String?
+  logoutUrl         String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 } 

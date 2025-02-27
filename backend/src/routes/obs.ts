@@ -33,20 +33,10 @@ router.put(
     body('enabled').isBoolean().withMessage('Enabled must be a boolean'),
     body('streamType').equals('rtmp_custom').withMessage('Stream type must be rtmp_custom'),
     body('protocol').isIn(['rtmp', 'srt']).withMessage('Protocol must be rtmp or srt'),
-    body('useLocalNetwork').isBoolean().withMessage('useLocalNetwork must be a boolean'),
-    body('localNetworkMode').isIn(['frontend', 'backend']).withMessage('localNetworkMode must be frontend or backend'),
-    // Host validation depends on mode
-    body().custom((body) => {
-      if (body.localNetworkMode === 'backend') {
-        if (!body.localNetworkHost) {
-          throw new Error('Host is required for backend mode');
-        }
-        if (!body.localNetworkPort || !Number.isInteger(body.localNetworkPort) || body.localNetworkPort < 1) {
-          throw new Error('Valid port is required for backend mode');
-        }
-      }
-      return true;
-    })
+    // Make host validation conditional - only required if enabled is true
+    body('host').if(body('enabled').equals('true')).notEmpty().withMessage('Host is required when OBS integration is enabled'),
+    // Port validation - only required if enabled is true
+    body('port').if(body('enabled').equals('true')).isInt({ min: 1 }).withMessage('Port must be a positive integer when OBS integration is enabled')
   ],
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -63,7 +53,7 @@ router.put(
           status: 'success',
           data: { settings },
           // Include a warning if connection test was skipped or failed
-          warning: req.body.enabled && req.body.localNetworkMode === 'backend' ? 
+          warning: req.body.enabled ? 
             'Settings saved, but OBS connection could not be verified. Make sure OBS is running with WebSocket server enabled.' : 
             undefined
         });
@@ -99,9 +89,7 @@ router.post(
       logger.info('Setting stream key with settings:', {
         protocol: req.body.protocol,
         host: settings.host,
-        port: settings.port,
-        useLocalNetwork: settings.useLocalNetwork,
-        localNetworkMode: settings.localNetworkMode
+        port: settings.port
       });
 
       // Update the settings with the current protocol
@@ -111,9 +99,9 @@ router.post(
       });
 
       try {
-        await obsService.connect(settings.host, settings.port, settings.password || undefined);
+        await obsService.connectToOBS(settings);
         await obsService.setStreamKey(req.body.streamKey);
-        await obsService.disconnect();
+        await obsService.disconnectFromOBS();
 
         res.json({
           status: 'success',
@@ -125,9 +113,7 @@ router.post(
           settings: {
             protocol: req.body.protocol,
             host: settings.host,
-            port: settings.port,
-            useLocalNetwork: settings.useLocalNetwork,
-            localNetworkMode: settings.localNetworkMode
+            port: settings.port
           }
         });
         throw new AppError(500, `Failed to set stream key: ${obsError.message}`);
@@ -149,9 +135,9 @@ router.post(
       }
 
       try {
-        await obsService.connect(settings.host, settings.port, settings.password || undefined);
+        await obsService.connectToOBS(settings);
         await obsService.stopStream();
-        await obsService.disconnect();
+        await obsService.disconnectFromOBS();
 
         res.json({
           status: 'success',
@@ -162,9 +148,7 @@ router.post(
           error: obsError.message,
           settings: {
             host: settings.host,
-            port: settings.port,
-            useLocalNetwork: settings.useLocalNetwork,
-            localNetworkMode: settings.localNetworkMode
+            port: settings.port
           }
         });
         throw new AppError(500, `Failed to stop stream: ${obsError.message}`);

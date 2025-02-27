@@ -7,7 +7,7 @@ const prisma = new PrismaClient();
 /**
  * Utility function to generate a stream key
  */
-const generateStreamKey = (): string => {
+// const _generateStreamKey = (): string => { // Unused code
   return crypto.randomBytes(16).toString('hex');
 };
 

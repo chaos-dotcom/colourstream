@@ -7,6 +7,8 @@ interface WebSocketClient extends WebSocket {
   isAlive: boolean;
   userId?: string;
   type?: 'admin' | 'user';
+  id?: string;
+  isAdmin?: boolean;
 }
 
 interface OBSStatusMessage {
@@ -23,12 +25,13 @@ class WebSocketService {
   constructor(server: Server) {
     this.wss = new WebSocket.Server({ 
       server,
-      path: '/api/ws',
+      // Remove the path restriction to handle all paths
+      // path: '/api/ws',
       // Increase timeout values to prevent premature disconnections
       clientTracking: true,
     });
     
-    logger.info('WebSocket server initialized with path: /api/ws');
+    logger.info('WebSocket server initialized without path restriction to handle all WebSocket connections');
     this.setupWebSocketServer();
     this.pingInterval = this.startPingInterval();
   }
@@ -64,7 +67,7 @@ class WebSocketService {
         ws.isAlive = true;
 
         // Only allow admin connections to the OBS status endpoint
-        if (path.includes('/obs-status') && ws.type !== 'admin') {
+        if (path.includes('/api/ws/obs-status') && ws.type !== 'admin') {
           logger.warn(`WebSocket connection rejected: Unauthorized access to ${path} by ${ws.userId} (${ws.type})`, {
             userId: ws.userId,
             type: ws.type,
@@ -83,26 +86,25 @@ class WebSocketService {
         });
 
         // Send initial status message for OBS connections
-        if (path.includes('/obs-status') && ws.type === 'admin') {
+        if (path.includes('/api/ws/obs-status') && ws.type === 'admin') {
           // Import here to avoid circular dependency
           const { obsService } = require('../index');
           const status = obsService.getWebSocketStatus();
-          const statusMessage = JSON.stringify({
-            type: 'obs_status',
-            status: status.status,
-            ...(status.error && { error: status.error })
-          });
           
-          try {
-            ws.send(statusMessage);
-            logger.info(`Sent initial OBS status to client ${ws.userId}: ${status.status}`, {
-              userId: ws.userId,
-              status: status.status,
-              error: status.error
-            });
-          } catch (error) {
-            logger.error(`Error sending initial status to client ${ws.userId}:`, error);
-          }
+          // Use the WebSocketService to send the initial status
+          const websocketService = require('./websocketService').default;
+          
+          // Add a unique ID to the client for the WebSocketService
+          ws.id = `${ws.userId}-${Date.now()}`;
+          ws.isAdmin = ws.type === 'admin';
+          
+          // Add the client to the WebSocketService
+          websocketService.addClient(ws);
+          
+          // Send the initial status
+          websocketService.sendInitialOBSStatus(ws, status);
+          
+          logger.info(`Added client ${ws.id} to WebSocketService. Total clients: ${websocketService.getClientCount()}`);
         }
 
         ws.on('pong', () => {
@@ -118,6 +120,13 @@ class WebSocketService {
 
         ws.on('close', (code, reason) => {
           this.clients.delete(ws);
+          
+          // Also remove from WebSocketService if it was added
+          if (ws.id && path.includes('/api/ws/obs-status')) {
+            const websocketService = require('./websocketService').default;
+            websocketService.removeClient(ws.id);
+          }
+          
           logger.info(`WebSocket client disconnected: ${ws.userId} with code ${code} and reason: ${reason || 'No reason provided'}`, {
             userId: ws.userId,
             code,

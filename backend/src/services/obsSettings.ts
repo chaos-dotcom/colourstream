@@ -9,10 +9,6 @@ export interface OBSSettings {
   enabled: boolean;
   streamType: 'rtmp_custom';
   protocol: 'rtmp' | 'srt';
-  useLocalNetwork: boolean;
-  localNetworkMode: 'frontend' | 'backend';
-  localNetworkHost?: string;
-  localNetworkPort?: number;
   srtUrl?: string;
 }
 
@@ -29,11 +25,11 @@ export const getOBSSettings = async (): Promise<OBSSettings | null> => {
       ...settings,
       streamType: 'rtmp_custom',
       password: settings.password || undefined,
-      localNetworkHost: settings.localNetworkHost || undefined,
-      localNetworkPort: settings.localNetworkPort || undefined,
       srtUrl: settings.srtUrl || undefined,
       protocol: (settings.protocol || 'rtmp') as 'rtmp' | 'srt',
-      localNetworkMode: (settings.localNetworkMode || 'frontend') as 'frontend' | 'backend'
+      // Use host/port directly, ignoring legacy fields
+      host: settings.host || settings.localNetworkHost || 'localhost',
+      port: settings.port || settings.localNetworkPort || 4455
     } as OBSSettings;
   } catch (error) {
     logger.error('Error getting OBS settings:', error);
@@ -48,32 +44,30 @@ export const updateOBSSettings = async (settings: Omit<OBSSettings, 'id'>): Prom
       update: {
         ...settings,
         streamType: 'rtmp_custom',
-        password: settings.password || null,
-        localNetworkHost: settings.localNetworkHost || null,
-        localNetworkPort: settings.localNetworkPort || null,
-        srtUrl: settings.srtUrl || null
+        // For backward compatibility, update the legacy fields too
+        useLocalNetwork: true,
+        localNetworkMode: 'backend',
+        localNetworkHost: settings.host,
+        localNetworkPort: settings.port
       },
       create: {
-        ...settings,
         id: 'default',
+        ...settings,
         streamType: 'rtmp_custom',
-        password: settings.password || null,
-        localNetworkHost: settings.localNetworkHost || null,
-        localNetworkPort: settings.localNetworkPort || null,
-        srtUrl: settings.srtUrl || null
+        useLocalNetwork: true,
+        localNetworkMode: 'backend',
+        localNetworkHost: settings.host,
+        localNetworkPort: settings.port
       }
     });
 
-    // Convert null values to undefined in the return value
+    logger.info('Updated OBS settings:', updatedSettings);
     return {
       ...updatedSettings,
       streamType: 'rtmp_custom',
       password: updatedSettings.password || undefined,
-      localNetworkHost: updatedSettings.localNetworkHost || undefined,
-      localNetworkPort: updatedSettings.localNetworkPort || undefined,
       srtUrl: updatedSettings.srtUrl || undefined,
-      protocol: (updatedSettings.protocol || 'rtmp') as 'rtmp' | 'srt',
-      localNetworkMode: (updatedSettings.localNetworkMode || 'frontend') as 'frontend' | 'backend'
+      protocol: (updatedSettings.protocol || 'rtmp') as 'rtmp' | 'srt'
     } as OBSSettings;
   } catch (error) {
     logger.error('Error updating OBS settings:', error);

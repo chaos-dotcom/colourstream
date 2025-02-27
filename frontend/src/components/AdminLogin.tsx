@@ -1,20 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
   Typography,
   Container,
   Paper,
   CircularProgress,
+  Divider,
 } from '@mui/material';
-import { authenticateWithPasskey } from '../utils/api';
+import { authenticateWithPasskey, loginWithOIDC, handleOIDCCallback, getOIDCConfig } from '../utils/api';
 import { PageHeading, Button, WarningText, InsetText } from './GovUkComponents';
 
 const AdminLogin: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [passkeySupported, setPasskeySupported] = useState(false);
+  const [oidcEnabled, setOidcEnabled] = useState(false);
+  const [oidcProviderName, setOidcProviderName] = useState('Identity Provider');
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     // Check if WebAuthn/passkey is supported
@@ -35,7 +39,22 @@ const AdminLogin: React.FC = () => {
       }
     };
 
+    // Check OIDC configuration
+    const checkOIDCConfig = async () => {
+      try {
+        const oidcConfig = await getOIDCConfig();
+        setOidcEnabled(oidcConfig.config?.enabled || false);
+        if (oidcConfig.config?.providerName) {
+          setOidcProviderName(oidcConfig.config.providerName);
+        }
+      } catch (error) {
+        console.error('Error checking OIDC config:', error);
+        setOidcEnabled(false);
+      }
+    };
+
     checkPasskeySupport();
+    checkOIDCConfig();
 
     // Check for stored error message
     const authError = localStorage.getItem('authError');
@@ -43,7 +62,14 @@ const AdminLogin: React.FC = () => {
       setError(authError);
       localStorage.removeItem('authError');
     }
-  }, []);
+
+    // Check for token in URL (from OIDC callback)
+    const params = new URLSearchParams(location.search);
+    const token = params.get('token');
+    if (token) {
+      handleOIDCCallback(token);
+    }
+  }, [location]);
 
   const handlePasskeyLogin = async () => {
     setError('');
@@ -71,17 +97,30 @@ const AdminLogin: React.FC = () => {
     }
   };
 
-  if (!passkeySupported) {
+  const handleOIDCLogin = async () => {
+    setError('');
+    setLoading(true);
+
+    try {
+      await loginWithOIDC(window.location.origin + '/admin/login');
+    } catch (error: any) {
+      console.error('OIDC login error:', error);
+      setError(error.response?.data?.message || 'OIDC login failed');
+      setLoading(false);
+    }
+  };
+
+  if (!passkeySupported && !oidcEnabled) {
     return (
       <Container component="main" maxWidth="md">
         <Box sx={{ mt: 6 }}>
           <PageHeading>Admin Login</PageHeading>
           <Paper sx={{ p: 4, backgroundColor: '#ffffff', borderRadius: 0 }}>
             <WarningText>
-              Your device or browser does not support passkey authentication.
+              Your device or browser does not support passkey authentication, and no alternative login method is configured.
             </WarningText>
             <Typography variant="body1" sx={{ mt: 2 }}>
-              Please use a supported browser (like Chrome, Safari, or Edge) on a compatible device.
+              Please use a supported browser (like Chrome, Safari, or Edge) on a compatible device, or contact your administrator to enable alternative login methods.
             </Typography>
           </Paper>
         </Box>
@@ -107,21 +146,55 @@ const AdminLogin: React.FC = () => {
 
         <Paper sx={{ p: 4, backgroundColor: '#ffffff', borderRadius: 0, mb: 4 }}>
           <Typography variant="body1" sx={{ mb: 4 }}>
-            Sign in to the admin dashboard using your registered passkey.
+            Sign in to the admin dashboard using one of the available authentication methods.
           </Typography>
           
-          <Button
-            onClick={handlePasskeyLogin}
-            disabled={loading}
-            fullWidth={false}
-            type="button"
-          >
-            {loading ? <CircularProgress size={24} color="inherit" /> : 'Sign in with Passkey'}
-          </Button>
+          {passkeySupported && (
+            <Box sx={{ mb: 4 }}>
+              <Typography variant="h6" gutterBottom>
+                Passkey Authentication
+              </Typography>
+              <Button
+                onClick={handlePasskeyLogin}
+                disabled={loading}
+                fullWidth={false}
+                type="button"
+              >
+                {loading ? <CircularProgress size={24} color="inherit" /> : 'Sign in with Passkey'}
+              </Button>
+              
+              <InsetText>
+                This will use your device's biometric sensors (fingerprint, face recognition) or PIN for authentication.
+              </InsetText>
+            </Box>
+          )}
           
-          <InsetText>
-            This will use your device's biometric sensors (fingerprint, face recognition) or PIN for authentication.
-          </InsetText>
+          {passkeySupported && oidcEnabled && (
+            <Divider sx={{ my: 3 }}>
+              <Typography variant="body2" color="text.secondary">OR</Typography>
+            </Divider>
+          )}
+          
+          {oidcEnabled && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="h6" gutterBottom>
+                Single Sign-On
+              </Typography>
+              <Button
+                onClick={handleOIDCLogin}
+                disabled={loading}
+                fullWidth={false}
+                type="button"
+                variant="secondary"
+              >
+                {loading ? <CircularProgress size={24} color="inherit" /> : `Sign in with ${oidcProviderName}`}
+              </Button>
+              
+              <InsetText>
+                This will redirect you to your organization's identity provider for authentication.
+              </InsetText>
+            </Box>
+          )}
         </Paper>
       </Box>
     </Container>

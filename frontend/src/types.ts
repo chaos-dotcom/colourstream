@@ -18,6 +18,7 @@ export interface ApiResponse<T> {
 
 export interface AuthResponse {
   token: string;
+  verified?: boolean;
 }
 
 export interface PasskeyInfo {
