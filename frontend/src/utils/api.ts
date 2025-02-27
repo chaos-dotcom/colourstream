@@ -166,6 +166,7 @@ export interface OIDCConfig {
   scope: string;
   redirectUri: string | null;
   logoutUrl: string | null;
+  group: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -388,14 +389,14 @@ export const authenticateWithPasskey = async (): Promise<ApiResponse<AuthRespons
       const result = verificationResponse.data;
       
       // Step 4: Store the authentication token
-      if (result.token) {
-        localStorage.setItem('adminToken', result.token);
+      if (result.data && result.data.token) {
+        localStorage.setItem('adminToken', result.data.token);
         localStorage.setItem('isAdminAuthenticated', 'true');
         
         return {
           status: 'success',
           data: {
-            token: result.token
+            token: result.data.token
           }
         };
       } else {
