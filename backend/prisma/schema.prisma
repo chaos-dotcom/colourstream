@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -79,4 +79,14 @@ model OIDCConfig {
   group             String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+}
+
+model OIDCAuthRequest {
+  id           String   @id @default(uuid())
+  state        String   @unique
+  codeVerifier String
+  nonce        String
+  redirectUrl  String
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
 } 
