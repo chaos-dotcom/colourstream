@@ -497,7 +497,9 @@ export const getDefaultMiroTalkCredentials = async (): Promise<DefaultMiroTalkCr
 
 export const getOIDCConfig = async (): Promise<OIDCConfigResponse> => {
   try {
+    console.log('Fetching OIDC config...');
     const response = await api.get('/auth/oidc/config');
+    console.log('OIDC config response:', response.data);
     return response.data;
   } catch (error) {
     console.error('Failed to get OIDC config:', error);
@@ -515,23 +517,43 @@ export const updateOIDCConfig = async (config: OIDCConfig): Promise<OIDCConfigRe
 };
 
 export const getOIDCLoginUrl = async (redirectUrl?: string): Promise<string> => {
-  const params = redirectUrl ? { redirectUrl } : {};
-  const response = await api.get('/auth/oidc/login', { params });
-  return response.data.data.url;
+  try {
+    const params = redirectUrl ? { redirectUrl } : {};
+    console.log('Getting OIDC login URL with params:', params);
+    const response = await api.get('/auth/oidc/login', { params });
+    console.log('OIDC login URL response:', response.data);
+    return response.data.data.url;
+  } catch (error) {
+    console.error('Failed to get OIDC login URL:', error);
+    throw error;
+  }
 };
 
 export const loginWithOIDC = async (redirectUrl: string): Promise<void> => {
-  const params = { redirectUrl };
-  const response = await api.get('/auth/oidc/login', { params });
-  
-  if (response.data?.data?.url) {
-    window.location.href = response.data.data.url;
-  } else {
-    throw new Error('No redirect URL received from OIDC provider');
+  try {
+    const params = { redirectUrl };
+    console.log('Initiating OIDC login with params:', params);
+    const response = await api.get('/auth/oidc/login', { params });
+    console.log('OIDC login response:', response.data);
+    
+    if (response.data?.data?.url) {
+      // Check if the URL is valid
+      if (response.data.data.url.startsWith('undefined')) {
+        console.error('Invalid OIDC authorization URL:', response.data.data.url);
+        throw new Error('Invalid OIDC authorization URL. Please check your OIDC configuration.');
+      }
+      window.location.href = response.data.data.url;
+    } else {
+      throw new Error('No redirect URL received from OIDC provider');
+    }
+  } catch (error) {
+    console.error('OIDC login error:', error);
+    throw error;
   }
 };
 
 export const handleOIDCCallback = (token: string): void => {
+  console.log('Handling OIDC callback with token:', token.substring(0, 10) + '...');
   localStorage.setItem('adminToken', token);
   localStorage.setItem('isAdminAuthenticated', 'true');
   window.location.href = '/admin/dashboard';

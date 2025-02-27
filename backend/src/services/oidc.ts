@@ -5,7 +5,6 @@ import * as child_process from 'child_process';
 
 // We'll use a different approach for ESM modules
 const prisma = new PrismaClient();
-const stateMap = new Map<string, { nonce: string, redirectUrl?: string, codeVerifier?: string }>();
 
 // Function to start the wrapper script
 let wrapperProcess: child_process.ChildProcess | null = null;
@@ -78,6 +77,13 @@ const callWrapper = async (action: string, params: Record<string, string> = {}):
   }
 };
 
+// Add the AuthUrlData interface at the top of the file
+interface AuthUrlData {
+  url: string;
+  codeVerifier: string;
+  nonce: string;
+}
+
 /**
  * Initialize OIDC client based on configuration in the database
  */
@@ -102,6 +108,35 @@ export async function initializeOIDC(): Promise<boolean> {
     try {
       await startWrapperProcess();
       logger.info('OIDC wrapper process started successfully');
+      
+      // If we have a discovery URL, perform discovery and update the config
+      if (config.discoveryUrl) {
+        try {
+          logger.info(`Performing OIDC discovery from ${config.discoveryUrl}`);
+          const discoveryResult = await callWrapper('discover', { 
+            discoveryUrl: config.discoveryUrl 
+          });
+          
+          logger.info('Discovery result:', discoveryResult);
+          
+          // Update the config with discovered endpoints
+          await (prisma as any).OIDCConfig.update({
+            where: { id: 'default' },
+            data: {
+              authorizationUrl: discoveryResult.authorizationUrl,
+              tokenUrl: discoveryResult.tokenUrl,
+              userInfoUrl: discoveryResult.userInfoUrl,
+              updatedAt: new Date()
+            }
+          });
+          
+          logger.info('Updated OIDC config with discovered endpoints');
+        } catch (error) {
+          logger.error('Failed to perform OIDC discovery:', error);
+          // Continue even if discovery fails - we'll try again later
+        }
+      }
+      
       return true;
     } catch (error) {
       logger.error('Error starting OIDC wrapper process:', error);
@@ -189,63 +224,50 @@ export async function updateOIDCConfig(configData: any) {
 /**
  * Generate authorization URL for OIDC login
  */
-export async function getAuthorizationUrl(redirectUrl?: string) {
+export async function getAuthorizationUrl(redirectUrl: string): Promise<AuthUrlData | null> {
   try {
     // Get the OIDC configuration
-    const config = await (prisma as any).OIDCConfig.findUnique({
+    const config = await prisma.oIDCConfig.findUnique({
       where: { id: 'default' },
     });
     
     if (!config || !config.enabled) {
       throw new Error('OIDC is not enabled or configured');
     }
-    
-    // Generate the necessary values
+
+    // Generate PKCE values
     const { nonce, state, codeVerifier, codeChallenge } = await callWrapper('generate');
     
-    // Store the redirect URL with the state
-    if (redirectUrl) {
-      stateMap.set(state, { nonce, redirectUrl, codeVerifier });
-    } else {
-      stateMap.set(state, { nonce, codeVerifier });
-    }
-    
-    // Construct the authorization URL
-    let authUrl = '';
-    
-    if (config.discoveryUrl) {
-      // Discover the endpoints
-      const issuerInfo = await callWrapper('discover', { url: config.discoveryUrl });
-      
-      // Construct the authorization URL
-      authUrl = `${issuerInfo.authorization_endpoint}?` + 
-        `client_id=${encodeURIComponent(config.clientId)}` +
-        `&redirect_uri=${encodeURIComponent(config.redirectUri || '')}` +
-        `&response_type=code` +
-        `&scope=${encodeURIComponent(config.scope || 'openid profile email')}` +
-        `&state=${encodeURIComponent(state)}` +
-        `&nonce=${encodeURIComponent(nonce)}` +
-        `&code_challenge=${encodeURIComponent(codeChallenge)}` +
-        `&code_challenge_method=S256`;
-    } else if (config.authorizationUrl) {
-      // Use the manually configured authorization URL
-      authUrl = `${config.authorizationUrl}?` + 
-        `client_id=${encodeURIComponent(config.clientId)}` +
-        `&redirect_uri=${encodeURIComponent(config.redirectUri || '')}` +
-        `&response_type=code` +
-        `&scope=${encodeURIComponent(config.scope || 'openid profile email')}` +
-        `&state=${encodeURIComponent(state)}` +
-        `&nonce=${encodeURIComponent(nonce)}` +
-        `&code_challenge=${encodeURIComponent(codeChallenge)}` +
-        `&code_challenge_method=S256`;
-    } else {
-      throw new Error('No authorization URL available');
-    }
-    
+    logger.debug('Generated PKCE values', { nonce, state, codeVerifier, codeChallenge });
+
+    // Store PKCE values in database
+    await prisma.oIDCAuthRequest.create({
+      data: {
+        state,
+        codeVerifier,
+        nonce,
+        redirectUrl,
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes expiry
+      },
+    });
+
+    // Construct authorization URL
+    const params = new URLSearchParams({
+      client_id: config.clientId,
+      redirect_uri: `${process.env.PUBLIC_URL}/api/auth/callback`,
+      response_type: 'code',
+      state,
+      nonce,
+      code_challenge: codeChallenge,
+      code_challenge_method: 'S256',
+      scope: config.scope || 'openid profile email'
+    });
+
+    const authUrl = `${config.authorizationUrl}?${params.toString()}`;
+    logger.debug('Generated authorization URL', { authUrl });
+
     return {
       url: authUrl,
-      codeVerifier,
-      nonce,
     };
   } catch (error) {
     logger.error('Error generating authorization URL:', error);
@@ -259,7 +281,7 @@ export async function getAuthorizationUrl(redirectUrl?: string) {
 export async function handleCallback(code: string, state: string) {
   try {
     // Get the OIDC configuration
-    const config = await (prisma as any).OIDCConfig.findUnique({
+    const config = await prisma.oIDCConfig.findUnique({
       where: { id: 'default' },
     });
     
@@ -267,88 +289,70 @@ export async function handleCallback(code: string, state: string) {
       throw new Error('OIDC is not enabled or configured');
     }
     
-    // Get the stored data for this state
-    const storedData = stateMap.get(state);
-    if (!storedData) {
-      throw new Error('Invalid state parameter');
+    // Get the stored auth request data
+    const authRequest = await prisma.oIDCAuthRequest.findUnique({
+      where: { state },
+    });
+
+    if (!authRequest) {
+      throw new Error('Invalid or expired state parameter');
     }
-    
-    logger.info(`Processing OIDC callback with code: ${code.substring(0, 10)}...`);
-    
+
+    // Check if the auth request has expired
+    if (authRequest.expiresAt < new Date()) {
+      await prisma.oIDCAuthRequest.delete({
+        where: { state },
+      });
+      throw new Error('Authorization request has expired');
+    }
+
     try {
-      // Discover the OIDC provider endpoints
-      const issuerInfo = await callWrapper('discover', { url: config.discoveryUrl });
-      
-      // Create parameters for token exchange
-      const tokenParams: Record<string, string> = {
-        client_id: config.clientId,
-        client_secret: config.clientSecret,
-        grant_type: 'authorization_code',
-        code: code,
-        redirect_uri: config.redirectUri
-      };
-      
-      // Only add code_verifier if it exists
-      if (storedData.codeVerifier) {
-        tokenParams.code_verifier = storedData.codeVerifier;
-      }
-      
-      // Exchange the authorization code for tokens
-      const tokenResponse = await fetch(issuerInfo.token_endpoint, {
+      // Exchange code for tokens
+      const tokenResponse = await fetch(config.tokenUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: new URLSearchParams(tokenParams),
+        body: new URLSearchParams({
+          grant_type: 'authorization_code',
+          client_id: config.clientId,
+          client_secret: config.clientSecret,
+          code,
+          redirect_uri: `${process.env.PUBLIC_URL}/api/auth/callback`,
+          code_verifier: authRequest.codeVerifier,
+        }),
       });
-      
+
       if (!tokenResponse.ok) {
         const errorData = await tokenResponse.text();
-        logger.error(`Token exchange failed: ${errorData}`);
+        logger.error('Token exchange failed:', errorData);
         throw new Error(`Failed to exchange code for tokens: ${tokenResponse.status}`);
       }
-      
+
       const tokenSet = await tokenResponse.json();
-      
-      // Get user information using the access token
-      const userInfoResponse = await fetch(issuerInfo.userinfo_endpoint, {
+
+      // Get user info
+      const userInfoResponse = await fetch(config.userInfoUrl, {
         headers: {
-          'Authorization': `Bearer ${tokenSet.access_token}`
-        }
+          'Authorization': `Bearer ${tokenSet.access_token}`,
+        },
       });
-      
+
       if (!userInfoResponse.ok) {
         throw new Error(`Failed to get user info: ${userInfoResponse.status}`);
       }
-      
+
       const userInfo = await userInfoResponse.json();
-      
-      // Check if a specific group is required
-      if (config.group) {
-        logger.info(`OIDC group check required: ${config.group}`);
-        
-        // Check if user belongs to the required group
-        // The exact property to check depends on your OIDC provider's response format
-        // Common properties are groups, roles, or custom claims
-        const userGroups = userInfo.groups || userInfo.roles || [];
-        
-        // Convert to array if it's a string
-        const groupsArray = Array.isArray(userGroups) ? userGroups : [userGroups];
-        
-        if (!groupsArray.includes(config.group)) {
-          logger.warn(`User ${userInfo.sub} does not belong to required group ${config.group}`);
-          throw new Error(`Access denied: User does not belong to required group ${config.group}`);
-        }
-        
-        logger.info(`User ${userInfo.sub} belongs to required group ${config.group}`);
-      }
-      
-      // Clean up the state map
-      stateMap.delete(state);
-      
+
+      // Clean up the auth request
+      await prisma.oIDCAuthRequest.delete({
+        where: { state },
+      });
+
       return {
         tokenSet,
         userInfo,
+        redirectUrl: authRequest.redirectUrl,
       };
     } catch (error) {
       logger.error('Error during OIDC token exchange or validation:', error);
