@@ -227,7 +227,7 @@ export async function updateOIDCConfig(configData: any) {
 export async function getAuthorizationUrl(redirectUrl: string): Promise<AuthUrlData | null> {
   try {
     // Get the OIDC configuration
-    const config = await prisma.oIDCConfig.findUnique({
+    const config = await (prisma as any).OIDCConfig.findUnique({
       where: { id: 'default' },
     });
     
@@ -241,7 +241,7 @@ export async function getAuthorizationUrl(redirectUrl: string): Promise<AuthUrlD
     logger.debug('Generated PKCE values', { nonce, state, codeVerifier, codeChallenge });
 
     // Store PKCE values in database
-    await prisma.oIDCAuthRequest.create({
+    await (prisma as any).OIDCAuthRequest.create({
       data: {
         state,
         codeVerifier,
@@ -252,22 +252,23 @@ export async function getAuthorizationUrl(redirectUrl: string): Promise<AuthUrlD
     });
 
     // Construct authorization URL
-    const params = new URLSearchParams({
-      client_id: config.clientId,
-      redirect_uri: `${process.env.PUBLIC_URL}/api/auth/callback`,
-      response_type: 'code',
-      state,
-      nonce,
-      code_challenge: codeChallenge,
-      code_challenge_method: 'S256',
-      scope: config.scope || 'openid profile email'
-    });
+    const params = new URLSearchParams();
+    if (config.clientId) params.append('client_id', config.clientId);
+    params.append('redirect_uri', `${process.env.PUBLIC_URL}/api/auth/callback`);
+    params.append('response_type', 'code');
+    params.append('state', state);
+    params.append('nonce', nonce);
+    params.append('code_challenge', codeChallenge);
+    params.append('code_challenge_method', 'S256');
+    params.append('scope', config.scope || 'openid profile email');
 
     const authUrl = `${config.authorizationUrl}?${params.toString()}`;
     logger.debug('Generated authorization URL', { authUrl });
 
     return {
       url: authUrl,
+      codeVerifier,
+      nonce
     };
   } catch (error) {
     logger.error('Error generating authorization URL:', error);
@@ -281,7 +282,7 @@ export async function getAuthorizationUrl(redirectUrl: string): Promise<AuthUrlD
 export async function handleCallback(code: string, state: string) {
   try {
     // Get the OIDC configuration
-    const config = await prisma.oIDCConfig.findUnique({
+    const config = await (prisma as any).OIDCConfig.findUnique({
       where: { id: 'default' },
     });
     
@@ -290,7 +291,7 @@ export async function handleCallback(code: string, state: string) {
     }
     
     // Get the stored auth request data
-    const authRequest = await prisma.oIDCAuthRequest.findUnique({
+    const authRequest = await (prisma as any).OIDCAuthRequest.findUnique({
       where: { state },
     });
 
@@ -300,7 +301,7 @@ export async function handleCallback(code: string, state: string) {
 
     // Check if the auth request has expired
     if (authRequest.expiresAt < new Date()) {
-      await prisma.oIDCAuthRequest.delete({
+      await (prisma as any).OIDCAuthRequest.delete({
         where: { state },
       });
       throw new Error('Authorization request has expired');
@@ -308,19 +309,24 @@ export async function handleCallback(code: string, state: string) {
 
     try {
       // Exchange code for tokens
+      if (!config.tokenUrl) {
+        throw new Error('Token URL is not configured');
+      }
+      
+      const tokenParams = new URLSearchParams();
+      tokenParams.append('grant_type', 'authorization_code');
+      if (config.clientId) tokenParams.append('client_id', config.clientId);
+      if (config.clientSecret) tokenParams.append('client_secret', config.clientSecret);
+      tokenParams.append('code', code);
+      tokenParams.append('redirect_uri', `${process.env.PUBLIC_URL}/api/auth/callback`);
+      tokenParams.append('code_verifier', authRequest.codeVerifier);
+      
       const tokenResponse = await fetch(config.tokenUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: new URLSearchParams({
-          grant_type: 'authorization_code',
-          client_id: config.clientId,
-          client_secret: config.clientSecret,
-          code,
-          redirect_uri: `${process.env.PUBLIC_URL}/api/auth/callback`,
-          code_verifier: authRequest.codeVerifier,
-        }),
+        body: tokenParams,
       });
 
       if (!tokenResponse.ok) {
@@ -332,6 +338,10 @@ export async function handleCallback(code: string, state: string) {
       const tokenSet = await tokenResponse.json();
 
       // Get user info
+      if (!config.userInfoUrl) {
+        throw new Error('User info URL is not configured');
+      }
+      
       const userInfoResponse = await fetch(config.userInfoUrl, {
         headers: {
           'Authorization': `Bearer ${tokenSet.access_token}`,
@@ -345,7 +355,7 @@ export async function handleCallback(code: string, state: string) {
       const userInfo = await userInfoResponse.json();
 
       // Clean up the auth request
-      await prisma.oIDCAuthRequest.delete({
+      await (prisma as any).OIDCAuthRequest.delete({
         where: { state },
       });
 
@@ -367,6 +377,9 @@ export async function handleCallback(code: string, state: string) {
 export function isOIDCInitialized(): boolean {
   return wrapperPort !== null;
 }
+
+// Create a Map to store state to redirect URL mappings
+const stateMap = new Map<string, { redirectUrl: string }>();
 
 export function getRedirectUrlFromState(state: string): string | undefined {
   return stateMap.get(state)?.redirectUrl;

@@ -9,6 +9,7 @@ import roomRoutes from './routes/rooms';
 import obsRoutes from './routes/obs';
 import omenRoutes from './routes/omen';
 import securityRoutes from './routes/security';
+import healthRoutes from './routes/health';
 import { logger } from './utils/logger';
 import { initializePassword } from './utils/initPassword';
 import mirotalkRoutes from './routes/mirotalk';
@@ -55,6 +56,9 @@ app.use(express.json());
 // Get base path from environment variable
 const basePath = process.env.BASE_PATH || '/api';
 
+// Health check routes - no rate limiting or auth required
+app.use(`${basePath}/health`, healthRoutes);
+
 // Routes with base path
 app.use(`${basePath}/auth`, authRoutes);
 app.use(`${basePath}/rooms`, roomRoutes);
@@ -74,6 +78,7 @@ const startServer = async () => {
     const PORT = process.env.PORT || 5001;
     server.listen(PORT, () => {
       logger.info(`Server is running on port ${PORT}`);
+      logger.info(`Health check available at ${basePath}/health`);
     });
   } catch (error) {
     logger.error('Failed to start server:', error);
