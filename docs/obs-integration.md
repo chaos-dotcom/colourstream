@@ -4,8 +4,7 @@ This document outlines the OBS WebSocket integration used in the ColourStream pl
 
 ## Overview
 
-The OBS integration supports two primary connection modes:
-- **Browser to OBS Connection**: Direct connection from the user's browser to OBS running on their local machine
+The OBS integration supports one primary connection modes:
 - **Server to OBS Connection**: Connection from our backend server to OBS running anywhere the server can reach
 
 ## Requirements
@@ -34,12 +33,6 @@ The OBS integration supports two primary connection modes:
 
 ## Connection Modes
 
-### Browser to OBS Connection
-- Connects directly from the user's browser to OBS
-- OBS must be running on the user's local machine
-- Ideal for single-machine setups
-- No server intervention needed for OBS control
-- Still saves stream settings (RTMP/SRT) on the server
 
 ### Server to OBS Connection
 - Connects from our backend server to OBS

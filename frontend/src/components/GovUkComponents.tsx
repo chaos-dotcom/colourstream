@@ -69,7 +69,7 @@ export const SectionHeading: React.FC<SectionHeadingProps> = ({ children }) => {
 interface ButtonProps {
   children: ReactNode;
   onClick?: () => void;
-  variant?: 'primary' | 'secondary' | 'warning' | 'grey' | 'purple';
+  variant?: 'primary' | 'secondary' | 'warning' | 'grey' | 'purple' | 'blue' | 'green' | 'red' | 'orange' | 'teal';
   disabled?: boolean;
   type?: 'button' | 'submit' | 'reset';
   fullWidth?: boolean;
@@ -115,6 +115,36 @@ export const Button: React.FC<ButtonProps> = ({
           hoverBg: '#3e2376',
           color: '#ffffff'
         };
+      case 'blue':
+        return {
+          bg: '#1d70b8',
+          hoverBg: '#003078',
+          color: '#ffffff'
+        };
+      case 'green':
+        return {
+          bg: '#00823b',
+          hoverBg: '#00692f',
+          color: '#ffffff'
+        };
+      case 'red':
+        return {
+          bg: '#d4351c',
+          hoverBg: '#aa2a16',
+          color: '#ffffff'
+        };
+      case 'orange':
+        return {
+          bg: '#f47738',
+          hoverBg: '#c25e30',
+          color: '#ffffff'
+        };
+      case 'teal':
+        return {
+          bg: '#28a197',
+          hoverBg: '#208b83',
+          color: '#ffffff'
+        };
       default:
         return {
           bg: '#00703c',
@@ -140,7 +170,7 @@ export const Button: React.FC<ButtonProps> = ({
         padding: '0.5625rem 1.25rem',
         borderRadius: 0,
         border: 'none',
-        boxShadow: '0 2px 0 #002d18',
+        boxShadow: '0 2px 0 rgba(0,0,0,0.15)',
         textTransform: 'none',
         '&:hover': {
           backgroundColor: buttonColors.hoverBg,

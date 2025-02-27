@@ -1,29 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box,
-  Button,
-  Card,
-  CardContent,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   IconButton,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   TextField,
-  Typography,
-  TablePagination,
   Tooltip,
+  TablePagination,
 } from '@mui/material';
 import { Delete as DeleteIcon, Block as BlockIcon } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
 import { api } from '../../utils/api';
+import { 
+  Button as GovUkButton, 
+  SectionHeading,
+  Table as GovUkTable,
+  TableHead as GovUkTableHead,
+  TableBody as GovUkTableBody,
+  TableRow as GovUkTableRow,
+  TableCell as GovUkTableCell
+} from '../GovUkComponents';
 
 interface BlockedIP {
   id: string;
@@ -85,8 +83,8 @@ const BlockIPDialog: React.FC<BlockIPDialogProps> = ({ open, onClose, onBlock })
         />
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button onClick={handleSubmit} disabled={!ip || !reason}>Block</Button>
+        <GovUkButton variant="secondary" onClick={onClose}>Cancel</GovUkButton>
+        <GovUkButton variant="blue" onClick={handleSubmit} disabled={!ip || !reason}>Block</GovUkButton>
       </DialogActions>
     </Dialog>
   );
@@ -144,73 +142,86 @@ export const SecuritySettings: React.FC = () => {
   };
 
   return (
-    <Card>
-      <CardContent>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-          <Typography variant="h6">IP Security</Typography>
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<BlockIcon />}
+    <Box sx={{ 
+      border: '1px solid #b1b4b6', 
+      mb: 3 
+    }}>
+      <Box sx={{ 
+        p: 2, 
+        backgroundColor: '#f3f2f1', 
+        borderBottom: '1px solid #b1b4b6' 
+      }}>
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center' 
+        }}>
+          <SectionHeading>IP Security</SectionHeading>
+          <GovUkButton
+            variant="blue"
             onClick={() => setBlockDialogOpen(true)}
           >
-            Block IP
-          </Button>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <BlockIcon fontSize="small" />
+              Block IP
+            </Box>
+          </GovUkButton>
         </Box>
+      </Box>
 
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>IP Address</TableCell>
-                <TableCell>Reason</TableCell>
-                <TableCell>Blocked At</TableCell>
-                <TableCell>Unblock At</TableCell>
-                <TableCell>Failed Attempts</TableCell>
-                <TableCell>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {blockedIPs.map((ip) => (
-                <TableRow key={ip.id}>
-                  <TableCell>{ip.ip || ip.hashedIP}</TableCell>
-                  <TableCell>{ip.reason}</TableCell>
-                  <TableCell>{new Date(ip.blockedAt).toLocaleString()}</TableCell>
-                  <TableCell>
-                    {ip.unblockAt ? new Date(ip.unblockAt).toLocaleString() : 'Never'}
-                  </TableCell>
-                  <TableCell>{ip.failedAttempts}</TableCell>
-                  <TableCell>
-                    <Tooltip title="Unblock IP">
-                      <IconButton
-                        size="small"
-                        color="error"
-                        onClick={() => handleUnblockIP(ip.ip || ip.hashedIP)}
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </Tooltip>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          <TablePagination
-            component="div"
-            count={total}
-            page={page}
-            onPageChange={handleChangePage}
-            rowsPerPage={rowsPerPage}
-            onRowsPerPageChange={handleChangeRowsPerPage}
-          />
-        </TableContainer>
+      <Box sx={{ p: 2 }}>
+        <GovUkTable>
+          <GovUkTableHead>
+            <GovUkTableRow>
+              <GovUkTableCell header>IP Address</GovUkTableCell>
+              <GovUkTableCell header>Reason</GovUkTableCell>
+              <GovUkTableCell header>Blocked At</GovUkTableCell>
+              <GovUkTableCell header>Unblock At</GovUkTableCell>
+              <GovUkTableCell header>Failed Attempts</GovUkTableCell>
+              <GovUkTableCell header>Actions</GovUkTableCell>
+            </GovUkTableRow>
+          </GovUkTableHead>
+          <GovUkTableBody>
+            {blockedIPs.map((ip) => (
+              <GovUkTableRow key={ip.id}>
+                <GovUkTableCell>{ip.ip || ip.hashedIP}</GovUkTableCell>
+                <GovUkTableCell>{ip.reason}</GovUkTableCell>
+                <GovUkTableCell>{new Date(ip.blockedAt).toLocaleString()}</GovUkTableCell>
+                <GovUkTableCell>
+                  {ip.unblockAt ? new Date(ip.unblockAt).toLocaleString() : 'Never'}
+                </GovUkTableCell>
+                <GovUkTableCell>{ip.failedAttempts}</GovUkTableCell>
+                <GovUkTableCell>
+                  <Tooltip title="Unblock IP">
+                    <IconButton
+                      size="small"
+                      color="error"
+                      onClick={() => handleUnblockIP(ip.ip || ip.hashedIP)}
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  </Tooltip>
+                </GovUkTableCell>
+              </GovUkTableRow>
+            ))}
+          </GovUkTableBody>
+        </GovUkTable>
+        
+        <TablePagination
+          component="div"
+          count={total}
+          page={page}
+          onPageChange={handleChangePage}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+        />
 
         <BlockIPDialog
           open={blockDialogOpen}
           onClose={() => setBlockDialogOpen(false)}
           onBlock={handleBlockIP}
         />
-      </CardContent>
-    </Card>
+      </Box>
+    </Box>
   );
 }; 
