@@ -24,8 +24,8 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install curl for debugging
-RUN apk add --no-cache curl
+# Install curl for debugging and PostgreSQL client for migrations and netcat for wait script
+RUN apk add --no-cache curl postgresql-client netcat-openbsd
 
 # Copy package files and install production dependencies
 COPY package*.json ./

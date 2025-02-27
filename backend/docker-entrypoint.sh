@@ -1,11 +1,31 @@
 #!/bin/sh
 set -e
 
-echo "Checking database..."
+echo "Waiting for PostgreSQL to be ready..."
+# Wait for PostgreSQL to be ready
+for i in $(seq 1 30); do
+  if nc -z postgres 5432; then
+    echo "PostgreSQL is ready!"
+    break
+  fi
+  echo "Waiting for PostgreSQL... ($i/30)"
+  sleep 1
+done
 
-# Use db push instead of migrations
-echo "Pushing database schema..."
-npx prisma db push --force-reset
+if [ "$i" = "30" ]; then
+  echo "PostgreSQL is not available, exiting..."
+  exit 1
+fi
+
+echo "Setting up database..."
+
+# Install PostgreSQL extensions
+echo "Installing PostgreSQL extensions..."
+PGPASSWORD=$POSTGRES_PASSWORD psql -h postgres -U $POSTGRES_USER -d $POSTGRES_DB -c "CREATE EXTENSION IF NOT EXISTS pgcrypto; CREATE EXTENSION IF NOT EXISTS uuid-ossp;"
+
+# Use migrations for initial setup
+echo "Running database migrations..."
+npx prisma migrate deploy
 
 # Create default OBS settings if they don't exist
 echo "Creating default OBS settings..."
