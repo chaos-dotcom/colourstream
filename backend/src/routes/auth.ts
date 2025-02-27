@@ -120,7 +120,13 @@ router.post('/oidc/config', async (req: Request, res: Response, next: NextFuncti
 // OIDC login endpoint
 router.get('/oidc/login', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const redirectUrl = req.query.redirectUrl as string | undefined;
+    const redirectUrl = req.query.redirectUrl as string;
+    
+    // Ensure redirectUrl is provided
+    if (!redirectUrl) {
+      throw new AppError(400, 'Missing redirectUrl parameter');
+    }
+    
     const authUrlData = await getAuthorizationUrl(redirectUrl);
     
     if (!authUrlData) {
