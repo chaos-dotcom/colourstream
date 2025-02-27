@@ -30,7 +30,7 @@ export const verifyToken = async (token: string): Promise<JwtPayload> => {
 
 export const authenticateToken = async (
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {

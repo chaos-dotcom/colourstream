@@ -1,5 +1,5 @@
 import fs from 'fs/promises';
-import _path from '_path';
+// import path from 'path';
 import { logger } from './logger';
 
 export async function updatePasswordHash(newPassword: string): Promise<void> {

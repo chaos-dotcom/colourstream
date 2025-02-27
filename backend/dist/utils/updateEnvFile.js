@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.updatePasswordHash = updatePasswordHash;
 const promises_1 = __importDefault(require("fs/promises"));
+// import path from 'path';
 const logger_1 = require("./logger");
 async function updatePasswordHash(newPassword) {
     try {

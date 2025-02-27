@@ -7,18 +7,27 @@ exports.trackLoginAttempts = exports.ipBlocker = exports.loginLimiter = exports.
 const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 const blockedIP_1 = require("../services/blockedIP");
 const logger_1 = require("../utils/logger");
-// Rate limiter for general requests
+// Rate limiter for general requests - increased limits for production
 exports.generalLimiter = (0, express_rate_limit_1.default)({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // Limit each IP to 100 requests per windowMs
+    max: 300, // Increased from 100 to 300 requests per windowMs
     message: 'Too many requests from this IP, please try again later',
     standardHeaders: true,
     legacyHeaders: false,
+    // Skip rate limiting for certain paths that need higher throughput
+    skip: (req) => {
+        // Skip rate limiting for static assets, websocket connections, and validation endpoints
+        return req.path.includes('/static') ||
+            req.path.includes('/assets') ||
+            req.path.includes('/ws') ||
+            req.path.startsWith('/api/rooms/validate') ||
+            req.path.startsWith('/api/obs/');
+    }
 });
 // Stricter rate limiter for login attempts
 exports.loginLimiter = (0, express_rate_limit_1.default)({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 5, // Limit each IP to 5 login attempts per windowMs
+    max: 10, // Increased from 5 to 10 login attempts per windowMs
     message: 'Too many login attempts from this IP, please try again later',
     standardHeaders: true,
     legacyHeaders: false,

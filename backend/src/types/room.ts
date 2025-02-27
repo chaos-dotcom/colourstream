@@ -1,4 +1,4 @@
-import { Room, Prisma } from '@prisma/client';
+import { Room } from '@prisma/client';
 
 // Type for incoming request body
 export type RoomCreateBody = {
@@ -9,6 +9,7 @@ export type RoomCreateBody = {
 
 // Type for Prisma create operation
 export type RoomCreateInput = {
+  id: string;
   name: string;
   mirotalkRoomId: string;
   streamKey: string;

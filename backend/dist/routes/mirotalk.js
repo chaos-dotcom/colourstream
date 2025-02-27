@@ -30,6 +30,18 @@ function getExpirationInSeconds(expireValue) {
 router.post('/join', auth_1.authenticateToken, async (req, res, next) => {
     try {
         const { room, name, audio, video, screen, hide, notify, token, customUsername, customPassword } = req.body;
+        // Log the incoming request for debugging
+        logger_1.logger.debug('MiroTalk join request received:', {
+            room,
+            name,
+            hasToken: !!token,
+            customUsername: customUsername || '(empty)',
+            customUsernameType: typeof customUsername,
+            customUsernameLength: customUsername === null || customUsername === void 0 ? void 0 : customUsername.length,
+            hasCustomPassword: customPassword ? true : false,
+            customPasswordType: typeof customPassword,
+            customPasswordLength: customPassword === null || customPassword === void 0 ? void 0 : customPassword.length
+        });
         if (!process.env.JWT_KEY) {
             throw new errorHandler_1.AppError(500, 'JWT_KEY environment variable is not set');
         }
@@ -43,29 +55,48 @@ router.post('/join', auth_1.authenticateToken, async (req, res, next) => {
                 presenter: token.presenter === "1" || token.presenter === "true" ? "true" : "false",
                 expire: token.expire || "24h"
             };
+            logger_1.logger.debug('Using provided token payload');
         }
         else {
             // Get username and password from custom parameters, environment, or use default
-            let username = customUsername || 'globalUsername';
-            let password = customPassword || 'globalPassword';
+            // Treat empty strings as undefined
+            let username = (customUsername && customUsername.trim() !== '') ? customUsername : undefined;
+            let password = (customPassword && customPassword.trim() !== '') ? customPassword : undefined;
+            logger_1.logger.debug('Processing custom credentials:', {
+                username: username || '(undefined)',
+                hasPassword: !!password
+            });
             // If no custom credentials provided, try to get from environment
-            if (!customUsername || !customPassword) {
+            if (!username || !password) {
                 try {
                     if (process.env.HOST_USERS) {
                         // Remove any surrounding quotes that might be included in the env var
                         const cleanedHostUsers = process.env.HOST_USERS.replace(/^['"]|['"]$/g, '');
+                        logger_1.logger.debug('Parsing HOST_USERS:', { cleanedHostUsers });
                         const parsedUsers = JSON.parse(cleanedHostUsers);
                         if (parsedUsers && parsedUsers.length > 0) {
-                            if (!customUsername)
+                            if (!username) {
                                 username = parsedUsers[0].username;
-                            if (!customPassword)
+                                logger_1.logger.debug('Using username from HOST_USERS');
+                            }
+                            if (!password) {
                                 password = parsedUsers[0].password;
+                                logger_1.logger.debug('Using password from HOST_USERS');
+                            }
                         }
                     }
                 }
                 catch (parseError) {
                     logger_1.logger.error('Error parsing HOST_USERS environment variable:', parseError);
                     // Continue with default values
+                    if (!username) {
+                        username = 'globalUsername';
+                        logger_1.logger.debug('Using default username after error');
+                    }
+                    if (!password) {
+                        password = 'globalPassword';
+                        logger_1.logger.debug('Using default password after error');
+                    }
                 }
             }
             // Create token payload with custom or default credentials
@@ -80,7 +111,7 @@ router.post('/join', auth_1.authenticateToken, async (req, res, next) => {
             username: tokenPayload.username,
             presenter: tokenPayload.presenter,
             expire: tokenPayload.expire,
-            usingCustomCredentials: !!(customUsername || customPassword)
+            usingCustomCredentials: !!(customUsername && customUsername.trim() !== '' || customPassword && customPassword.trim() !== '')
         });
         // Encrypt payload using AES
         const payloadString = JSON.stringify(tokenPayload);
@@ -122,6 +153,19 @@ router.post('/join', auth_1.authenticateToken, async (req, res, next) => {
 router.post('/generate-token', auth_1.authenticateToken, async (req, res, next) => {
     try {
         const { roomId, name, isPresenter, expireTime = "1d", customUsername, customPassword } = req.body;
+        // Log the incoming request for debugging
+        logger_1.logger.debug('MiroTalk generate-token request received:', {
+            roomId,
+            name,
+            isPresenter,
+            expireTime,
+            customUsername: customUsername || '(empty)',
+            customUsernameType: typeof customUsername,
+            customUsernameLength: customUsername === null || customUsername === void 0 ? void 0 : customUsername.length,
+            hasCustomPassword: customPassword ? true : false,
+            customPasswordType: typeof customPassword,
+            customPasswordLength: customPassword === null || customPassword === void 0 ? void 0 : customPassword.length
+        });
         if (!process.env.JWT_KEY) {
             throw new errorHandler_1.AppError(500, 'JWT_KEY environment variable is not set');
         }
@@ -159,26 +203,44 @@ router.post('/generate-token', auth_1.authenticateToken, async (req, res, next) 
             ? `${Math.floor(finalExpireSeconds / (24 * 3600))}d`
             : `${Math.floor(finalExpireSeconds / 3600)}h`;
         // Get username and password from custom parameters, environment, or use default
-        let username = customUsername || 'globalUsername';
-        let password = customPassword || 'globalPassword';
+        // Treat empty strings as undefined
+        let username = (customUsername && customUsername.trim() !== '') ? customUsername : undefined;
+        let password = (customPassword && customPassword.trim() !== '') ? customPassword : undefined;
+        logger_1.logger.debug('Processing custom credentials:', {
+            username: username || '(undefined)',
+            hasPassword: !!password
+        });
         // If no custom credentials provided, try to get from environment
-        if (!customUsername || !customPassword) {
+        if (!username || !password) {
             try {
                 if (process.env.HOST_USERS) {
                     // Remove any surrounding quotes that might be included in the env var
                     const cleanedHostUsers = process.env.HOST_USERS.replace(/^['"]|['"]$/g, '');
+                    logger_1.logger.debug('Parsing HOST_USERS:', { cleanedHostUsers });
                     const parsedUsers = JSON.parse(cleanedHostUsers);
                     if (parsedUsers && parsedUsers.length > 0) {
-                        if (!customUsername)
+                        if (!username) {
                             username = parsedUsers[0].username;
-                        if (!customPassword)
+                            logger_1.logger.debug('Using username from HOST_USERS');
+                        }
+                        if (!password) {
                             password = parsedUsers[0].password;
+                            logger_1.logger.debug('Using password from HOST_USERS');
+                        }
                     }
                 }
             }
             catch (parseError) {
                 logger_1.logger.error('Error parsing HOST_USERS environment variable:', parseError);
                 // Continue with default values
+                if (!username) {
+                    username = 'globalUsername';
+                    logger_1.logger.debug('Using default username after error');
+                }
+                if (!password) {
+                    password = 'globalPassword';
+                    logger_1.logger.debug('Using default password after error');
+                }
             }
         }
         // Construct token payload
@@ -193,7 +255,7 @@ router.post('/generate-token', auth_1.authenticateToken, async (req, res, next) 
             presenter: tokenPayload.presenter,
             expire: tokenPayload.expire,
             roomExpiry: maxExpireTime,
-            usingCustomCredentials: !!(customUsername || customPassword)
+            usingCustomCredentials: !!(customUsername && customUsername.trim() !== '' || customPassword && customPassword.trim() !== '')
         });
         // Encrypt payload using AES
         const payloadString = JSON.stringify(tokenPayload);
@@ -234,7 +296,7 @@ router.post('/generate-token', auth_1.authenticateToken, async (req, res, next) 
     }
 });
 // Add a new endpoint to get default MiroTalk credentials
-router.get('/default-credentials', auth_1.authenticateToken, async (req, res, next) => {
+router.get('/default-credentials', auth_1.authenticateToken, async (_req, res, next) => {
     try {
         // Default values if environment variable is not set or cannot be parsed
         let defaultCredentials = {

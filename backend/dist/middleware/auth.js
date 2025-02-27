@@ -8,7 +8,7 @@ const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const errorHandler_1 = require("./errorHandler");
 const verifyToken = async (token) => {
     try {
-        const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_KEY);
+        const decoded = jsonwebtoken_1.default.verify(token, process.env.ADMIN_AUTH_SECRET);
         return decoded;
     }
     catch (error) {
@@ -16,7 +16,7 @@ const verifyToken = async (token) => {
     }
 };
 exports.verifyToken = verifyToken;
-const authenticateToken = async (req, res, next) => {
+const authenticateToken = async (req, _res, next) => {
     try {
         const authHeader = req.headers.authorization;
         const token = authHeader && authHeader.split(' ')[1];
