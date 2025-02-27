@@ -1,15 +1,15 @@
 import { PrismaClient } from '@prisma/client';
 import { logger } from '../utils/logger';
-import * as crypto from 'crypto';
+// import * as crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
 /**
- * Utility function to generate a stream key
+ * Utility function to generate a stream key - for future reference only
  */
-// const _generateStreamKey = (): string => { // Unused code
-  return crypto.randomBytes(16).toString('hex');
-};
+// const _generateStreamKey = (): string => {
+//   return crypto.randomBytes(16).toString('hex');
+// };
 
 /**
  * Check the format of stream keys in the database

@@ -17,7 +17,8 @@ import {
   handleCallback, 
   getOIDCConfig, 
   updateOIDCConfig, 
-  isOIDCInitialized,
+  // isOIDCInitialized is not used, so let's comment it out
+  // isOIDCInitialized,
   getRedirectUrlFromState
 } from '../services/oidc';
 

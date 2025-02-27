@@ -1,16 +1,14 @@
 import express, { Request, Response, NextFunction } from 'express';
-import { body, param, _validationResult } from 'express-validator';
-import _bcrypt from 'bcryptjs';
-import { _authenticateToken } from '../middleware/auth';
+// import { body, param } from 'express-validator';
+// import bcrypt from 'bcryptjs';
+// import { authenticateToken } from '../middleware/auth';
 import prisma from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { logger } from '../utils/logger';
-import crypto from 'crypto';
-import _fetch from 'node-_fetch';
+// import fetch from 'node-fetch';
 import jwt from 'jsonwebtoken';
 import CryptoJS from 'crypto-js';
-import { RoomCreateBody, RoomCreateInput, RoomSelect } from '../types/room';
-import { Prisma } from '@prisma/client';
+import { RoomCreateInput } from '../types/room';
 import { generateUniqueId } from '../utils/idGenerator';
 import rateLimit from 'express-rate-limit';
 
@@ -25,20 +23,22 @@ const roomValidationLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-interface _ValidateRoomBody {
+// These are for documentation purposes only
+/* interface _ValidateRoomBody {
   password: string;
   isPresenter?: boolean;
-}
+} */
 
-// Utility function to generate random IDs
-const _generateRandomId = (length: number = 12): string => {
-  return crypto.randomBytes(length).toString('hex');
-};
+// Middleware definitions for documentation purposes only
+/* const _validateRoomId = [
+  param('id').notEmpty().withMessage('Invalid room ID'),
+];
 
-// Utility function to generate stream key
-const _generateStreamKey = (): string => {
-  return crypto.randomBytes(16).toString('hex');
-};
+const _validateRoom = [
+  body('name').notEmpty().trim().withMessage('Name is required'),
+  body('password').notEmpty().withMessage('Password is required'),
+  body('expiryDays').isInt({ min: 1 }).withMessage('Expiry days must be a positive number'),
+]; */
 
 // Utility function to generate MiroTalk token
 const generateMiroTalkToken = async (
@@ -145,18 +145,6 @@ const generateMiroTalkToken = async (
   }
 };
 
-// Middleware to validate room ID
-const _validateRoomId = [
-  param('id').notEmpty().withMessage('Invalid room ID'),
-];
-
-// Middleware to validate room creation/update
-const _validateRoom = [
-  body('name').notEmpty().trim().withMessage('Name is required'),
-  body('password').notEmpty().withMessage('Password is required'),
-  body('expiryDays').isInt({ min: 1 }).withMessage('Expiry days must be a positive number'),
-];
-
 // Get all rooms
 router.get("/", async (_req: Request, res: Response) => {
   try {
@@ -241,7 +229,7 @@ router.post("/", async (req: Request, res: Response) => {
     }
 
     // Create room data
-    const roomData: Prisma.RoomCreateInput = {
+    const roomData: RoomCreateInput = {
       id: roomId, // Use the generated ID
       name,
       mirotalkRoomId,

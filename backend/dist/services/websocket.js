@@ -11,11 +11,12 @@ class WebSocketService {
         this.clients = new Set();
         this.wss = new ws_1.default.Server({
             server,
-            path: '/api/ws',
+            // Remove the path restriction to handle all paths
+            // path: '/api/ws',
             // Increase timeout values to prevent premature disconnections
             clientTracking: true,
         });
-        logger_1.logger.info('WebSocket server initialized with path: /api/ws');
+        logger_1.logger.info('WebSocket server initialized without path restriction to handle all WebSocket connections');
         this.setupWebSocketServer();
         this.pingInterval = this.startPingInterval();
     }
@@ -46,7 +47,7 @@ class WebSocketService {
                 ws.type = decoded.type;
                 ws.isAlive = true;
                 // Only allow admin connections to the OBS status endpoint
-                if (path.includes('/obs-status') && ws.type !== 'admin') {
+                if (path.includes('/api/ws/obs-status') && ws.type !== 'admin') {
                     logger_1.logger.warn(`WebSocket connection rejected: Unauthorized access to ${path} by ${ws.userId} (${ws.type})`, {
                         userId: ws.userId,
                         type: ws.type,
@@ -63,26 +64,20 @@ class WebSocketService {
                     totalClients: this.clients.size
                 });
                 // Send initial status message for OBS connections
-                if (path.includes('/obs-status') && ws.type === 'admin') {
+                if (path.includes('/api/ws/obs-status') && ws.type === 'admin') {
                     // Import here to avoid circular dependency
                     const { obsService } = require('../index');
                     const status = obsService.getWebSocketStatus();
-                    const statusMessage = JSON.stringify({
-                        type: 'obs_status',
-                        status: status.status,
-                        ...(status.error && { error: status.error })
-                    });
-                    try {
-                        ws.send(statusMessage);
-                        logger_1.logger.info(`Sent initial OBS status to client ${ws.userId}: ${status.status}`, {
-                            userId: ws.userId,
-                            status: status.status,
-                            error: status.error
-                        });
-                    }
-                    catch (error) {
-                        logger_1.logger.error(`Error sending initial status to client ${ws.userId}:`, error);
-                    }
+                    // Use the WebSocketService to send the initial status
+                    const websocketService = require('./websocketService').default;
+                    // Add a unique ID to the client for the WebSocketService
+                    ws.id = `${ws.userId}-${Date.now()}`;
+                    ws.isAdmin = ws.type === 'admin';
+                    // Add the client to the WebSocketService
+                    websocketService.addClient(ws);
+                    // Send the initial status
+                    websocketService.sendInitialOBSStatus(ws, status);
+                    logger_1.logger.info(`Added client ${ws.id} to WebSocketService. Total clients: ${websocketService.getClientCount()}`);
                 }
                 ws.on('pong', () => {
                     ws.isAlive = true;
@@ -95,6 +90,11 @@ class WebSocketService {
                 });
                 ws.on('close', (code, reason) => {
                     this.clients.delete(ws);
+                    // Also remove from WebSocketService if it was added
+                    if (ws.id && path.includes('/api/ws/obs-status')) {
+                        const websocketService = require('./websocketService').default;
+                        websocketService.removeClient(ws.id);
+                    }
                     logger_1.logger.info(`WebSocket client disconnected: ${ws.userId} with code ${code} and reason: ${reason || 'No reason provided'}`, {
                         userId: ws.userId,
                         code,

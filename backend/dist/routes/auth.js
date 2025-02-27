@@ -11,6 +11,7 @@ const logger_1 = require("../utils/logger");
 const prisma_1 = __importDefault(require("../lib/prisma"));
 const server_1 = require("@simplewebauthn/server");
 const base64url_1 = __importDefault(require("base64url"));
+const oidc_1 = require("../services/oidc");
 const router = express_1.default.Router();
 // WebAuthn configuration
 const rpName = 'ColourStream Admin';
@@ -30,6 +31,97 @@ function bigIntToNumber(value) {
     }
     return number;
 }
+// Initialize OIDC on startup
+(0, oidc_1.initializeOIDC)().catch(error => {
+    logger_1.logger.error('Failed to initialize OIDC', error);
+});
+// OIDC configuration endpoint
+router.get('/oidc/config', async (_req, res, next) => {
+    var _a;
+    try {
+        const config = await (0, oidc_1.getOIDCConfig)();
+        // Don't expose client secret
+        const configWithoutSecret = config ? {
+            ...config,
+            clientSecret: ((_a = config.config) === null || _a === void 0 ? void 0 : _a.clientSecret) ? '********' : null
+        } : null;
+        res.json({
+            status: 'success',
+            data: configWithoutSecret
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+// Update OIDC configuration
+router.post('/oidc/config', async (req, res, next) => {
+    var _a, _b;
+    try {
+        const config = req.body;
+        // If client secret is not provided or is masked, keep the existing one
+        if (!config.clientSecret || config.clientSecret === '********') {
+            const existingConfig = await (0, oidc_1.getOIDCConfig)();
+            if (existingConfig) {
+                config.clientSecret = (_a = existingConfig.config) === null || _a === void 0 ? void 0 : _a.clientSecret;
+            }
+        }
+        const updatedConfig = await (0, oidc_1.updateOIDCConfig)(config);
+        // Don't expose client secret in response
+        const configWithoutSecret = {
+            ...updatedConfig,
+            clientSecret: ((_b = updatedConfig.config) === null || _b === void 0 ? void 0 : _b.clientSecret) ? '********' : null
+        };
+        res.json({
+            status: 'success',
+            data: configWithoutSecret
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+// OIDC login endpoint
+router.get('/oidc/login', async (req, res, next) => {
+    try {
+        const redirectUrl = req.query.redirectUrl;
+        const authUrlData = await (0, oidc_1.getAuthorizationUrl)(redirectUrl);
+        if (!authUrlData) {
+            throw new errorHandler_1.AppError(500, 'OIDC is not configured or initialized');
+        }
+        res.json({
+            status: 'success',
+            data: {
+                url: authUrlData.url
+            }
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+// OIDC callback endpoint
+router.get('/oidc/callback', async (req, res, next) => {
+    try {
+        const { code, state } = req.query;
+        if (!code || !state) {
+            throw new errorHandler_1.AppError(400, 'Missing code or state parameter');
+        }
+        const result = await (0, oidc_1.handleCallback)(code, state);
+        if (!result) {
+            throw new errorHandler_1.AppError(500, 'Failed to handle OIDC callback');
+        }
+        // Generate JWT token
+        const token = jsonwebtoken_1.default.sign({ userId: 'admin', type: 'admin' }, process.env.ADMIN_AUTH_SECRET, { expiresIn: '7d' });
+        // Get redirect URL from state
+        const redirectUrl = (0, oidc_1.getRedirectUrlFromState)(state) || '/admin/dashboard';
+        // Redirect to frontend with token
+        res.redirect(`${redirectUrl}?token=${token}`);
+    }
+    catch (error) {
+        next(error);
+    }
+});
 // WebAuthn registration endpoint
 router.post('/webauthn/register', auth_1.authenticateToken, async (req, res, next) => {
     var _a;
@@ -168,10 +260,21 @@ router.post('/webauthn/register/verify', auth_1.authenticateToken, async (req, r
 // WebAuthn authentication endpoint
 router.post('/webauthn/authenticate', async (req, res, next) => {
     try {
+        logger_1.logger.info('Starting WebAuthn authentication process', {
+            userAgent: req.headers['user-agent'],
+            ip: req.ip,
+            path: req.path,
+            fullUrl: req.protocol + '://' + req.get('host') + req.originalUrl
+        });
         const credentials = await prisma_1.default.webAuthnCredential.findMany({
             where: { userId: 'admin' }
         });
+        logger_1.logger.info('Found credentials for authentication', {
+            count: credentials.length,
+            credentialIds: credentials.map(c => c.credentialId.substring(0, 10) + '...')
+        });
         if (credentials.length === 0) {
+            logger_1.logger.error('No passkeys registered for authentication');
             throw new errorHandler_1.AppError(400, 'No passkey registered');
         }
         const options = await (0, server_1.generateAuthenticationOptions)({
@@ -182,18 +285,8 @@ router.post('/webauthn/authenticate', async (req, res, next) => {
                     transports = cred.transports ? JSON.parse(cred.transports) : undefined;
                 }
                 catch (error) {
-                    logger_1.logger.warn(`Failed to parse transports for credential ${cred.id}: ${error.message}`);
-                    // If parsing fails, try to handle common cases
-                    if (cred.transports === 'internal') {
-                        transports = ['internal'];
-                    }
-                    else if (cred.transports) {
-                        // Try to split by comma if it's a comma-separated string
-                        transports = cred.transports.split(',').map(t => t.trim());
-                    }
-                    else {
-                        transports = undefined;
-                    }
+                    logger_1.logger.warn(`Failed to parse transports for credential ${cred.id}`);
+                    transports = undefined;
                 }
                 return {
                     id: base64url_1.default.toBuffer(cred.credentialId),
@@ -203,65 +296,139 @@ router.post('/webauthn/authenticate', async (req, res, next) => {
             }),
             userVerification: 'preferred',
         });
+        // Store challenge for verification
         currentChallenge = options.challenge;
+        logger_1.logger.info('Generated authentication options', {
+            rpID,
+            origin,
+            challenge: (currentChallenge === null || currentChallenge === void 0 ? void 0 : currentChallenge.substring(0, 10)) + '...',
+            hasChallenge: !!currentChallenge
+        });
         res.json(options);
     }
     catch (error) {
+        logger_1.logger.error('Error in WebAuthn authentication', {
+            error: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined
+        });
         next(error);
     }
 });
 // WebAuthn authentication verification endpoint
 router.post('/webauthn/authenticate/verify', async (req, res, next) => {
+    var _a, _b;
     try {
+        logger_1.logger.info('Starting WebAuthn authentication verification', {
+            userAgent: req.headers['user-agent'],
+            ip: req.ip,
+            path: req.path,
+            fullUrl: req.protocol + '://' + req.get('host') + req.originalUrl,
+            hasBody: !!req.body,
+            credentialIdPresent: !!((_a = req.body) === null || _a === void 0 ? void 0 : _a.id)
+        });
         if (!currentChallenge) {
+            logger_1.logger.error('No challenge found for verification');
             throw new errorHandler_1.AppError(400, 'Authentication challenge not found');
         }
-        // Find the credential that matches the authentication response
-        const credential = await prisma_1.default.webAuthnCredential.findFirst({
-            where: {
-                userId: 'admin',
-                credentialId: base64url_1.default.encode(Buffer.from(req.body.id, 'base64url'))
-            }
+        logger_1.logger.info('Challenge found for verification', {
+            challenge: currentChallenge.substring(0, 10) + '...'
         });
+        if (!req.body || !req.body.id) {
+            logger_1.logger.error('Invalid authentication response', { body: JSON.stringify(req.body) });
+            throw new errorHandler_1.AppError(400, 'Invalid authentication response. Missing credential ID.');
+        }
+        // Find the credential in the database
+        const credentialId = req.body.id;
+        logger_1.logger.info('Looking up credential', {
+            credentialId: typeof credentialId === 'string' ? credentialId.substring(0, 10) + '...' : 'not a string',
+            credentialType: typeof credentialId
+        });
+        const credentials = await prisma_1.default.webAuthnCredential.findMany({
+            where: { userId: 'admin' }
+        });
+        logger_1.logger.info('Found credentials in database', {
+            count: credentials.length,
+            credentialIds: credentials.map(c => c.credentialId.substring(0, 10) + '...')
+        });
+        // Find the matching credential
+        const credential = credentials.find(cred => cred.credentialId === credentialId);
         if (!credential) {
-            throw new errorHandler_1.AppError(400, 'No matching passkey found');
+            logger_1.logger.error('Credential not found', {
+                credentialId: typeof credentialId === 'string' ? credentialId.substring(0, 10) + '...' : 'not a string',
+                availableCredentials: credentials.map(c => ({
+                    id: c.credentialId.substring(0, 10) + '...',
+                    createdAt: c.createdAt
+                }))
+            });
+            throw new errorHandler_1.AppError(400, 'Authentication failed: Credential not found');
         }
-        const verification = await (0, server_1.verifyAuthenticationResponse)({
-            response: req.body,
-            expectedChallenge: currentChallenge,
-            expectedOrigin: origin,
-            expectedRPID: rpID,
-            authenticator: {
-                credentialID: base64url_1.default.toBuffer(credential.credentialId),
-                credentialPublicKey: base64url_1.default.toBuffer(credential.publicKey),
-                counter: bigIntToNumber(credential.counter),
-            },
+        logger_1.logger.info('Found matching credential', {
+            credentialId: credential.credentialId.substring(0, 10) + '...',
+            createdAt: credential.createdAt
         });
-        if (verification.verified) {
-            // Update counter
-            await prisma_1.default.webAuthnCredential.update({
-                where: { id: credential.id },
-                data: {
-                    counter: BigInt(verification.authenticationInfo.newCounter),
-                    lastUsed: new Date()
-                }
+        try {
+            // Verify the authentication
+            logger_1.logger.info('Verifying authentication response', {
+                challenge: currentChallenge.substring(0, 10) + '...',
+                origin,
+                rpID
             });
-            // Generate JWT token - no need to check for password here
-            const token = jsonwebtoken_1.default.sign({ userId: 'admin' }, process.env.JWT_SECRET, { expiresIn: '7d' });
-            res.json({
-                status: 'success',
-                data: { token }
+            const verification = await (0, server_1.verifyAuthenticationResponse)({
+                response: req.body,
+                expectedChallenge: currentChallenge,
+                expectedOrigin: origin,
+                expectedRPID: rpID,
+                authenticator: {
+                    credentialID: base64url_1.default.toBuffer(credential.credentialId),
+                    credentialPublicKey: base64url_1.default.toBuffer(credential.publicKey),
+                    counter: bigIntToNumber(credential.counter),
+                },
             });
+            logger_1.logger.info('Authentication verification result', {
+                verified: verification.verified,
+                newCounter: (_b = verification.authenticationInfo) === null || _b === void 0 ? void 0 : _b.newCounter
+            });
+            if (verification.verified) {
+                // Update the counter in the database
+                await prisma_1.default.webAuthnCredential.update({
+                    where: { id: credential.id },
+                    data: {
+                        counter: BigInt(verification.authenticationInfo.newCounter),
+                        lastUsed: new Date()
+                    },
+                });
+                // Clear the challenge after successful verification
+                currentChallenge = undefined;
+                // Generate a JWT token
+                const token = jsonwebtoken_1.default.sign({ userId: 'admin', role: 'admin' }, process.env.ADMIN_AUTH_SECRET, { expiresIn: '7d' });
+                logger_1.logger.info('Authentication successful, token generated');
+                // Return the token
+                return res.json({
+                    status: 'success',
+                    data: {
+                        token
+                    }
+                });
+            }
+            else {
+                logger_1.logger.error('Authentication verification failed');
+                throw new errorHandler_1.AppError(400, 'Authentication verification failed');
+            }
         }
-        else {
-            throw new errorHandler_1.AppError(401, 'Authentication failed');
+        catch (error) {
+            logger_1.logger.error('Error during authentication verification', {
+                error: error.message,
+                stack: error.stack
+            });
+            // Clear the challenge on error
+            currentChallenge = undefined;
+            throw new errorHandler_1.AppError(400, `Authentication failed: ${error.message}`);
         }
     }
     catch (error) {
-        next(error);
-    }
-    finally {
+        // Clear the challenge on any error
         currentChallenge = undefined;
+        next(error);
     }
 });
 // First-time setup registration endpoint (no auth required)
@@ -362,7 +529,7 @@ router.post('/webauthn/first-time-setup/verify', async (req, res, next) => {
         // Clear the challenge
         currentChallenge = undefined;
         // Generate a token for the admin user
-        const token = jsonwebtoken_1.default.sign({ userId: 'admin', type: 'admin' }, process.env.COLOURSTREAM_JWT_SECRET, { expiresIn: '7d' });
+        const token = jsonwebtoken_1.default.sign({ userId: 'admin', type: 'admin' }, process.env.ADMIN_AUTH_SECRET, { expiresIn: '7d' });
         logger_1.logger.info('First-time setup passkey registered successfully');
         res.json({
             status: 'success',
