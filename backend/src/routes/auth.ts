@@ -19,7 +19,8 @@ import {
   updateOIDCConfig, 
   // isOIDCInitialized is not used, so let's comment it out
   // isOIDCInitialized,
-  getRedirectUrlFromState
+  getRedirectUrlFromState,
+  initializeOIDCFromEnv
 } from '../services/oidc';
 
 const router = express.Router();
@@ -46,10 +47,25 @@ function bigIntToNumber(value: bigint): number {
   return number;
 }
 
-// Initialize OIDC on startup
-initializeOIDC().catch(error => {
-  logger.error('Failed to initialize OIDC', error);
-});
+// Initialize OIDC from environment variables first, then fall back to database config
+initializeOIDCFromEnv()
+  .then(success => {
+    if (!success) {
+      // If environment initialization fails, try database initialization
+      return initializeOIDC();
+    }
+    return success;
+  })
+  .then(success => {
+    if (success) {
+      logger.info('OIDC initialized successfully');
+    } else {
+      logger.warn('OIDC initialization failed, authentication will be limited to passkeys');
+    }
+  })
+  .catch(error => {
+    logger.error('Failed to initialize OIDC', error);
+  });
 
 // OIDC configuration endpoint
 router.get('/oidc/config', async (_req: Request, res: Response, next: NextFunction) => {
