@@ -18,4 +18,4 @@ certs/chain.pem
 certs/fullchain.pem
 certs/privkey.pem
 node_modules
-mirotalk_backup/mirotalk_backup/
+mirotalk_backup/
