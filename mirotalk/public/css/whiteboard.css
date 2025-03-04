@@ -1,0 +1,190 @@
+/*--------------------------------------------------------------
+# Whiteboard
+--------------------------------------------------------------*/
+
+#whiteboard {
+    z-index: 11;
+    position: fixed;
+    margin: auto;
+    padding: 10px;
+    width: var(--wb-width);
+    height: var(--wb-height);
+    background: var(--wb-bg);
+    border: var(--border);
+    box-shadow: var(--box-shadow);
+    border-radius: 10px;
+    /* center */
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    /* fade in */
+    -webkit-animation: fadeIn ease-in 1;
+    -moz-animation: fadeIn ease-in 1;
+    animation: fadeIn ease-in 1;
+    -webkit-animation-fill-mode: forwards;
+    -moz-animation-fill-mode: forwards;
+    animation-fill-mode: forwards;
+    -webkit-animation-duration: 1s;
+    -moz-animation-duration: 1s;
+    animation-duration: 1s;
+    overflow: hidden;
+}
+
+.whiteboard-header {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.2);
+    color: #ffffff;
+    cursor: move;
+}
+
+.whiteboard-header-title {
+    display: flex;
+    align-items: center;
+}
+
+#whiteboardUnlockBtn,
+#whiteboardLockBtn {
+    display: none;
+    margin-left: 3px;
+    margin-right: 3px;
+}
+
+.whiteboard-header-title button,
+.whiteboard-header-options button {
+    padding: 10px;
+    font-size: 1rem;
+    background: transparent;
+    color: #fff;
+    border: none !important;
+    border-radius: 5px;
+    transition: all 0.3s ease-in-out;
+    transition: background 0.23s;
+}
+
+.whiteboard-header-title button:hover,
+.whiteboard-header-options button:hover {
+    background: var(--body-bg);
+}
+
+.whiteboardColorPicker {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    padding: 0;
+    width: 20px;
+    height: 15px;
+    margin: 2px;
+    border-radius: 20px;
+    border: solid 0.5px #afadad38;
+    cursor: pointer;
+}
+.whiteboardColorPicker:hover {
+    transform: var(--btns-hover-scale);
+    transition: all 0.3s ease-in-out;
+}
+.whiteboardColorPicker::-webkit-color-swatch {
+    border: none;
+    border-radius: 20px;
+    padding: 0;
+}
+.whiteboardColorPicker::-webkit-color-swatch-wrapper {
+    border: none;
+    border-radius: 20px;
+    padding: 0;
+}
+.whiteboardColorPicker::-moz-color-swatch {
+    border: none;
+    border-radius: 20px;
+    padding: 0;
+}
+.whiteboardColorPicker::-moz-color-swatch-wrapper {
+    border: none;
+    border-radius: 20px;
+    padding: 0;
+}
+.whiteboardColorPicker::color-swatch {
+    border: none;
+    border-radius: 20px;
+    padding: 0;
+}
+.whiteboardColorPicker::color-swatch-wrapper {
+    border: none;
+    border-radius: 20px;
+    padding: 0;
+}
+
+.hidden {
+    display: none;
+}
+
+.show {
+    display: block;
+}
+
+/* Styles for the dropdown button */
+.whiteboard-dropdown {
+    margin-left: 5px;
+    float: right;
+    position: relative;
+}
+
+/* Styles for the dropdown menu container */
+.whiteboard-dropdown-menu {
+    z-index: 12;
+    position: absolute;
+    margin-top: 5px;
+    top: 100%;
+    right: 0;
+    display: none;
+    border-radius: 5px;
+    background: var(--body-bg);
+    /* box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); */
+    box-shadow: var(--box-shadow);
+    border: none;
+    overflow-y: auto;
+    overflow-x: hidden;
+    max-height: calc(var(--wb-height) * 1px) !important;
+}
+
+/* Styles for dropdown menu items */
+.whiteboard-dropdown-menu button {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    width: 160px;
+    font-size: 0.8em;
+    text-align: left;
+    padding: 10px;
+    border: none;
+    background: none;
+    cursor: pointer;
+}
+
+.whiteboard-dropdown-menu button:hover {
+    background: var(--select-bg) !important;
+    color: #ffffff;
+}
+
+/* Styles for icons and SVGs inside buttons */
+.whiteboard-dropdown-menu button i,
+.whiteboard-dropdown-menu button svg {
+    margin-right: 8px;
+}
+
+/* Styles for list items */
+.whiteboard-dropdown-menu li {
+    padding: 8px 16px;
+}
+
+.whiteboard-dropdown-menu li:hover {
+    background: var(--body-bg);
+}
+
+/* Ensuring dropdown buttons within list items have transparent background */
+.whiteboard-dropdown-menu li button {
+    background: transparent;
+    padding: 0;
+}
