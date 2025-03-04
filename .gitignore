@@ -9,6 +9,7 @@ backend/.env
 frontend/.env
 mirotalk/.env
 ovenmediaengine/.env
+
 # Certificates
 certs
 certs/certs
