@@ -19,3 +19,18 @@ certs/fullchain.pem
 certs/privkey.pem
 node_modules
 mirotalk_backup/
+docker-compose.test.yml
+
+# Traefik
+traefik/certs
+traefik/certs/private
+traefik/certs/certs
+traefik/acme.json
+traefik/acme.json.backup
+traefik/certs/chain.pem
+traefik/certs/fullchain.pem
+traefik/certs/privkey.pem
+traefik/certs/letsencrypt.key
+traefik/certs/letsencrypt.key.pem
+traefik/certs/letsencrypt.key.pem.enc
+traefik/ome
