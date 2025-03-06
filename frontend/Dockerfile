@@ -20,8 +20,7 @@ COPY . .
 
 # Set environment variables for build
 ENV NODE_ENV=production
-ENV VITE_API_URL=https://live.colourstream.johnrogerscolour.co.uk/api
-
+ENV VITE_API_URL=${VITE_API_URL}
 # Build the app
 RUN npm run build
 

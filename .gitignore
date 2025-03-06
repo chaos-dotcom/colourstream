@@ -45,3 +45,4 @@ package-lock.json
 
 .git-filtered-backup
 letsencrypt
+security-reports
