@@ -9,9 +9,11 @@ import type {
   WebAuthnAuthenticationOptions,
 } from '../types';
 
-// Use the explicit API URL with the correct protocol
-const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+// Use the environment variable if available, otherwise fall back to window.location.origin
+const baseURL = import.meta.env.VITE_API_URL || `${window.location.origin}/api`;
 
+// Log the API URL for debugging
+console.log('API environment:', import.meta.env.MODE);
 console.log('API baseURL:', baseURL);
 
 export type { PasskeyInfo };
@@ -546,7 +548,7 @@ export const loginWithOIDC = async (redirectUrl: string): Promise<void> => {
     });
     
     // Use the correct authorization endpoint from environment variable
-    const authEndpoint = import.meta.env.VITE_OIDC_AUTH_ENDPOINT || 'http://localhost:5001/authorize';
+    const authEndpoint = import.meta.env.VITE_OIDC_AUTH_ENDPOINT || `${window.location.origin}/authorize`;
     const authUrl = `${authEndpoint}?${params.toString()}`;
     
     console.log('Redirecting to SSO provider:', authUrl);

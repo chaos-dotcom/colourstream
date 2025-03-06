@@ -5,6 +5,14 @@ services:
     restart: always
     expose:
       - 3000
+    environment:
+      VITE_API_URL: https://live.colourstream.example.com/api
+      VITE_WEBRTC_WS_HOST: live.colourstream.example.com
+      VITE_WEBRTC_WS_PORT: 3334
+      VITE_WEBRTC_WS_PROTOCOL: wss
+      VITE_WEBRTC_APP_PATH: app
+      VITE_VIDEO_URL: https://video.colourstream.example.com/join
+      VITE_OVENPLAYER_SCRIPT_URL: https://cdn.jsdelivr.net/npm/ovenplayer/dist/ovenplayer.js
     networks:
       - network
     labels:
