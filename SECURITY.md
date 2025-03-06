@@ -90,6 +90,72 @@ We would like to thank the following individuals and organizations for their con
 
 For any questions about our security policy or practices, please contact us at security@johnrogerscolour.co.uk
 
+## NPM Dependency Security Scanning
+
+The ColourStream project implements automated security scanning for npm dependencies using GitHub Actions. This ensures that security vulnerabilities in dependencies are regularly identified and addressed.
+
+### Automated Scanning
+
+The repository uses a GitHub Actions workflow to run npm audit scans:
+
+1. **Schedule**: Scans run automatically:
+   - On every push or pull request that changes package.json or package-lock.json files
+   - Weekly on Sunday at midnight (scheduled scan)
+   - Manually when triggered through GitHub Actions interface
+
+2. **Reports**: The workflow generates:
+   - JSON reports capturing raw audit data
+   - HTML reports for easier analysis
+   - A summary in the GitHub Actions run
+
+3. **Access Reports**: To view reports:
+   - Go to the Actions tab in the GitHub repository
+   - Select the "NPM Security Audit" workflow
+   - Choose a completed workflow run
+   - Download the artifacts containing the reports
+
+### Running Scans Locally
+
+You can run security scans locally using the npm scripts defined in the root package.json:
+
+```bash
+# Run audit on all packages (root, frontend, backend)
+npm run audit:all
+
+# Run audit on a specific package
+npm run audit:root
+npm run audit:frontend
+npm run audit:backend
+
+# Attempt to automatically fix vulnerabilities
+npm run audit:fix
+```
+
+### Addressing Vulnerabilities
+
+When vulnerabilities are discovered:
+
+1. Check if the vulnerability affects your application's usage of the package
+2. Update the vulnerable package to a patched version when possible
+3. If no patched version is available:
+   - Consider alternatives to the vulnerable package
+   - Implement mitigation strategies as recommended
+   - Document accepted risks if the vulnerability cannot be addressed
+
+4. For critical vulnerabilities:
+   - Create a GitHub issue to track the vulnerability
+   - Assign priority based on severity and exploitation risk
+   - Set a timeline for resolution
+
+### Security Audit Standards
+
+We follow these standards for dependency security:
+
+- All direct dependencies should be regularly updated
+- Critical and high vulnerabilities should be addressed immediately
+- Moderate vulnerabilities should be addressed in the next release cycle
+- Low vulnerabilities should be documented and addressed when convenient
+
 ---
 
 This security policy was last updated on February 27, 2024. 

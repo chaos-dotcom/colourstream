@@ -1,0 +1,132 @@
+name: NPM Security Audit
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - '**/package.json'
+      - '**/package-lock.json'
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - '**/package.json'
+      - '**/package-lock.json'
+  schedule:
+    - cron: '0 0 * * 0'  # Run weekly on Sunday at midnight
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  audit-root:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          
+      - name: Audit root packages
+        run: npm audit --json > npm-audit-root.json || true
+        continue-on-error: true
+        
+      - name: Upload root audit results
+        uses: actions/upload-artifact@v3
+        with:
+          name: npm-audit-root
+          path: npm-audit-root.json
+          retention-days: 30
+          
+  audit-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          
+      - name: Audit frontend packages
+        working-directory: frontend
+        run: npm audit --json > npm-audit-frontend.json || true
+        continue-on-error: true
+        
+      - name: Upload frontend audit results
+        uses: actions/upload-artifact@v3
+        with:
+          name: npm-audit-frontend
+          path: frontend/npm-audit-frontend.json
+          retention-days: 30
+          
+  audit-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          
+      - name: Audit backend packages
+        working-directory: backend
+        run: npm audit --json > npm-audit-backend.json || true
+        continue-on-error: true
+        
+      - name: Upload backend audit results
+        uses: actions/upload-artifact@v3
+        with:
+          name: npm-audit-backend
+          path: backend/npm-audit-backend.json
+          retention-days: 30
+          
+  generate-report:
+    needs: [audit-root, audit-frontend, audit-backend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          
+      - name: Download all audit results
+        uses: actions/download-artifact@v3
+        
+      - name: Install report generator
+        run: npm install -g npm-audit-html
+        
+      - name: Generate HTML reports
+        run: |
+          npm-audit-html -i npm-audit-root/npm-audit-root.json -o npm-audit-root-report.html || true
+          npm-audit-html -i npm-audit-frontend/npm-audit-frontend.json -o npm-audit-frontend-report.html || true
+          npm-audit-html -i npm-audit-backend/npm-audit-backend.json -o npm-audit-backend-report.html || true
+        continue-on-error: true
+        
+      - name: Upload HTML reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: npm-audit-html-reports
+          path: npm-audit-*-report.html
+          retention-days: 30
+          
+      - name: Check for vulnerabilities
+        run: |
+          echo "## NPM Audit Summary" > audit-summary.md
+          echo "" >> audit-summary.md
+          echo "### Root Package" >> audit-summary.md
+          jq -r '.metadata.vulnerabilities | "- Low: \(.low)\n- Moderate: \(.moderate)\n- High: \(.high)\n- Critical: \(.critical)"' npm-audit-root/npm-audit-root.json >> audit-summary.md || echo "- No data available" >> audit-summary.md
+          echo "" >> audit-summary.md
+          echo "### Frontend Package" >> audit-summary.md
+          jq -r '.metadata.vulnerabilities | "- Low: \(.low)\n- Moderate: \(.moderate)\n- High: \(.high)\n- Critical: \(.critical)"' npm-audit-frontend/npm-audit-frontend.json >> audit-summary.md || echo "- No data available" >> audit-summary.md
+          echo "" >> audit-summary.md
+          echo "### Backend Package" >> audit-summary.md
+          jq -r '.metadata.vulnerabilities | "- Low: \(.low)\n- Moderate: \(.moderate)\n- High: \(.high)\n- Critical: \(.critical)"' npm-audit-backend/npm-audit-backend.json >> audit-summary.md || echo "- No data available" >> audit-summary.md
+          echo "" >> audit-summary.md
+          echo "Download the HTML reports for detailed information." >> audit-summary.md
+        continue-on-error: true
+        
+      - name: Create summary
+        run: cat audit-summary.md >> $GITHUB_STEP_SUMMARY 
