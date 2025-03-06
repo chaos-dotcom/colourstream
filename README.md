@@ -1,4 +1,4 @@
-# 🎨 ColourStream: A Self Hosted Livestream Colour Grading Review Platform for Colourists 🎬
+# 🏳️‍🌈 ColourStream: A Self Hosted Livestream Colour Grading Review Platform for Colourists
 
 
 ## 🚀 Overview
