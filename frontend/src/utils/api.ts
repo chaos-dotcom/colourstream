@@ -8,6 +8,7 @@ import type {
   WebAuthnRegistrationOptions,
   WebAuthnAuthenticationOptions,
 } from '../types';
+import { API_URL, OIDC_AUTH_ENDPOINT } from '../config';
 
 // Use the environment variable if available, otherwise fall back to window.location.origin
 const baseURL = import.meta.env.VITE_API_URL || `${window.location.origin}/api`;
@@ -20,10 +21,8 @@ export type { PasskeyInfo };
 
 // Create axios instance with retry capability
 export const api = axios.create({
-  baseURL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  baseURL: API_URL,
+  withCredentials: true,
 });
 
 // Add request interceptor to include auth token
@@ -548,7 +547,7 @@ export const loginWithOIDC = async (redirectUrl: string): Promise<void> => {
     });
     
     // Use the correct authorization endpoint from environment variable
-    const authEndpoint = import.meta.env.VITE_OIDC_AUTH_ENDPOINT || `${window.location.origin}/authorize`;
+    const authEndpoint = OIDC_AUTH_ENDPOINT;
     const authUrl = `${authEndpoint}?${params.toString()}`;
     
     console.log('Redirecting to SSO provider:', authUrl);

@@ -1,0 +1,178 @@
+services:
+  frontend:
+    image: ghcr.io/${ORGANIZATION}/colourstream-frontend:${TAG:-latest}
+    restart: always
+    expose:
+      - 3000
+    environment:
+      VITE_API_URL: https://${DOMAIN}/api
+      VITE_WEBRTC_WS_HOST: ${DOMAIN}
+      VITE_WEBRTC_WS_PORT: 3334
+      VITE_WEBRTC_WS_PROTOCOL: wss
+      VITE_WEBRTC_APP_PATH: app
+      VITE_VIDEO_URL: https://${VIDEO_DOMAIN}/join
+      VITE_OVENPLAYER_SCRIPT_URL: https://cdn.jsdelivr.net/npm/ovenplayer/dist/ovenplayer.js
+    networks:
+      - network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls=true"
+      - "traefik.http.routers.frontend.tls.certresolver=myresolver"
+      - "traefik.http.routers.frontend.service=frontend"
+      - "traefik.http.services.frontend.loadbalancer.server.port=3000"
+      
+      # Static assets route - higher priority
+      - "traefik.http.routers.frontend-static.rule=Host(`${DOMAIN}`) && (PathPrefix(`/assets`) || PathPrefix(`/static`) || Path(`/favicon.ico`) || Path(`/manifest.json`) || Path(`/robots.txt`) || Path(`/logo192.png`) || Path(`/logo512.png`) || Path(`/security.txt`) || PathPrefix(`/.well-known`))"
+      - "traefik.http.routers.frontend-static.entrypoints=websecure"
+      - "traefik.http.routers.frontend-static.tls=true"
+      - "traefik.http.routers.frontend-static.tls.certresolver=myresolver"
+      - "traefik.http.routers.frontend-static.service=frontend"
+      - "traefik.http.routers.frontend-static.priority=200"
+      
+      # SPA routes with proper middleware
+      - "traefik.http.routers.frontend-spa.rule=Host(`${DOMAIN}`) && (PathPrefix(`/admin`) || PathPrefix(`/login`) || PathPrefix(`/room`))"
+      - "traefik.http.routers.frontend-spa.entrypoints=websecure"
+      - "traefik.http.routers.frontend-spa.tls=true"
+      - "traefik.http.routers.frontend-spa.tls.certresolver=myresolver"
+      - "traefik.http.routers.frontend-spa.service=frontend"
+      - "traefik.http.routers.frontend-spa.middlewares=spa-fallback"
+      - "traefik.http.routers.frontend-spa.priority=100"
+      
+      # Middleware for SPA
+      - "traefik.http.middlewares.spa-fallback.headers.customResponseHeaders.Content-Type=text/html; charset=utf-8"
+      
+      # Root path with middleware
+      - "traefik.http.routers.frontend-root.rule=Host(`${DOMAIN}`) && Path(`/`)"
+      - "traefik.http.routers.frontend-root.entrypoints=websecure"
+      - "traefik.http.routers.frontend-root.tls=true"
+      - "traefik.http.routers.frontend-root.tls.certresolver=myresolver"
+      - "traefik.http.routers.frontend-root.service=frontend"
+      - "traefik.http.routers.frontend-root.priority=50"
+
+  postgres:
+    container_name: colourstream-postgres
+    image: postgres:16-alpine
+    restart: always
+    expose:
+      - "5432"
+    environment:
+      POSTGRES_USER: ${DB_USER:-colourstream}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-colourstream}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/postgresql.conf:/etc/postgresql/postgresql.conf
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    networks:
+      - network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-colourstream}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      - "traefik.enable=false"
+
+  backend:
+    image: ghcr.io/${ORGANIZATION}/colourstream-backend:${TAG:-latest}
+    restart: always
+    expose:
+      - 5001
+    env_file:
+      - ./backend/.env
+      - ./global.env
+    environment:
+      DATABASE_URL: "postgresql://${DB_USER:-colourstream}:${DB_PASSWORD}@colourstream-postgres:5432/${DB_NAME:-colourstream}"
+      NODE_ENV: production
+      JWT_KEY: ${JWT_KEY}
+      ADMIN_AUTH_SECRET: ${ADMIN_AUTH_SECRET}
+      WEBAUTHN_RP_ID: ${DOMAIN}
+      WEBAUTHN_ORIGIN: https://${DOMAIN}
+      DOMAIN: ${DOMAIN}
+      VIDEO_DOMAIN: ${VIDEO_DOMAIN}
+      FRONTEND_URL: https://${DOMAIN}
+      BASE_PATH: /api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - network
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/logs:/app/logs
+    labels:
+      - "traefik.enable=true"
+      # API routes
+      - "traefik.http.routers.backend.rule=Host(`${DOMAIN}`) && PathPrefix(`/api`) && !PathPrefix(`/api/ws`)"
+      - "traefik.http.routers.backend.entrypoints=websecure"
+      - "traefik.http.routers.backend.tls=true"
+      - "traefik.http.routers.backend.tls.certresolver=myresolver"
+      - "traefik.http.routers.backend.service=backend"
+      - "traefik.http.services.backend.loadbalancer.server.port=5001"
+      - "traefik.http.routers.backend.middlewares=backend-headers"
+      
+      # WebSocket routes
+      - "traefik.http.routers.backend-ws.rule=Host(`${DOMAIN}`) && PathPrefix(`/api/ws`)"
+      - "traefik.http.routers.backend-ws.entrypoints=websecure"
+      - "traefik.http.routers.backend-ws.tls=true"
+      - "traefik.http.routers.backend-ws.tls.certresolver=myresolver"
+      - "traefik.http.routers.backend-ws.service=backend-ws"
+      - "traefik.http.services.backend-ws.loadbalancer.server.port=5001"
+      - "traefik.http.routers.backend-ws.middlewares=websocket-headers"
+      
+      # Headers for regular API requests
+      - "traefik.http.middlewares.backend-headers.headers.accesscontrolallowmethods=GET,OPTIONS,PUT,POST,DELETE"
+      - "traefik.http.middlewares.backend-headers.headers.accesscontrolallowheaders=*"
+      - "traefik.http.middlewares.backend-headers.headers.accesscontrolalloworiginlist=*"
+      - "traefik.http.middlewares.backend-headers.headers.accesscontrolmaxage=100"
+      - "traefik.http.middlewares.backend-headers.headers.addvaryheader=true"
+      
+      # Headers for WebSocket connections
+      - "traefik.http.middlewares.websocket-headers.headers.accesscontrolallowmethods=GET,OPTIONS,PUT,POST,DELETE"
+      - "traefik.http.middlewares.websocket-headers.headers.accesscontrolallowheaders=*"
+      - "traefik.http.middlewares.websocket-headers.headers.accesscontrolalloworiginlist=*"
+      - "traefik.http.middlewares.websocket-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.middlewares.websocket-headers.headers.customrequestheaders.Connection=Upgrade"
+      - "traefik.http.middlewares.websocket-headers.headers.customrequestheaders.Upgrade=websocket"
+
+  traefik:
+    image: traefik:v3.3.3
+    restart: always
+    command:
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=true"
+      - "--providers.docker.network=colourstream_network"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.myresolver.acme.httpchallenge=true"
+      - "--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.myresolver.acme.email=${ADMIN_EMAIL}"
+      - "--certificatesresolvers.myresolver.acme.storage=/acme.json"
+      - "--log.level=DEBUG"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8090:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/acme.json:/acme.json
+    networks:
+      - network
+    labels:
+      - "traefik.enable=true"
+
+# Additional services like origin and edge would follow the same pattern
+
+networks:
+  network:
+    name: colourstream_network
+
+volumes:
+  postgres_data: 
