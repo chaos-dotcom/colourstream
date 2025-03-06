@@ -15,12 +15,18 @@ const Login: React.FC = () => {
   const [error, setError] = useState('');
   const [oidcEnabled, setOidcEnabled] = useState(false);
   const [oidcProviderName, setOidcProviderName] = useState('Identity Provider');
+  const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
+    console.log('Login component mounted');
+    
     const checkAuth = async () => {
       try {
+        console.log('Checking auth status...');
+        
         // Check if user is already authenticated
         const isAuthenticated = localStorage.getItem('isAdminAuthenticated') === 'true';
+        console.log('Is authenticated:', isAuthenticated);
         if (isAuthenticated) {
           navigate('/admin/dashboard');
           return;
@@ -28,15 +34,36 @@ const Login: React.FC = () => {
 
         // Check if first-time setup is needed
         const response = await checkSetupRequired();
+        console.log('Setup required response:', response);
         setSetupRequired(response.data.setupRequired);
 
         // Check OIDC configuration
         try {
+          console.log('Fetching OIDC config...');
           const oidcResponse = await getOIDCConfig();
           console.log('OIDC config response:', oidcResponse);
-          setOidcEnabled(oidcResponse.config?.enabled || false);
+          const isEnabled = oidcResponse.config?.enabled || false;
+          console.log('OIDC enabled:', isEnabled);
+          setOidcEnabled(isEnabled);
           if (oidcResponse.config?.providerName) {
             setOidcProviderName(oidcResponse.config.providerName);
+          }
+          
+          // Auto-redirect to OIDC login if enabled and not already in a callback flow
+          const isOIDCCallback = location.pathname.includes('/callback') || 
+                                location.search.includes('code=') || 
+                                location.search.includes('error=');
+          console.log('Is OIDC callback:', isOIDCCallback);
+          console.log('Auth error in localStorage:', localStorage.getItem('authError'));
+          console.log('Skip OIDC auto redirect in localStorage:', localStorage.getItem('skipOidcAutoRedirect'));
+          
+          if (isEnabled && !isOIDCCallback && !localStorage.getItem('authError') && !localStorage.getItem('skipOidcAutoRedirect')) {
+            console.log('Auto-redirecting to OIDC login...');
+            // Set a flag to prevent redirect loops
+            localStorage.setItem('skipOidcAutoRedirect', 'true');
+            // Redirect to OIDC login
+            await loginWithOIDC(window.location.origin + '/admin/dashboard');
+            return;
           }
         } catch (oidcError) {
           console.error('Error fetching OIDC config:', oidcError);
@@ -53,17 +80,37 @@ const Login: React.FC = () => {
         const params = new URLSearchParams(location.search);
         const token = params.get('token');
         if (token) {
-          handleOIDCCallback(token);
+          handleOIDCCallback();
         }
       } catch (error) {
         console.error('Error checking auth status:', error);
       } finally {
         setIsLoading(false);
+        setInitializing(false);
       }
     };
 
     checkAuth();
+    
+    // Cleanup function to remove the skip flag when component unmounts
+    return () => {
+      localStorage.removeItem('skipOidcAutoRedirect');
+    };
   }, [navigate, location]);
+
+  // Show loading indicator during initialization
+  if (initializing) {
+    return (
+      <Container component="main" maxWidth="md">
+        <Box sx={{ mt: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column' }}>
+          <CircularProgress />
+          <Typography variant="body1" sx={{ mt: 2 }}>
+            Initializing authentication options...
+          </Typography>
+        </Box>
+      </Container>
+    );
+  }
 
   const handleOIDCLogin = async () => {
     setError('');
@@ -138,6 +185,33 @@ const Login: React.FC = () => {
             Sign in to the admin dashboard using one of the available authentication methods.
           </Typography>
           
+          {/* Show OIDC login first if enabled */}
+          {oidcEnabled && (
+            <Box sx={{ mb: 4 }}>
+              <Typography variant="h6" gutterBottom>
+                Single Sign-On (Recommended)
+              </Typography>
+              <Button
+                onClick={handleOIDCLogin}
+                disabled={loading}
+                fullWidth={false}
+                type="button"
+              >
+                {loading ? <CircularProgress size={24} color="inherit" /> : `Sign in with ${oidcProviderName}`}
+              </Button>
+              
+              <InsetText>
+                This will redirect you to your organization's identity provider for authentication.
+              </InsetText>
+            </Box>
+          )}
+          
+          {oidcEnabled && (
+            <Divider sx={{ my: 3 }}>
+              <Typography variant="body2" color="text.secondary">OR</Typography>
+            </Divider>
+          )}
+          
           <Box sx={{ mb: 4 }}>
             <Typography variant="h6" gutterBottom>
               Passkey Authentication
@@ -151,33 +225,6 @@ const Login: React.FC = () => {
               </Typography>
             </Box>
           </Box>
-          
-          {oidcEnabled && (
-            <>
-              <Divider sx={{ my: 3 }}>
-                <Typography variant="body2" color="text.secondary">OR</Typography>
-              </Divider>
-              
-              <Box sx={{ mt: 2 }}>
-                <Typography variant="h6" gutterBottom>
-                  Single Sign-On
-                </Typography>
-                <Button
-                  onClick={handleOIDCLogin}
-                  disabled={loading}
-                  fullWidth={false}
-                  type="button"
-                  variant="secondary"
-                >
-                  {loading ? <CircularProgress size={24} color="inherit" /> : `Sign in with ${oidcProviderName}`}
-                </Button>
-                
-                <InsetText>
-                  This will redirect you to your organization's identity provider for authentication.
-                </InsetText>
-              </Box>
-            </>
-          )}
         </Paper>
       </Box>
     </Container>

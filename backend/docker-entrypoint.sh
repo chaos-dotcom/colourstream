@@ -31,24 +31,18 @@ for i in $(seq 1 $MAX_RETRIES); do
   if check_postgres; then
     echo "PostgreSQL is ready!"
     
-    # Drop the database if it exists and recreate it
-    if check_database_exists; then
-      echo "Database $POSTGRES_DB exists, dropping it..."
-      PGPASSWORD=$POSTGRES_PASSWORD psql -h $DB_HOST -U $POSTGRES_USER -p $DB_PORT -d postgres -c "DROP DATABASE $POSTGRES_DB;"
+    # Create the database if it doesn't exist
+    if ! check_database_exists; then
+      echo "Database $POSTGRES_DB does not exist, creating it..."
+      PGPASSWORD=$POSTGRES_PASSWORD psql -h $DB_HOST -U $POSTGRES_USER -p $DB_PORT -d postgres -c "CREATE DATABASE $POSTGRES_DB;"
       if [ $? -ne 0 ]; then
-        echo "Failed to drop database $POSTGRES_DB"
+        echo "Failed to create database $POSTGRES_DB"
         exit 1
       fi
-      echo "Database $POSTGRES_DB dropped successfully"
+      echo "Database $POSTGRES_DB created successfully"
+    else
+      echo "Database $POSTGRES_DB already exists, using it"
     fi
-    
-    echo "Creating database $POSTGRES_DB..."
-    PGPASSWORD=$POSTGRES_PASSWORD psql -h $DB_HOST -U $POSTGRES_USER -p $DB_PORT -d postgres -c "CREATE DATABASE $POSTGRES_DB;"
-    if [ $? -ne 0 ]; then
-      echo "Failed to create database $POSTGRES_DB"
-      exit 1
-    fi
-    echo "Database $POSTGRES_DB created successfully"
     
     break
   fi
@@ -80,7 +74,7 @@ echo "PostgreSQL extensions installed successfully"
 
 # Use db push instead of migrations - skip generating client
 echo "Pushing schema to database..."
-npx prisma db push --accept-data-loss --skip-generate
+npx prisma db push --skip-generate
 if [ $? -ne 0 ]; then
   echo "Failed to push schema to database"
   exit 1

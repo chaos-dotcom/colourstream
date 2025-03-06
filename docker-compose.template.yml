@@ -1,0 +1,332 @@
+services:
+  frontend:
+    build:
+      context: ./frontend
+    restart: always
+    expose:
+      - 3000
+    networks:
+      - network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`live.colourstream.example.com`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls=true"
+      - "traefik.http.routers.frontend.tls.certresolver=myresolver"
+      - "traefik.http.routers.frontend.service=frontend"
+      - "traefik.http.services.frontend.loadbalancer.server.port=3000"
+      
+      # Static assets route - higher priority
+      - "traefik.http.routers.frontend-static.rule=Host(`live.colourstream.example.com`) && (PathPrefix(`/assets`) || PathPrefix(`/static`) || Path(`/favicon.ico`) || Path(`/manifest.json`) || Path(`/robots.txt`) || Path(`/logo192.png`) || Path(`/logo512.png`) || Path(`/security.txt`) || PathPrefix(`/.well-known`))"
+      - "traefik.http.routers.frontend-static.entrypoints=websecure"
+      - "traefik.http.routers.frontend-static.tls=true"
+      - "traefik.http.routers.frontend-static.tls.certresolver=myresolver"
+      - "traefik.http.routers.frontend-static.service=frontend"
+      - "traefik.http.routers.frontend-static.priority=200"
+      
+      # SPA routes with proper middleware
+      - "traefik.http.routers.frontend-spa.rule=Host(`live.colourstream.example.com`) && (PathPrefix(`/admin`) || PathPrefix(`/login`) || PathPrefix(`/room`))"
+      - "traefik.http.routers.frontend-spa.entrypoints=websecure"
+      - "traefik.http.routers.frontend-spa.tls=true"
+      - "traefik.http.routers.frontend-spa.tls.certresolver=myresolver"
+      - "traefik.http.routers.frontend-spa.service=frontend"
+      - "traefik.http.routers.frontend-spa.middlewares=spa-fallback"
+      - "traefik.http.routers.frontend-spa.priority=100"
+      
+      # Middleware for SPA
+      - "traefik.http.middlewares.spa-fallback.headers.customResponseHeaders.Content-Type=text/html; charset=utf-8"
+      
+      # Root path with middleware
+      - "traefik.http.routers.frontend-root.rule=Host(`live.colourstream.example.com`) && Path(`/`)"
+      - "traefik.http.routers.frontend-root.entrypoints=websecure"
+      - "traefik.http.routers.frontend-root.tls=true"
+      - "traefik.http.routers.frontend-root.tls.certresolver=myresolver"
+      - "traefik.http.routers.frontend-root.service=frontend"
+      - "traefik.http.routers.frontend-root.priority=50"
+
+  postgres:
+    container_name: colourstream-postgres
+    image: postgres:16-alpine
+    restart: always
+    expose:
+      - "5432"
+    environment:
+      POSTGRES_USER: colourstream
+      POSTGRES_PASSWORD: 628db0ebd5d8c8fc4f539e7192fa6ff1
+      POSTGRES_DB: colourstream
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/postgresql.conf:/etc/postgresql/postgresql.conf
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    networks:
+      - network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U colourstream"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      - "traefik.enable=false"
+
+  backend:
+    build:
+      context: ./backend
+    restart: always
+    expose:
+      - 5001
+    env_file:
+      - ./backend/.env
+      - ./global.env
+    environment:
+      DATABASE_URL: "postgresql://colourstream:628db0ebd5d8c8fc4f539e7192fa6ff1@colourstream-postgres:5432/colourstream"
+      NODE_ENV: production
+      JWT_KEY: 015a8afab726389330e5002945d9d27a7de31bc813
+      ADMIN_AUTH_SECRET: a4097b976531c94f5e4cf9d2676751c7
+      WEBAUTHN_RP_ID: live.colourstream.example.com
+      WEBAUTHN_ORIGIN: https://live.colourstream.example.com
+      DOMAIN: live.colourstream.example.com
+      VIDEO_DOMAIN: video.colourstream.example.com
+      FRONTEND_URL: https://live.colourstream.example.com
+      BASE_PATH: /api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - network
+    volumes:
+      - ./backend/prisma:/app/prisma
+      - ./backend/src:/app/src
+      - ./backend/uploads:/app/uploads
+      - ./backend/logs:/app/logs
+    labels:
+      - "traefik.enable=true"
+      # API routes
+      - "traefik.http.routers.backend.rule=Host(`live.colourstream.example.com`) && PathPrefix(`/api`) && !PathPrefix(`/api/ws`)"
+      - "traefik.http.routers.backend.entrypoints=websecure"
+      - "traefik.http.routers.backend.tls=true"
+      - "traefik.http.routers.backend.tls.certresolver=myresolver"
+      - "traefik.http.routers.backend.service=backend"
+      - "traefik.http.services.backend.loadbalancer.server.port=5001"
+      - "traefik.http.routers.backend.middlewares=backend-headers"
+      
+      # WebSocket routes - updated to handle all WebSocket paths
+      - "traefik.http.routers.backend-ws.rule=Host(`live.colourstream.example.com`) && PathPrefix(`/api/ws`)"
+      - "traefik.http.routers.backend-ws.entrypoints=websecure"
+      - "traefik.http.routers.backend-ws.tls=true"
+      - "traefik.http.routers.backend-ws.tls.certresolver=myresolver"
+      - "traefik.http.routers.backend-ws.service=backend-ws"
+      - "traefik.http.services.backend-ws.loadbalancer.server.port=5001"
+      - "traefik.http.routers.backend-ws.middlewares=websocket-headers"
+      
+      # Headers for regular API requests
+      - "traefik.http.middlewares.backend-headers.headers.accesscontrolallowmethods=GET,OPTIONS,PUT,POST,DELETE"
+      - "traefik.http.middlewares.backend-headers.headers.accesscontrolallowheaders=*"
+      - "traefik.http.middlewares.backend-headers.headers.accesscontrolalloworiginlist=*"
+      - "traefik.http.middlewares.backend-headers.headers.accesscontrolmaxage=100"
+      - "traefik.http.middlewares.backend-headers.headers.addvaryheader=true"
+      
+      # Headers for WebSocket connections - updated with proper WebSocket headers
+      - "traefik.http.middlewares.websocket-headers.headers.accesscontrolallowmethods=GET,OPTIONS,PUT,POST,DELETE"
+      - "traefik.http.middlewares.websocket-headers.headers.accesscontrolallowheaders=*"
+      - "traefik.http.middlewares.websocket-headers.headers.accesscontrolalloworiginlist=*"
+      - "traefik.http.middlewares.websocket-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.middlewares.websocket-headers.headers.customrequestheaders.Connection=Upgrade"
+      - "traefik.http.middlewares.websocket-headers.headers.customrequestheaders.Upgrade=websocket"
+
+  traefik:
+    image: traefik:v3.3.3
+    restart: always
+    command:
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=true"
+      - "--providers.docker.network=colourstream_network"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.myresolver.acme.httpchallenge=true"
+      - "--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.myresolver.acme.email=admin@example.com"
+      - "--certificatesresolvers.myresolver.acme.storage=/acme.json"
+      - "--log.level=DEBUG"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8090:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/acme.json:/acme.json
+    networks:
+      - network
+    labels:
+      - "traefik.enable=true"
+
+  origin:
+    build:
+      context: ./ovenmediaengine
+    image: airensoft/ovenmediaengine:0.18.0
+    ports:
+      - "8081:8081/tcp" # OVT(Origin)1
+      - "8082:8082/tcp" # OVT(Origin)2
+      - "9000:9000/tcp" # OVT(Origin)
+      - "1935:1935/tcp" # RTMP Provider
+      - "9999:9999" # SRT
+      - "3333:3333" # WebRTC Signaling / LLHLS
+      - "3334:3334" # TLS WebRTC Signaling / LLHLS - Optional unless TLS is enabled
+      - "3478:3478/tcp" # WebRTC TURN
+      - "10000-10004:10000-10004/udp" # WebRTC Candidate
+    environment:
+      OME_HOST_IP: "192.168.0.160"
+      OME_ORIGIN_PORT: "9000"
+      OME_RTMP_PROV_PORT: "1935"
+      OME_SRT_PROV_PORT: "9999"
+      OME_LLHLS_STREAM_PORT: "3332"
+      OME_WEBRTC_SIGNALLING_PORT: "3333"
+      OME_WEBRTC_SIGNALLING_TLS_PORT: "3334"
+      OME_WEBRTC_TCP_RELAY_PORT: "3478"
+      OME_WEBRTC_CANDIDATE_PORT: "10002-10004/udp"
+      OME_API_PORT: "8081"
+      OME_API_TLS_PORT: "8082"
+      OME_API_ACCESS_TOKEN: "0fc62ea62790ad7c"
+    env_file:
+      - global.env
+    restart: always
+    networks:
+      - network
+    volumes:
+      - ./ovenmediaengine/origin_conf:/opt/ovenmediaengine/bin/origin_conf
+      - ./certs/certs/live.colourstream.example.com.crt:/opt/ovenmediaengine/bin/cert/cert.crt
+      - ./certs/private/live.colourstream.example.com.key:/opt/ovenmediaengine/bin/cert/priv.key
+    labels:
+      - "traefik.enable=true"
+      # WebRTC WebSocket
+      - "traefik.http.routers.ome-webrtc.rule=Host(`video.colourstream.example.com`) && PathPrefix(`/ws`)"
+      - "traefik.http.routers.ome-webrtc.entrypoints=websecure"
+      - "traefik.http.routers.ome-webrtc.tls.certresolver=myresolver"
+      - "traefik.http.routers.ome-webrtc.service=ome-webrtc-service"
+      - "traefik.http.services.ome-webrtc-service.loadbalancer.server.port=3333"
+      - "traefik.http.middlewares.ome-websocket.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.routers.ome-webrtc.middlewares=ome-websocket"
+      
+      # WebRTC TLS Signaling
+      - "traefik.http.routers.ome-webrtc-tls.rule=Host(`live.colourstream.example.com`) && PathPrefix(`/app`)"
+      - "traefik.http.routers.ome-webrtc-tls.entrypoints=websecure"
+      - "traefik.http.routers.ome-webrtc-tls.tls.certresolver=myresolver"
+      - "traefik.http.routers.ome-webrtc-tls.service=ome-webrtc-tls-service"
+      - "traefik.http.services.ome-webrtc-tls-service.loadbalancer.server.port=3334"
+      - "traefik.http.middlewares.ome-websocket-tls.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.routers.ome-webrtc-tls.middlewares=ome-websocket-tls"
+      
+      # WebRTC TLS Signaling for video domain
+      - "traefik.http.routers.ome-webrtc-tls-video.rule=Host(`video.colourstream.example.com`) && PathPrefix(`/app`)"
+      - "traefik.http.routers.ome-webrtc-tls-video.entrypoints=websecure"
+      - "traefik.http.routers.ome-webrtc-tls-video.tls.certresolver=myresolver"
+      - "traefik.http.routers.ome-webrtc-tls-video.service=ome-webrtc-tls-video-service"
+      - "traefik.http.services.ome-webrtc-tls-video-service.loadbalancer.server.port=3334"
+      - "traefik.http.middlewares.ome-websocket-tls-video.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.routers.ome-webrtc-tls-video.middlewares=ome-websocket-tls-video"
+
+  edge:
+    build:
+      context: ./ovenmediaengine
+    image: airensoft/ovenmediaengine:0.18.0
+    ports:
+      - "4333:3333/tcp" # WebRTC Signaling / LLHLS
+      - "3479:3479/tcp" # WebRTC TURN
+      - "10005-10009:10005-10009/udp" # WebRTC Candidate
+    environment:
+      OME_HOST_IP: "192.168.0.160"
+      DEFAULT_ORIGIN_SERVER: "192.168.0.160"
+      DEFAULT_ORIGIN_PORT: "9000"
+      OME_LLHLS_STREAM_PORT: "3330"
+      OME_WEBRTC_SIGNALLING_PORT: "3333"
+      OME_WEBRTC_SIGNALLING_TLS_PORT: "3000"
+      OME_WEBRTC_TCP_RELAY_PORT: "3479"
+      OME_WEBRTC_CANDIDATE_PORT: "10005-10009/udp"
+    env_file:
+      - global.env
+    restart: always
+
+    volumes:
+      - ./ovenmediaengine/edge_conf:/opt/ovenmediaengine/bin/edge_conf
+      - ./ovenmediaengine/edge_conf:/opt/ovenmediaengine/bin/origin_conf
+      - ./certs/certs/live.colourstream.example.com.crt:/opt/ovenmediaengine/bin/cert/cert.crt
+      - ./certs/private/live.colourstream.example.com.key:/opt/ovenmediaengine/bin/cert/priv.key
+    networks:
+      - network
+  mirotalk:
+    build:
+      context: ./mirotalk
+    image: mirotalk/p2p:latest
+    restart: always
+    container_name: colourstream-mirotalk
+    hostname: mirotalk
+    expose:
+      - 3000
+    volumes:
+      - ./mirotalk/.env:/src/.env
+    environment:
+      STUN_SERVER_ENABLED: "true"
+      STUN_SERVER_URL: "stun:stun.l.google.com:19302"
+      TURN_SERVER_ENABLED: "true"
+      TURN_SERVER_URL: "turn:video.colourstream.example.com:3480"
+      TURN_SERVER_USERNAME: "colourstream"
+      TURN_SERVER_CREDENTIAL: "turnserver123"
+      OIDC_ENABLED: "false"
+      HOST_PROTECTED: "true"
+      TRUST_PROXY: "true"
+      SEVER_TUNNEL: "false"
+    env_file:
+      - global.env
+    networks:
+      - network
+    labels:
+      - "traefik.enable=true"
+      # Main route
+      - "traefik.http.routers.mirotalk.rule=Host(`video.colourstream.example.com`)"
+      - "traefik.http.routers.mirotalk.entrypoints=websecure"
+      - "traefik.http.routers.mirotalk.tls.certresolver=myresolver"
+      - "traefik.http.routers.mirotalk.service=mirotalk-service"
+      - "traefik.http.services.mirotalk-service.loadbalancer.server.port=3000"
+      
+      # WebSocket route - Reverted to previous working configuration
+      - "traefik.http.routers.mirotalk-ws.rule=Host(`video.colourstream.example.com`) && PathPrefix(`/socket.io`)"
+      - "traefik.http.routers.mirotalk-ws.entrypoints=websecure"
+      - "traefik.http.routers.mirotalk-ws.tls.certresolver=myresolver"
+      - "traefik.http.routers.mirotalk-ws.service=mirotalk-ws-service"
+      - "traefik.http.services.mirotalk-ws-service.loadbalancer.server.port=3000"
+      - "traefik.http.middlewares.sio.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.routers.mirotalk-ws.middlewares=sio"
+
+  coturn:
+    image: coturn/coturn
+    container_name: colourstream-coturn
+    restart: always
+    volumes:
+      - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf
+      - ./certs/certs/video.colourstream.example.com.crt:/certs/video.colourstream.example.com.crt
+      - ./certs/private/video.colourstream.example.com.key:/certs/video.colourstream.example.com.key
+    ports:
+      - "3480:3480"
+      - "3480:3480/udp"
+      - "5350:5350"
+      - "5350:5350/udp"
+      - "30000-31000:30000-31000/udp"
+    networks:
+      - network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.tcp.routers.coturn.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.coturn.entrypoints=websecure"
+      - "traefik.tcp.routers.coturn.service=coturn"
+      - "traefik.tcp.services.coturn.loadbalancer.server.port=3480"
+
+volumes:
+  postgres_data:
+
+networks:
+  network:
+    driver: bridge
