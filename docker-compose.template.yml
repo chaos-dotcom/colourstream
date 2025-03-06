@@ -1,7 +1,6 @@
 services:
   frontend:
-    build:
-      context: ./frontend
+    image: ghcr.io/johnr24/colourstream-frontend:latest
     restart: always
     expose:
       - 3000
@@ -78,8 +77,7 @@ services:
       - "traefik.enable=false"
 
   backend:
-    build:
-      context: ./backend
+    image: ghcr.io/johnr24/colourstream-backend:latest
     restart: always
     expose:
       - 5001
@@ -173,9 +171,7 @@ services:
       - "traefik.enable=true"
 
   origin:
-    build:
-      context: ./ovenmediaengine
-    image: airensoft/ovenmediaengine:0.18.0
+    image: ghcr.io/johnr24/colourstream-ovenmediaengine:latest
     ports:
       - "8081:8081/tcp" # OVT(Origin)1
       - "8082:8082/tcp" # OVT(Origin)2
@@ -238,9 +234,7 @@ services:
       - "traefik.http.routers.ome-webrtc-tls-video.middlewares=ome-websocket-tls-video"
 
   edge:
-    build:
-      context: ./ovenmediaengine
-    image: airensoft/ovenmediaengine:0.18.0
+    image: ghcr.io/johnr24/colourstream-ovenmediaengine:latest
     ports:
       - "4333:3333/tcp" # WebRTC Signaling / LLHLS
       - "3479:3479/tcp" # WebRTC TURN
@@ -266,8 +260,6 @@ services:
     networks:
       - network
   mirotalk:
-    build:
-      context: ./mirotalk
     image: mirotalk/p2p:latest
     restart: always
     container_name: colourstream-mirotalk
