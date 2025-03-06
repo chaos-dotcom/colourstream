@@ -31,7 +31,7 @@ The ColourStream platform consists of several integrated components:
 ┌─────────────┐           │             ┌─────────────┐
 │ OBS/Encoder │────┐      │             │   Backend   │
 └─────────────┘    │      │             └─────────────┘
-                   ▼      ▼                   │
+                   ▼      ▼                    │
 ┌─────────────┐   ┌─────────────┐      ┌─────────────┐
 │   Mirotalk  │◀──│ OvenMedia   │      │  PostgreSQL │
 │  (WebRTC)   │   │   Engine    │◀─────│  Database   │
