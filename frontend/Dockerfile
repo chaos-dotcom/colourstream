@@ -6,8 +6,14 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies with clean slate
-RUN npm ci --legacy-peer-deps
+# Install dependencies - handle case where package-lock.json might not exist
+RUN if [ ! -f package-lock.json ]; then \
+        echo "No package-lock.json found, creating one..." && \
+        npm install --package-lock-only && \
+        npm install; \
+    else \
+        npm ci --legacy-peer-deps; \
+    fi
 
 # Copy source code
 COPY . .

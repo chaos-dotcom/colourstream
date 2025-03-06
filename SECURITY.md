@@ -9,7 +9,7 @@ At ColourStream, we take security seriously. We appreciate your efforts to respo
 If you believe you've found a security vulnerability in our application, please send a report to:
 
 - Email: security@johnrogerscolour.co.uk
-- Web: https://live.colourstream.johnrogerscolour.co.uk/security-contact
+
 
 Please include the following information in your report:
 
@@ -88,7 +88,7 @@ We would like to thank the following individuals and organizations for their con
 
 ## Contact
 
-For any questions about our security policy or practices, please contact us at security@johnrogerscolour.co.uk.
+For any questions about our security policy or practices, please contact us at security@johnrogerscolour.co.uk
 
 ---
 

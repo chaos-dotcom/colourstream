@@ -1,0 +1,41 @@
+# Gitleaks ignore file
+# 
+# This file contains fingerprints of secrets that should be ignored by Gitleaks.
+# Each line should be in the format: COMMIT_HASH:FILEPATH:RULE_ID:LINE_NUMBER
+#
+# Example:
+# a0f72a4e3595ddb382a77804d2674d54b2b0e880:config/database.yml:generic-api-key:15
+#
+# To add new files to ignore, you need to:
+# 1. Run gitleaks locally to get the fingerprint of the secret
+# 2. Add the fingerprint to this file
+#
+# You can run: gitleaks detect --report-format=json --report-path=leaks.json
+# to get a report with fingerprints of all secrets in your repo.
+#
+# ADD YOUR FINGERPRINTS BELOW THIS LINE:
+
+# Mirotalk README.md - Documentation examples with default secrets
+6e98c195ba92c5f563186b038f9bc4e8d773bc10:mirotalk/README.md:curl-auth-header:238
+6e98c195ba92c5f563186b038f9bc4e8d773bc10:mirotalk/README.md:curl-auth-header:239
+6e98c195ba92c5f563186b038f9bc4e8d773bc10:mirotalk/README.md:curl-auth-header:240
+6e98c195ba92c5f563186b038f9bc4e8d773bc10:mirotalk/README.md:curl-auth-header:242
+6e98c195ba92c5f563186b038f9bc4e8d773bc10:mirotalk/README.md:curl-auth-header:243
+6e98c195ba92c5f563186b038f9bc4e8d773bc10:mirotalk/README.md:curl-auth-header:244
+6e98c195ba92c5f563186b038f9bc4e8d773bc10:mirotalk/README.md:curl-auth-header:246
+6e98c195ba92c5f563186b038f9bc4e8d773bc10:mirotalk/README.md:curl-auth-header:247
+6e98c195ba92c5f563186b038f9bc4e8d773bc10:mirotalk/README.md:curl-auth-header:248
+6e98c195ba92c5f563186b038f9bc4e8d773bc10:mirotalk/README.md:curl-auth-header:250
+6e98c195ba92c5f563186b038f9bc4e8d773bc10:mirotalk/README.md:curl-auth-header:251
+6e98c195ba92c5f563186b038f9bc4e8d773bc10:mirotalk/README.md:curl-auth-header:252
+6e98c195ba92c5f563186b038f9bc4e8d773bc10:mirotalk/README.md:curl-auth-header:254
+6e98c195ba92c5f563186b038f9bc4e8d773bc10:mirotalk/README.md:curl-auth-header:255
+6e98c195ba92c5f563186b038f9bc4e8d773bc10:mirotalk/README.md:curl-auth-header:256
+6e98c195ba92c5f563186b038f9bc4e8d773bc10:mirotalk/README.md:curl-auth-header:258
+6e98c195ba92c5f563186b038f9bc4e8d773bc10:mirotalk/README.md:curl-auth-header:259
+6e98c195ba92c5f563186b038f9bc4e8d773bc10:mirotalk/README.md:curl-auth-header:260
+
+# Docker Compose Template - Example API keys in template file
+2dbed7e5f72c29a8b3128cb93d322479f65d8df7:docker-compose.template.yml:generic-api-key:55
+2dbed7e5f72c29a8b3128cb93d322479f65d8df7:docker-compose.template.yml:generic-api-key:84
+2dbed7e5f72c29a8b3128cb93d322479f65d8df7:docker-compose.template.yml:generic-api-key:85
