@@ -52,6 +52,7 @@ if [ -f "docker-compose.template.yml" ]; then
   cp docker-compose.template.yml docker-compose.yml
   sed -i "s/example.com/$domain_name/g" docker-compose.yml
   sed -i "s/admin@example.com/$admin_email/g" docker-compose.yml
+  sed -i "s/--certificatesresolvers.myresolver.acme.email=admin@johnrogerscolour.co.uk/--certificatesresolvers.myresolver.acme.email=$admin_email/g" docker-compose.yml
   echo "✅ Created docker-compose.yml"
 else
   echo "❌ docker-compose.template.yml not found"
