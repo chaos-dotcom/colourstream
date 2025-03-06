@@ -115,9 +115,11 @@ const RoomView: React.FC<RoomViewProps> = ({ isPasswordProtected = false, isPres
           console.log('Stream key length:', roomConfig.streamKey?.length);
           
           // Construct the WebRTC URL with the stream key
+          const wsHost = import.meta.env.VITE_WEBRTC_WS_HOST || 'live.colourstream.example.com';
+          const wsPort = import.meta.env.VITE_WEBRTC_WS_PORT || '3334';
           const streamUrl = roomConfig.streamKey
-            ? `wss://live.colourstream.johnrogerscolour.co.uk:3334/app/${roomConfig.streamKey}`
-            : 'wss://live.colourstream.johnrogerscolour.co.uk:3334/app/stream';
+            ? `wss://${wsHost}:${wsPort}/app/${roomConfig.streamKey}`
+            : `wss://${wsHost}:${wsPort}/app/stream`;
             
           console.log('Using stream URL:', streamUrl);
           
@@ -168,7 +170,7 @@ const RoomView: React.FC<RoomViewProps> = ({ isPasswordProtected = false, isPres
   useEffect(() => {
     if (isNameSubmitted && isPlayerReady && iframeRef.current && roomConfig) {
       const timestamp = new Date().getTime();
-      const baseUrl = 'https://video.colourstream.johnrogerscolour.co.uk/join';
+      const baseUrl = import.meta.env.VITE_VIDEO_URL || 'https://video.colourstream.example.com/join';
       const queryParams = new URLSearchParams({
         room: roomConfig.mirotalkRoomId,
         name: userName,

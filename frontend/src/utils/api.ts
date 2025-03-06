@@ -10,7 +10,7 @@ import type {
 } from '../types';
 
 // Use the explicit API URL with the correct protocol
-const baseURL = 'https://live.colourstream.johnrogerscolour.co.uk/api';
+const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
 console.log('API baseURL:', baseURL);
 
@@ -545,8 +545,8 @@ export const loginWithOIDC = async (redirectUrl: string): Promise<void> => {
       state: state // Add explicit state parameter
     });
     
-    // Use the correct authorization endpoint for sso.shed.gay
-    const authEndpoint = 'https://sso.shed.gay/authorize';
+    // Use the correct authorization endpoint from environment variable
+    const authEndpoint = import.meta.env.VITE_OIDC_AUTH_ENDPOINT || 'http://localhost:5001/authorize';
     const authUrl = `${authEndpoint}?${params.toString()}`;
     
     console.log('Redirecting to SSO provider:', authUrl);
