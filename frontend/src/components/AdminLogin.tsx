@@ -17,6 +17,7 @@ const AdminLogin: React.FC = () => {
   const [passkeySupported, setPasskeySupported] = useState(false);
   const [oidcEnabled, setOidcEnabled] = useState(false);
   const [oidcProviderName, setOidcProviderName] = useState('Identity Provider');
+  const [initializing, setInitializing] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -42,14 +43,37 @@ const AdminLogin: React.FC = () => {
     // Check OIDC configuration
     const checkOIDCConfig = async () => {
       try {
+        console.log('Checking OIDC config...');
         const oidcConfig = await getOIDCConfig();
-        setOidcEnabled(oidcConfig.config?.enabled || false);
+        console.log('OIDC config response:', oidcConfig);
+        const isEnabled = oidcConfig.config?.enabled || false;
+        console.log('OIDC enabled:', isEnabled);
+        setOidcEnabled(isEnabled);
         if (oidcConfig.config?.providerName) {
           setOidcProviderName(oidcConfig.config.providerName);
+        }
+        
+        // Auto-redirect to OIDC login if enabled and not already in a callback flow
+        const isOIDCCallback = location.pathname.includes('/callback') || 
+                              location.search.includes('code=') || 
+                              location.search.includes('error=');
+        console.log('Is OIDC callback:', isOIDCCallback);
+        console.log('Auth error in localStorage:', localStorage.getItem('authError'));
+        console.log('Skip OIDC auto redirect in localStorage:', localStorage.getItem('skipOidcAutoRedirect'));
+        
+        if (isEnabled && !isOIDCCallback && !localStorage.getItem('authError') && !localStorage.getItem('skipOidcAutoRedirect')) {
+          console.log('Auto-redirecting to OIDC login...');
+          // Set a flag to prevent redirect loops
+          localStorage.setItem('skipOidcAutoRedirect', 'true');
+          // Redirect to OIDC login
+          await loginWithOIDC(window.location.origin + '/admin/dashboard');
+          return;
         }
       } catch (error) {
         console.error('Error checking OIDC config:', error);
         setOidcEnabled(false);
+      } finally {
+        setInitializing(false);
       }
     };
 
@@ -61,15 +85,31 @@ const AdminLogin: React.FC = () => {
     if (authError) {
       setError(authError);
       localStorage.removeItem('authError');
+      // Clear the auto-redirect skip flag when there's an error
+      localStorage.removeItem('skipOidcAutoRedirect');
     }
 
-    // Check for token in URL (from OIDC callback)
-    const params = new URLSearchParams(location.search);
-    const token = params.get('token');
-    if (token) {
-      handleOIDCCallback(token);
+    // Check if this is a callback from OIDC provider
+    const isOIDCCallback = location.pathname.includes('/callback') || 
+                          location.search.includes('code=') || 
+                          location.search.includes('error=');
+    
+    if (isOIDCCallback) {
+      // Handle the OIDC callback
+      handleOIDCCallback()
+        .catch(error => {
+          console.error('Error handling OIDC callback:', error);
+          setError('Failed to complete authentication');
+          // Clear the auto-redirect skip flag when there's an error
+          localStorage.removeItem('skipOidcAutoRedirect');
+        });
     }
-  }, [location]);
+
+    // Cleanup function to remove the skip flag when component unmounts
+    return () => {
+      localStorage.removeItem('skipOidcAutoRedirect');
+    };
+  }, [location, navigate]);
 
   const handlePasskeyLogin = async () => {
     setError('');
@@ -102,13 +142,28 @@ const AdminLogin: React.FC = () => {
     setLoading(true);
 
     try {
-      await loginWithOIDC(window.location.origin + '/admin/login');
+      // Pass the current URL as the return URL
+      await loginWithOIDC(window.location.origin + '/admin/dashboard');
     } catch (error: any) {
       console.error('OIDC login error:', error);
-      setError(error.response?.data?.message || 'OIDC login failed');
+      setError(error.message || 'OIDC login failed');
       setLoading(false);
     }
   };
+
+  // Show loading indicator during initialization
+  if (initializing) {
+    return (
+      <Container component="main" maxWidth="md">
+        <Box sx={{ mt: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column' }}>
+          <CircularProgress />
+          <Typography variant="body1" sx={{ mt: 2 }}>
+            Initializing authentication options...
+          </Typography>
+        </Box>
+      </Container>
+    );
+  }
 
   if (!passkeySupported && !oidcEnabled) {
     return (
@@ -149,8 +204,35 @@ const AdminLogin: React.FC = () => {
             Sign in to the admin dashboard using one of the available authentication methods.
           </Typography>
           
-          {passkeySupported && (
+          {/* Show OIDC login first if enabled */}
+          {oidcEnabled && (
             <Box sx={{ mb: 4 }}>
+              <Typography variant="h6" gutterBottom>
+                Single Sign-On (Recommended)
+              </Typography>
+              <Button
+                onClick={handleOIDCLogin}
+                disabled={loading}
+                fullWidth={false}
+                type="button"
+              >
+                {loading ? <CircularProgress size={24} color="inherit" /> : `Sign in with ${oidcProviderName}`}
+              </Button>
+              
+              <InsetText>
+                This will redirect you to your organization's identity provider for authentication.
+              </InsetText>
+            </Box>
+          )}
+          
+          {oidcEnabled && passkeySupported && (
+            <Divider sx={{ my: 3 }}>
+              <Typography variant="body2" color="text.secondary">OR</Typography>
+            </Divider>
+          )}
+          
+          {passkeySupported && (
+            <Box sx={{ mt: oidcEnabled ? 2 : 0 }}>
               <Typography variant="h6" gutterBottom>
                 Passkey Authentication
               </Typography>
@@ -159,39 +241,13 @@ const AdminLogin: React.FC = () => {
                 disabled={loading}
                 fullWidth={false}
                 type="button"
+                variant={oidcEnabled ? "secondary" : "primary"}
               >
                 {loading ? <CircularProgress size={24} color="inherit" /> : 'Sign in with Passkey'}
               </Button>
               
               <InsetText>
                 This will use your device's biometric sensors (fingerprint, face recognition) or PIN for authentication.
-              </InsetText>
-            </Box>
-          )}
-          
-          {passkeySupported && oidcEnabled && (
-            <Divider sx={{ my: 3 }}>
-              <Typography variant="body2" color="text.secondary">OR</Typography>
-            </Divider>
-          )}
-          
-          {oidcEnabled && (
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="h6" gutterBottom>
-                Single Sign-On
-              </Typography>
-              <Button
-                onClick={handleOIDCLogin}
-                disabled={loading}
-                fullWidth={false}
-                type="button"
-                variant="secondary"
-              >
-                {loading ? <CircularProgress size={24} color="inherit" /> : `Sign in with ${oidcProviderName}`}
-              </Button>
-              
-              <InsetText>
-                This will redirect you to your organization's identity provider for authentication.
               </InsetText>
             </Box>
           )}

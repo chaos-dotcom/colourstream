@@ -12,16 +12,10 @@ import {
 } from '@simplewebauthn/server';
 import base64url from 'base64url';
 import { 
-  initializeOIDC, 
-  getAuthorizationUrl, 
-  handleCallback, 
   getOIDCConfig, 
-  updateOIDCConfig, 
-  // isOIDCInitialized is not used, so let's comment it out
-  // isOIDCInitialized,
-  getRedirectUrlFromState,
-  initializeOIDCFromEnv
-} from '../services/oidc';
+  updateOIDCConfigInDB
+} from '../services/oidc-express';
+import { requiresAuth } from 'express-openid-connect';
 
 const router = express.Router();
 
@@ -47,40 +41,14 @@ function bigIntToNumber(value: bigint): number {
   return number;
 }
 
-// Initialize OIDC from environment variables first, then fall back to database config
-initializeOIDCFromEnv()
-  .then(success => {
-    if (!success) {
-      // If environment initialization fails, try database initialization
-      return initializeOIDC();
-    }
-    return success;
-  })
-  .then(success => {
-    if (success) {
-      logger.info('OIDC initialized successfully');
-    } else {
-      logger.warn('OIDC initialization failed, authentication will be limited to passkeys');
-    }
-  })
-  .catch(error => {
-    logger.error('Failed to initialize OIDC', error);
-  });
-
 // OIDC configuration endpoint
 router.get('/oidc/config', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const config = await getOIDCConfig();
     
-    // Don't expose client secret
-    const configWithoutSecret = config ? {
-      ...config,
-      clientSecret: config.config?.clientSecret ? '********' : null
-    } : null;
-    
     res.json({
       status: 'success',
-      data: configWithoutSecret
+      data: config
     });
   } catch (error) {
     next(error);
@@ -95,83 +63,278 @@ router.post('/oidc/config', async (req: Request, res: Response, next: NextFuncti
     // If client secret is not provided or is masked, keep the existing one
     if (!config.clientSecret || config.clientSecret === '********') {
       const existingConfig = await getOIDCConfig();
-      if (existingConfig) {
-        config.clientSecret = existingConfig.config?.clientSecret;
+      if (existingConfig && existingConfig.config) {
+        // Access the client secret from the existing config
+        const existingOIDCConfig = await prisma.oIDCConfig.findUnique({
+          where: { id: 'default' },
+        });
+        
+        if (existingOIDCConfig && existingOIDCConfig.clientSecret) {
+          config.clientSecret = existingOIDCConfig.clientSecret;
+        }
       }
     }
     
-    const updatedConfig = await updateOIDCConfig(config);
-    
-    // Don't expose client secret in response
-    const configWithoutSecret = {
-      ...updatedConfig,
-      clientSecret: updatedConfig.config?.clientSecret ? '********' : null
-    };
+    const updatedConfig = await updateOIDCConfigInDB(config);
     
     res.json({
       status: 'success',
-      data: configWithoutSecret
+      data: updatedConfig
     });
   } catch (error) {
     next(error);
   }
 });
 
-// OIDC login endpoint
-router.get('/oidc/login', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const redirectUrl = req.query.redirectUrl as string;
-    
-    // Ensure redirectUrl is provided
-    if (!redirectUrl) {
-      throw new AppError(400, 'Missing redirectUrl parameter');
+// OIDC profile endpoint - returns user info from the OIDC provider
+router.get('/oidc/profile', requiresAuth(), (req: Request, res: Response) => {
+  res.json({
+    status: 'success',
+    data: {
+      user: req.oidc.user
     }
-    
-    const authUrlData = await getAuthorizationUrl(redirectUrl);
-    
-    if (!authUrlData) {
-      throw new AppError(500, 'OIDC is not configured or initialized');
-    }
-    
-    res.json({
-      status: 'success',
-      data: {
-        url: authUrlData.url
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
+  });
 });
 
-// OIDC callback endpoint
-router.get('/oidc/callback', async (req: Request, res: Response, next: NextFunction) => {
+// OIDC token endpoint - generates a JWT token for the authenticated user
+router.get('/oidc/token', requiresAuth(), (req: Request, res: Response) => {
   try {
-    const { code, state } = req.query as { code: string, state: string };
-    
-    if (!code || !state) {
-      throw new AppError(400, 'Missing code or state parameter');
-    }
-    
-    const result = await handleCallback(code, state);
-    
-    if (!result) {
-      throw new AppError(500, 'Failed to handle OIDC callback');
+    // Check if user info contains required fields
+    if (!req.oidc.user || !req.oidc.user.sub) {
+      logger.error('Invalid user info from OIDC provider', { userInfo: req.oidc.user });
+      throw new AppError(400, 'Invalid user info from OIDC provider');
     }
     
     // Generate JWT token
     const token = jwt.sign(
-      { userId: 'admin', type: 'admin' },
+      { 
+        userId: 'admin', 
+        type: 'admin',
+        oidc: {
+          sub: req.oidc.user.sub,
+          provider: req.oidc.user.iss
+        }
+      },
       process.env.ADMIN_AUTH_SECRET!,
       { expiresIn: '7d' }
     );
     
-    // Get redirect URL from state
-    const redirectUrl = getRedirectUrlFromState(state) || '/admin/dashboard';
+    logger.info('Generated JWT token for OIDC user', {
+      sub: req.oidc.user.sub
+    });
     
-    // Redirect to frontend with token
-    res.redirect(`${redirectUrl}?token=${token}`);
-  } catch (error) {
+    res.json({
+      status: 'success',
+      data: {
+        token,
+        user: req.oidc.user
+      }
+    });
+  } catch (error: any) {
+    logger.error('Error generating token', {
+      error: error.message,
+      stack: error.stack
+    });
+    
+    res.status(500).json({
+      status: 'error',
+      message: error.message || 'Failed to generate token'
+    });
+  }
+});
+
+// OIDC token exchange endpoint - exchanges authorization code for token
+router.post('/oidc/token-exchange', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { code, redirectUri } = req.body;
+    
+    if (!code) {
+      logger.error('Missing authorization code in token exchange request');
+      throw new AppError(400, 'Missing authorization code');
+    }
+    
+    logger.info('Processing OIDC token exchange request', { 
+      hasCode: !!code, 
+      redirectUri
+    });
+    
+    // Get the OIDC configuration
+    const config = await prisma.oIDCConfig.findUnique({
+      where: { id: 'default' },
+    });
+    
+    if (!config || !config.enabled || !config.clientId || !config.clientSecret) {
+      logger.error('OIDC not properly configured - missing basic config');
+      throw new AppError(500, 'OIDC configuration is missing or invalid');
+    }
+    
+    // For SSO.shed.gay, we can derive the token and userinfo endpoints if they're not set
+    let tokenUrl = config.tokenUrl;
+    let userInfoUrl = config.userInfoUrl;
+    
+    if (!tokenUrl && config.discoveryUrl) {
+      // If we have a discovery URL, try to use it to derive the token URL
+      // For example, if discoveryUrl is https://sso.shed.gay, the token URL would be https://sso.shed.gay/token
+      logger.info('Token URL not configured, deriving from discovery URL', { discoveryUrl: config.discoveryUrl });
+      tokenUrl = `${config.discoveryUrl.replace(/\/$/, '')}/token`;
+    } else if (!tokenUrl && config.authorizationUrl) {
+      // If we have an authorization URL, try to derive the token URL from it
+      // For example, if authorizationUrl is https://sso.shed.gay/authorize, the token URL would be https://sso.shed.gay/token
+      logger.info('Token URL not configured, deriving from authorization URL', { authorizationUrl: config.authorizationUrl });
+      const baseUrl = config.authorizationUrl.split('/').slice(0, -1).join('/');
+      tokenUrl = `${baseUrl}/token`;
+    }
+    
+    if (!userInfoUrl && config.discoveryUrl) {
+      // Same logic for userinfo URL
+      logger.info('UserInfo URL not configured, deriving from discovery URL', { discoveryUrl: config.discoveryUrl });
+      userInfoUrl = `${config.discoveryUrl.replace(/\/$/, '')}/userinfo`;
+    } else if (!userInfoUrl && config.authorizationUrl) {
+      // If we have an authorization URL, try to derive the userinfo URL from it
+      logger.info('UserInfo URL not configured, deriving from authorization URL', { authorizationUrl: config.authorizationUrl });
+      const baseUrl = config.authorizationUrl.split('/').slice(0, -1).join('/');
+      userInfoUrl = `${baseUrl}/userinfo`;
+    }
+    
+    // If we still don't have valid URLs, we can't proceed
+    if (!tokenUrl) {
+      logger.error('Missing token URL in OIDC configuration');
+      throw new AppError(500, 'Missing token URL in OIDC configuration');
+    }
+    
+    logger.info('Using token URL for code exchange', { tokenUrl });
+    
+    // Create form data for token request
+    const params = new URLSearchParams();
+    params.append('grant_type', 'authorization_code');
+    params.append('client_id', config.clientId);
+    params.append('client_secret', config.clientSecret);
+    params.append('code', code);
+    params.append('redirect_uri', redirectUri || `${process.env.PUBLIC_URL}/api/auth/oidc/callback`);
+    
+    // Exchange the code for a token
+    const tokenResponse = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params.toString(),
+    });
+    
+    if (!tokenResponse.ok) {
+      let errorMessage = `Token endpoint error: ${tokenResponse.statusText}`;
+      try {
+        const errorData = await tokenResponse.text();
+        logger.error('Token endpoint returned error', { 
+          status: tokenResponse.status, 
+          statusText: tokenResponse.statusText,
+          error: errorData
+        });
+        errorMessage = `Token endpoint error: ${errorData}`;
+      } catch (e) {
+        logger.error('Failed to parse token endpoint error response');
+      }
+      throw new AppError(tokenResponse.status, errorMessage);
+    }
+    
+    const tokenData = await tokenResponse.json();
+    
+    if (!tokenData.access_token) {
+      logger.error('No access token in response', { tokenData });
+      throw new AppError(500, 'No access token received from token endpoint');
+    }
+    
+    logger.info('Successfully exchanged code for token');
+    
+    // If we don't have a userinfo URL, we'll skip that step and just use the token data
+    if (!userInfoUrl) {
+      logger.warn('Missing userInfoUrl in OIDC configuration, skipping user info retrieval');
+      
+      // Use token claims directly if possible
+      const sub = tokenData.sub || 'unknown';
+      
+      // Generate JWT token for the user
+      const token = jwt.sign(
+        { 
+          userId: 'admin', 
+          type: 'admin',
+          oidc: {
+            sub,
+            provider: config.providerName
+          }
+        },
+        process.env.ADMIN_AUTH_SECRET!,
+        { expiresIn: '7d' }
+      );
+      
+      logger.info('Generated JWT token for OIDC user from token data');
+      
+      res.json({
+        status: 'success',
+        data: {
+          token,
+          user: {
+            sub,
+            ...tokenData
+          }
+        }
+      });
+      return;
+    }
+    
+    // Get user info using the token
+    logger.info('Fetching user info from', { userInfoUrl });
+    const userInfoResponse = await fetch(userInfoUrl, {
+      headers: {
+        'Authorization': `Bearer ${tokenData.access_token}`
+      }
+    });
+    
+    if (!userInfoResponse.ok) {
+      logger.error('Error fetching user info', { 
+        status: userInfoResponse.status,
+        statusText: userInfoResponse.statusText
+      });
+      throw new AppError(userInfoResponse.status, 'Failed to fetch user info');
+    }
+    
+    const userInfo = await userInfoResponse.json();
+    
+    if (!userInfo.sub) {
+      logger.error('Missing sub in user info response', { userInfo });
+      throw new AppError(500, 'Invalid user info response');
+    }
+    
+    // Generate JWT token for the user
+    const token = jwt.sign(
+      { 
+        userId: 'admin', 
+        type: 'admin',
+        oidc: {
+          sub: userInfo.sub,
+          provider: config.providerName
+        }
+      },
+      process.env.ADMIN_AUTH_SECRET!,
+      { expiresIn: '7d' }
+    );
+    
+    logger.info('Generated JWT token for OIDC user', {
+      sub: userInfo.sub
+    });
+    
+    res.json({
+      status: 'success',
+      data: {
+        token,
+        user: userInfo
+      }
+    });
+  } catch (error: any) {
+    logger.error('Error in OIDC token exchange', {
+      error: error.message,
+      stack: error.stack
+    });
     next(error);
   }
 });

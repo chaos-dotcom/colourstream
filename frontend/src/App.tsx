@@ -5,14 +5,24 @@ import CssBaseline from '@mui/material/CssBaseline';
 import './App.css';
 import './govuk.css';
 import Login from './pages/Login';
+import AdminLoginPage from './components/AdminLoginPage';
 import AdminDashboard from './components/AdminDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 import RoomView from './components/RoomView';
 import PresenterView from './components/PresenterView';
 import govukTheme from './lib/govukTheme';
 import GovUkLayout from './components/GovUkLayout';
+import OIDCCallback from './components/OIDCCallback';
+
+// Debug component to verify rendering
+const DebugAdminLoginPage = () => {
+  console.log('Rendering AdminLoginPage wrapper');
+  return <AdminLoginPage />;
+};
 
 function App() {
+  console.log('App component rendering');
+  
   return (
     <ThemeProvider theme={govukTheme}>
       <CssBaseline />
@@ -32,7 +42,7 @@ function App() {
               path="/admin/login"
               element={
                 <GovUkLayout serviceName="ColourStream">
-                  <Login />
+                  <DebugAdminLoginPage />
                 </GovUkLayout>
               }
             />
@@ -54,6 +64,9 @@ function App() {
                 </GovUkLayout>
               }
             />
+            
+            {/* OIDC Callback Route - frontend-specific route */}
+            <Route path="/auth/callback" element={<OIDCCallback />} />
             
             {/* Routes without GovUkLayout (no footer) */}
             <Route path="/room/:roomId" element={<RoomView isPasswordProtected={true} />} />

@@ -15,6 +15,7 @@ import { initializePassword } from './utils/initPassword';
 import mirotalkRoutes from './routes/mirotalk';
 import WebSocketService from './services/websocket';
 import OBSService from './services/obsService';
+import { initializeOIDC, initializeOIDCMiddleware } from './services/oidc-express';
 
 dotenv.config();
 
@@ -59,6 +60,10 @@ const basePath = process.env.BASE_PATH || '/api';
 // Health check routes - no rate limiting or auth required
 app.use(`${basePath}/health`, healthRoutes);
 
+// Initialize OIDC middleware
+// Moving this line to after OIDC initialization in startServer function
+// initializeOIDCMiddleware(app);
+
 // Routes with base path
 app.use(`${basePath}/auth`, authRoutes);
 app.use(`${basePath}/rooms`, roomRoutes);
@@ -74,6 +79,16 @@ const startServer = async () => {
   try {
     // Initialize the admin password hash
     await initializePassword();
+    
+    // Initialize OIDC
+    const oidcInitialized = await initializeOIDC();
+    if (oidcInitialized) {
+      logger.info('OIDC initialized successfully');
+      // Initialize OIDC middleware after configuration is loaded
+      initializeOIDCMiddleware(app);
+    } else {
+      logger.warn('OIDC initialization failed, authentication will be limited to passkeys');
+    }
     
     const PORT = process.env.PORT || 5001;
     server.listen(PORT, () => {

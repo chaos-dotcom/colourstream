@@ -35,3 +35,7 @@ traefik/certs/letsencrypt.key
 traefik/certs/letsencrypt.key.pem
 traefik/certs/letsencrypt.key.pem.enc
 traefik/ome
+
+# Docker Compose
+docker-compose.yml
+
