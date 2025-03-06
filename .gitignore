@@ -3,6 +3,7 @@ data
 node_modules
 .   
 ssl
+.log
 # Environment Variables
 global.env
 backend/.env

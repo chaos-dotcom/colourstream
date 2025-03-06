@@ -65,6 +65,7 @@ ColourStream uses a modern, secure authentication system that prioritizes passke
 - 🔄 Automatic transition from password to passkey authentication
 - 🛡️ Enhanced security with WebAuthn standard
 - 🎟️ JWT-based authentication for secure service-to-service communication
+- 🔑 ColourStream also Supports Single Sign On via OIDC
 
 For detailed information about the authentication system, see [Authentication Documentation](docs/authentication.md).
 For information about JWT key naming conventions, see [JWT Keys Documentation](docs/jwt_keys.md).
