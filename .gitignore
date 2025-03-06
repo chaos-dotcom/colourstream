@@ -41,9 +41,6 @@ traefik/ome
 # Docker Compose
 docker-compose.yml
 
-# Package lock files
-package-lock.json
-*/package-lock.json
 
 .git-filtered-backup
 letsencrypt
