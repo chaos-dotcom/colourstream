@@ -4,27 +4,49 @@ This project uses GitHub Container Registry to publish Docker images. The publis
 
 - `ghcr.io/johnr24/colourstream-frontend:latest`
 - `ghcr.io/johnr24/colourstream-backend:latest`
+- `ghcr.io/johnr24/colourstream-ovenmediaengine:latest`
 
-## Using the Published Images
+## Quick Setup
 
-To use these images in your own deployment:
+The easiest way to deploy ColourStream is using our setup script:
+
+```bash
+curl -s https://raw.githubusercontent.com/johnr24/colourstream/main/setup-ghcr.sh | bash
+```
+
+This script will:
+1. Download the necessary configuration files
+2. Generate secure random passwords and secrets
+3. Configure the application to use the GHCR images
+4. Create all required directories and environment files
+
+After running the script, you can simply start the application with:
+
+```bash
+docker-compose up -d
+```
+
+## Manual Setup
+
+If you prefer to set up manually:
 
 1. Pull the images:
    ```bash
    docker pull ghcr.io/johnr24/colourstream-frontend:latest
    docker pull ghcr.io/johnr24/colourstream-backend:latest
+   docker pull ghcr.io/johnr24/colourstream-ovenmediaengine:latest
    ```
 
-2. Reference them in your docker-compose.yml:
-   ```yaml
-   services:
-     frontend:
-       image: ghcr.io/johnr24/colourstream-frontend:latest
-       # Your configuration here...
-       
-     backend:
-       image: ghcr.io/johnr24/colourstream-backend:latest
-       # Your configuration here...
+2. Download the docker-compose template:
+   ```bash
+   curl -s https://raw.githubusercontent.com/johnr24/colourstream/main/docker-compose.template.yml > docker-compose.yml
+   ```
+
+3. Configure your environment files and directories
+   
+4. Start the application:
+   ```bash
+   docker-compose up -d
    ```
 
 ## Publishing New Versions
