@@ -21,7 +21,7 @@ ColourStream is a self-hosted livestreaming review platform designed for colouri
 ## 🏗️ System Architecture
 
 The ColourStream platform consists of several integrated components:
-
+```
 graph TD
     %% Client connections
     Client([User/Client Browser]) --> Traefik
@@ -47,7 +47,7 @@ graph TD
     Mirotalk[Mirotalk WebRTC] --> Coturn[Coturn TURN Server]
     OME_Origin --> Coturn
     OME_Edge --> Coturn
-
+```
 
 ### 🧩 Components
 
