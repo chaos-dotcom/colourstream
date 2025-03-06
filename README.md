@@ -5,7 +5,7 @@
 
 ColourStream is a self-hosted livestreaming review platform designed for colourists by a colourist. Powered by OvenMediaEngine and Mirotalk (AGPL), it provides potential end-to-end latency of less than 5 frames, making it perfect for real-time collaboration and client reviews.
 
-💡 **Built by A Colourist, for colourists** - with features specifically designed for the unique needs of color grading professionals.
+💡 **Built by A Colourist, for colourists** - with features specifically designed for the unique needs of color grading professionals. Unlike Grading over Zoom,Teams or another Video Meeting App, Colourstream is a purpose built application designed from the ground up with colourgrading in mind leveraging OvenMediaEngine to ensure a fully accurate Colour Pipeline Workflow
 
 ## ✨ Key Features
 
