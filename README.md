@@ -14,7 +14,7 @@ ColourStream is a self-hosted livestreaming review platform designed for colouri
 - **🎭 Multi-Room Support**: Host multiple review sessions simultaneously with separate rooms - this is currently functional but the automatic OBS control will not run. 
 - **🔄 OBS Integration**: Stream directly from OBS or other RTMP/SRT sources
 - **💬 Built-in Video Conferencing**: Real-time communication via Mirotalk's WebRTC capabilities
-- **🛡️ Secure by Design**: End-to-end security for your sensitive content
+- **🛡️ Secure by Design**: End-to-end security for your sensitive content, Colourstream folllows Industry Best practices and uses a full SSL pipeline to ensure your review remains safe, 
 - **🎛️ Admin Dashboard**: Manage users, rooms, and streaming settings
 - **📱 Device Compatibility**: Works across desktop and mobile devices
 
