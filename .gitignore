@@ -9,6 +9,8 @@ backend/.env
 frontend/.env
 mirotalk/.env
 ovenmediaengine/.env
+.env
+env.reference
 
 # Certificates
 certs
@@ -46,3 +48,5 @@ package-lock.json
 .git-filtered-backup
 letsencrypt
 security-reports
+backend/logs/combined.log
+.DS_Store
