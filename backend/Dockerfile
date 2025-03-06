@@ -7,8 +7,14 @@ WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# Install dependencies
-RUN npm ci
+# Install dependencies - handle case where package-lock.json might not exist
+RUN if [ ! -f package-lock.json ]; then \
+        echo "No package-lock.json found, creating one..." && \
+        npm install --package-lock-only && \
+        npm install; \
+    else \
+        npm ci; \
+    fi
 
 # Generate Prisma client
 RUN npx prisma generate
@@ -27,12 +33,20 @@ WORKDIR /app
 # Install curl for debugging and PostgreSQL client for migrations and netcat for wait script
 RUN apk add --no-cache curl postgresql-client netcat-openbsd
 
-# Copy package files and install production dependencies
+# Copy package files
 COPY package*.json ./
 
 # Copy Prisma files including migrations
 COPY prisma ./prisma/
-RUN npm ci --production
+
+# Install production dependencies - handle case where package-lock.json might not exist
+RUN if [ ! -f package-lock.json ]; then \
+        echo "No package-lock.json found, creating one..." && \
+        npm install --package-lock-only --omit=dev && \
+        npm install --omit=dev; \
+    else \
+        npm ci --omit=dev; \
+    fi
 
 # Copy built files from builder stage
 COPY --from=builder /app/dist ./dist

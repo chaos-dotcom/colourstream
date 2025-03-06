@@ -109,3 +109,40 @@ All containers are connected through the `colourstream_network` Docker network. 
 ## Restart Policy
 
 All containers are configured with `restart: unless-stopped` for automatic recovery from failures, except for OME Edge which uses `restart: always`.
+
+## Security
+
+### Gitleaks
+
+This repository uses [Gitleaks](https://github.com/gitleaks/gitleaks) to detect and prevent hardcoded secrets in the codebase. Gitleaks is configured as a GitHub Action that runs on each push and pull request.
+
+#### Configuration Files
+
+- `.github/workflows/gitleaks.yml`: GitHub Action workflow configuration
+- `.gitleaksignore`: List of fingerprints for secrets that should be ignored by Gitleaks
+
+#### Managing False Positives
+
+If Gitleaks detects a false positive or you need to ignore a specific file:
+
+1. Run Gitleaks locally to get the fingerprint:
+   ```
+   # Install Gitleaks (if not already installed)
+   brew install gitleaks
+
+   # Scan your repository
+   gitleaks detect --report-format=json --report-path=leaks.json
+   ```
+
+2. Find the fingerprint in the `leaks.json` file for the specific secret you want to ignore
+
+3. Add the fingerprint to the `.gitleaksignore` file in the format:
+   ```
+   COMMIT_HASH:FILEPATH:RULE_ID:LINE_NUMBER
+   ```
+
+#### Best Practices
+
+- Never commit sensitive information such as API keys, passwords, or tokens
+- Use environment variables or secure secret management solutions
+- If a secret is accidentally committed, change it immediately as it should be considered compromised
