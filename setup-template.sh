@@ -50,9 +50,17 @@ echo "Creating configuration files..."
 # Create docker-compose.yml from template
 if [ -f "docker-compose.template.yml" ]; then
   cp docker-compose.template.yml docker-compose.yml
+  
+  # Replace domains in host rules
   sed -i "s/example.com/$domain_name/g" docker-compose.yml
   sed -i "s/admin@example.com/$admin_email/g" docker-compose.yml
   sed -i "s/--certificatesresolvers.myresolver.acme.email=admin@johnrogerscolour.co.uk/--certificatesresolvers.myresolver.acme.email=$admin_email/g" docker-compose.yml
+  
+  # Replace domains in environment variables for frontend
+  sed -i "s|VITE_API_URL: https://live.colourstream.example.com/api|VITE_API_URL: https://live.colourstream.$domain_name/api|g" docker-compose.yml
+  sed -i "s|VITE_WEBRTC_WS_HOST: live.colourstream.example.com|VITE_WEBRTC_WS_HOST: live.colourstream.$domain_name|g" docker-compose.yml
+  sed -i "s|VITE_VIDEO_URL: https://video.colourstream.example.com/join|VITE_VIDEO_URL: https://video.colourstream.$domain_name/join|g" docker-compose.yml
+  
   echo "✅ Created docker-compose.yml"
 else
   echo "❌ docker-compose.template.yml not found"
@@ -83,6 +91,18 @@ else
   echo "❌ backend/.env.template not found"
 fi
 
+# Create frontend/.env from template
+if [ -f "frontend/.env.template" ]; then
+  cp frontend/.env.template frontend/.env
+  # Replace domain in all the frontend environment variables
+  sed -i "s/live.colourstream.example.com/live.colourstream.$domain_name/g" frontend/.env
+  sed -i "s/video.colourstream.example.com/video.colourstream.$domain_name/g" frontend/.env
+  # Leave the OIDC endpoint as a placeholder until the user configures their actual OIDC provider
+  echo "✅ Created frontend/.env"
+else
+  echo "❌ frontend/.env.template not found"
+fi
+
 # Create mirotalk/.env from template
 if [ -f "mirotalk/.env.template" ]; then
   cp mirotalk/.env.template mirotalk/.env
@@ -99,6 +119,23 @@ else
   echo "❌ mirotalk/.env.template not found"
 fi
 
+# Create .env file in the root directory to document the configuration for reference
+cat > .env << EOL
+# Generated Configuration - $(date)
+DOMAIN_NAME=$domain_name
+ADMIN_EMAIL=$admin_email
+DB_PASSWORD=$db_password
+JWT_KEY=$jwt_key
+ADMIN_PASSWORD=$admin_password
+MIROTALK_API_KEY=$mirotalk_api_key
+TURN_PASSWORD=$turn_password
+OME_API_TOKEN=$ome_api_token
+FRONTEND_URL=https://live.colourstream.$domain_name
+VIDEO_URL=https://video.colourstream.$domain_name
+EOL
+
+echo "✅ Created .env file with configuration summary"
+
 echo
 echo "Configuration Summary:"
 echo "======================"
@@ -111,10 +148,13 @@ echo "MiroTalk API Key: $mirotalk_api_key"
 echo "TURN Server Password: $turn_password"
 echo "OvenMediaEngine API Token: $ome_api_token"
 echo
+echo "Frontend URL: https://live.colourstream.$domain_name"
+echo "Video URL: https://video.colourstream.$domain_name"
+echo
 echo "Next Steps:"
 echo "1. Review and further customize the configuration files if needed"
 echo "2. Set up SSL certificates for your domains"
 echo "3. Configure your DNS to point the subdomains to your server"
 echo "4. Start the application with: docker-compose up -d"
 echo
-echo "For more information, see TEMPLATE_README.md" 
+echo "For more information, see TEMPLATE_README.md"

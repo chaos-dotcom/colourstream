@@ -106,7 +106,7 @@ const RoomView: React.FC<RoomViewProps> = ({ isPasswordProtected = false, isPres
   useEffect(() => {
     if (!scriptRef.current && isNameSubmitted && roomConfig) {
       const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/ovenplayer/dist/ovenplayer.js';
+      script.src = import.meta.env.VITE_OVENPLAYER_SCRIPT_URL || 'https://cdn.jsdelivr.net/npm/ovenplayer/dist/ovenplayer.js';
       script.async = true;
       script.onload = () => {
         const player = (window as any).OvenPlayer;
@@ -115,11 +115,13 @@ const RoomView: React.FC<RoomViewProps> = ({ isPasswordProtected = false, isPres
           console.log('Stream key length:', roomConfig.streamKey?.length);
           
           // Construct the WebRTC URL with the stream key
-          const wsHost = import.meta.env.VITE_WEBRTC_WS_HOST || 'live.colourstream.example.com';
+          const wsHost = import.meta.env.VITE_WEBRTC_WS_HOST || window.location.hostname;
           const wsPort = import.meta.env.VITE_WEBRTC_WS_PORT || '3334';
+          const wsProtocol = import.meta.env.VITE_WEBRTC_WS_PROTOCOL || 'wss';
+          const appPath = import.meta.env.VITE_WEBRTC_APP_PATH || 'app';
           const streamUrl = roomConfig.streamKey
-            ? `wss://${wsHost}:${wsPort}/app/${roomConfig.streamKey}`
-            : `wss://${wsHost}:${wsPort}/app/stream`;
+            ? `${wsProtocol}://${wsHost}:${wsPort}/${appPath}/${roomConfig.streamKey}`
+            : `${wsProtocol}://${wsHost}:${wsPort}/${appPath}/stream`;
             
           console.log('Using stream URL:', streamUrl);
           
@@ -170,7 +172,7 @@ const RoomView: React.FC<RoomViewProps> = ({ isPasswordProtected = false, isPres
   useEffect(() => {
     if (isNameSubmitted && isPlayerReady && iframeRef.current && roomConfig) {
       const timestamp = new Date().getTime();
-      const baseUrl = import.meta.env.VITE_VIDEO_URL || 'https://video.colourstream.example.com/join';
+      const baseUrl = import.meta.env.VITE_VIDEO_URL || `${window.location.protocol}//${window.location.hostname}/join`;
       const queryParams = new URLSearchParams({
         room: roomConfig.mirotalkRoomId,
         name: userName,
