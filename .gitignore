@@ -49,4 +49,6 @@ package-lock.json
 letsencrypt
 security-reports
 backend/logs/combined.log
+*.DS_Store
+backend/logs/combined.log
 .DS_Store
