@@ -86,8 +86,13 @@ fi
 if [ -f "mirotalk/.env.template" ]; then
   cp mirotalk/.env.template mirotalk/.env
   sed -i "s/example.com/$domain_name/g" mirotalk/.env
-  sed -i "s/your_turn_username/colourstream/g" mirotalk/.env
   sed -i "s/your_turn_password/$turn_password/g" mirotalk/.env
+  sed -i "s/your_api_key_secret/$mirotalk_api_key/g" mirotalk/.env
+  sed -i "s/your_mirotalk_api_key_here/$mirotalk_api_key/g" mirotalk/.env
+  sed -i "s/your_jwt_key_here/$jwt_key/g" mirotalk/.env
+  sed -i "s/TURN_SERVER_CREDENTIAL=your_turn_password/TURN_SERVER_CREDENTIAL=$turn_password/g" mirotalk/.env
+  sed -i "s/globalUsername/admin/g" mirotalk/.env
+  sed -i "s/globalPassword/$admin_password/g" mirotalk/.env
   echo "✅ Created mirotalk/.env"
 else
   echo "❌ mirotalk/.env.template not found"
