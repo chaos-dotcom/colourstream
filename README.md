@@ -70,12 +70,12 @@ ColourStream leverages OvenMediaEngine's powerful streaming capabilities:
 - Handles transcoding and adaptive bitrate streaming
 - Distributes to edge servers for scalability
 
-#### Edge Server
+#### Optional Edge Server can be setup to, although all functionality can be done by the Origin Server if needed. 
+
 - Distributes streams to viewers
 - Supports WebRTC and LLHLS playback
 - Optimized for low-latency delivery
 
-For OvenMediaEngine API flow information, see [OME API Flow](docs/omen-api-flow.md).
 
 ### Video Conferencing
 
@@ -107,7 +107,6 @@ This repository uses [Gitleaks](https://github.com/gitleaks/gitleaks) to detect 
 For more security information, see [SECURITY.md](SECURITY.md).
 
 ## 🚀 Getting Started
-
 
 Please run the setup-template.sh script 
 
