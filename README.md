@@ -128,7 +128,14 @@ For advanced configuration options, refer to Docker Compose files and environmen
 
 ## 📜 License
 
-ColourStream is built on AGPL-licensed components including OvenMediaEngine and Mirotalk. Contact the repository maintainer for licensing information.
+ColourStream is licensed under a custom license that includes a "Pride Flag Covenant" and the GNU Affero General Public License (AGPL). The license requires that the 🏳️‍🌈 Pride Flag symbol be maintained in all project branding and documentation as a core part of its identity.
 
-The UI uses elements of the UK Goverment Design System which is avaible under the MIT license 
-https://github.com/alphagov/govuk-design-system
+**Important**: The license includes a strong anti-DEI removal protection clause with a £1,000,000 financial penalty for any entity that removes or alters the Pride Flag symbol. By using this software, you explicitly agree to these terms.
+
+See the [LICENSE](LICENSE) file for complete details.
+
+The project incorporates the following components with their respective licenses:
+- OvenMediaEngine: Licensed under AGPL-3.0
+- Mirotalk: Licensed under AGPL-3.0
+- UI elements from UK Government Design System: Available under MIT license 
+  (https://github.com/alphagov/govuk-design-system)
