@@ -9,7 +9,10 @@ import type {
   WebAuthnAuthenticationOptions,
 } from '../types';
 
-const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+// Use the explicit API URL with the correct protocol
+const baseURL = 'https://live.colourstream.johnrogerscolour.co.uk/api';
+
+console.log('API baseURL:', baseURL);
 
 export type { PasskeyInfo };
 
@@ -27,55 +30,21 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  
+  // Log all API requests for debugging
+  console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`, config);
+  
   return config;
 });
 
-// Add response interceptor to handle token expiration and rate limiting
+// Add response interceptor for debugging
 api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
-    
-    // Handle token expiration
-    if (error.response?.status === 401) {
-      // Clear auth state
-      localStorage.removeItem('adminToken');
-      localStorage.removeItem('isAdminAuthenticated');
-      
-      // Store error message for login page
-      localStorage.setItem('authError', 'Your session has expired. Please log in again.');
-      
-      // Redirect to login page
-      window.location.href = '/admin/login';
-      return Promise.reject(error);
-    }
-    
-    // Handle rate limiting with exponential backoff retry
-    if (error.response?.status === 429 && !originalRequest._retry) {
-      // Initialize retry count if not set
-      originalRequest._retryCount = originalRequest._retryCount || 0;
-      
-      // Maximum number of retries
-      const maxRetries = 3;
-      
-      // Check if we've reached max retries
-      if (originalRequest._retryCount < maxRetries) {
-        originalRequest._retryCount++;
-        originalRequest._retry = true;
-        
-        // Calculate delay with exponential backoff (1s, 2s, 4s)
-        const delay = Math.pow(2, originalRequest._retryCount - 1) * 1000;
-        
-        console.log(`Rate limit exceeded. Retrying in ${delay}ms... (Attempt ${originalRequest._retryCount} of ${maxRetries})`);
-        
-        // Wait for the calculated delay
-        await new Promise(resolve => setTimeout(resolve, delay));
-        
-        // Retry the request
-        return api(originalRequest);
-      }
-    }
-    
+  (response) => {
+    console.log(`API Response: ${response.status} ${response.config.url}`, response.data);
+    return response;
+  },
+  (error) => {
+    console.error(`API Error: ${error.config?.url}`, error);
     return Promise.reject(error);
   }
 );
@@ -174,6 +143,12 @@ export interface OIDCConfig {
 export interface OIDCConfigResponse {
   config: OIDCConfig | null;
   isInitialized: boolean;
+}
+
+export interface AuthResult {
+  success: boolean;
+  token?: string;
+  error?: string;
 }
 
 export const adminLogin = async (password: string): Promise<ApiResponse<AuthResponse>> => {
@@ -362,81 +337,67 @@ export const registerPasskey = async (): Promise<ApiResponse<WebAuthnRegistratio
   }
 };
 
-export const authenticateWithPasskey = async (): Promise<ApiResponse<AuthResponse>> => {
+export const authenticateWithPasskey = async (): Promise<AuthResult> => {
   try {
+    console.log('Starting passkey authentication');
+    
     // Step 1: Get authentication options from the server
-    const response = await api.post('/auth/webauthn/authenticate');
-    if (!response.data) {
-      throw new Error('No authentication options received from server');
+    const optionsResponse = await axios.post(`${baseURL}/auth/webauthn/authenticate`);
+    console.log('Authentication options response:', optionsResponse);
+    
+    if (!optionsResponse.data) {
+      console.error('No authentication options received');
+      return { success: false, error: 'No authentication options received' };
     }
     
-    // Log the options for debugging
-    console.log('Authentication options received:', response.data);
+    const options = optionsResponse.data;
+    console.log('Authentication options:', options);
     
-    // Step 2: Start the authentication process in the browser
-    try {
-      // Make sure we're using the raw response data without type casting
-      // This ensures we pass exactly what the browser expects
-      const credential = await startAuthentication(response.data);
+    // Step 2: Create authentication credential in the browser
+    const credential = await startAuthentication(options);
+    console.log('Created authentication credential:', credential);
+    
+    // Step 3: Send the credential to the server for verification
+    const verificationResponse = await axios.post(`${baseURL}/auth/webauthn/authenticate/verify`, credential);
+    console.log('Verification response:', verificationResponse);
+    
+    // Extract token from the correct location in the response
+    const responseData = verificationResponse.data;
+    
+    if (responseData?.status === 'success' && responseData?.data?.token) {
+      const token = responseData.data.token;
+      console.log('Authentication token received, setting auth state');
       
-      console.log('Authentication credential created:', credential);
+      // Store auth token consistently
+      localStorage.setItem('adminToken', token);
+      localStorage.setItem('isAdminAuthenticated', 'true');
+      localStorage.setItem('authToken', token);
+      localStorage.setItem('authTimestamp', Date.now().toString());
       
-      // Step 3: Send the credential back to the server for verification
-      const verificationResponse = await api.post('/auth/webauthn/authenticate/verify', credential);
-      console.log('Verification response:', verificationResponse.data);
+      // Apply token to axios default headers for subsequent requests
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       
-      // Update to handle the new response format
-      const result = verificationResponse.data;
-      
-      // Step 4: Store the authentication token
-      if (result.data && result.data.token) {
-        localStorage.setItem('adminToken', result.data.token);
-        localStorage.setItem('isAdminAuthenticated', 'true');
-        
-        return {
-          status: 'success',
-          data: {
-            token: result.data.token
-          }
-        };
-      } else {
-        console.error('No token received in authentication response:', result);
-        throw new Error('Authentication successful but no token received');
-      }
-    } catch (error: any) {
-      console.error('WebAuthn authentication error:', {
-        name: error.name,
-        message: error.message,
-        error
-      });
-      
-      // Handle browser-level WebAuthn errors with clear user messages
-      if (error.name === 'NotAllowedError') {
-        throw new Error('User declined to authenticate with passkey');
-      } else if (error.name === 'SecurityError') {
-        throw new Error('Security error: The origin is not secure or does not match the registered origin');
-      } else if (error.name === 'InvalidStateError') {
-        throw new Error('Invalid authentication state. Please try again.');
-      } else if (error.name === 'AbortError') {
-        throw new Error('Authentication was aborted. Please try again.');
-      } else if (error.name === 'TypeError') {
-        throw new Error('Authentication failed: Invalid response from authenticator');
-      } else if (error.name === 'NotSupportedError') {
-        throw new Error('WebAuthn is not supported in this browser or environment');
-      }
-      
-      throw new Error(`Authentication failed: ${error.message}`);
+      return { success: true, token: token };
+    } else {
+      console.error('No token received from verification, response data:', responseData);
+      return { success: false, error: 'No token received from verification. Please check server logs.' };
     }
   } catch (error: any) {
     console.error('Passkey authentication error:', error);
     
-    // Extract the error message from the response if available
-    const errorMessage = error.response?.data?.message || 
-                         error.response?.data?.error || 
-                         error.message || 
-                         'Failed to authenticate with passkey';
+    // Handle specific WebAuthn errors
+    if (error.name === 'NotAllowedError') {
+      return { success: false, error: 'Authentication was not allowed by the user or the device' };
+    } else if (error.name === 'SecurityError') {
+      return { success: false, error: 'A security error occurred during authentication' };
+    } else if (error.name === 'TypeError') {
+      return { success: false, error: 'Invalid parameters were provided for authentication' };
+    }
     
-    throw new Error(errorMessage);
+    return { 
+      success: false, 
+      error: error.response?.data?.message || error.message || 'Failed to authenticate with passkey' 
+    };
   }
 };
 
@@ -497,9 +458,19 @@ export const getDefaultMiroTalkCredentials = async (): Promise<DefaultMiroTalkCr
 
 export const getOIDCConfig = async (): Promise<OIDCConfigResponse> => {
   try {
-    console.log('Fetching OIDC config...');
-    const response = await api.get('/auth/oidc/config');
-    console.log('OIDC config response:', response.data);
+    console.log('Getting OIDC config from:', `${baseURL}/auth/oidc/config`);
+    const response = await axios.get(`${baseURL}/auth/oidc/config`);
+    console.log('OIDC config response:', response);
+    
+    // Check different possible response structures
+    if (response.data?.status === 'success' && response.data?.data) {
+      console.log('OIDC config found in response.data.data:', response.data.data);
+      return {
+        config: response.data.data.config || response.data.data,
+        isInitialized: true
+      };
+    }
+    
     return response.data;
   } catch (error) {
     console.error('Failed to get OIDC config:', error);
@@ -509,52 +480,208 @@ export const getOIDCConfig = async (): Promise<OIDCConfigResponse> => {
 
 export const updateOIDCConfig = async (config: OIDCConfig): Promise<OIDCConfigResponse> => {
   try {
-    const response = await api.post('/auth/oidc/config', config);
+    console.log('Updating OIDC config at:', `${baseURL}/auth/oidc/config`);
+    console.log('OIDC config payload:', config);
+    const response = await axios.post(`${baseURL}/auth/oidc/config`, config);
+    console.log('OIDC config update response:', response);
     return response.data;
   } catch (error: any) {
+    console.error('Failed to update OIDC config:', error);
     throw new Error(error.response?.data?.message || 'Failed to update OIDC configuration');
-  }
-};
-
-export const getOIDCLoginUrl = async (redirectUrl?: string): Promise<string> => {
-  try {
-    const params = redirectUrl ? { redirectUrl } : {};
-    console.log('Getting OIDC login URL with params:', params);
-    const response = await api.get('/auth/oidc/login', { params });
-    console.log('OIDC login URL response:', response.data);
-    return response.data.data.url;
-  } catch (error) {
-    console.error('Failed to get OIDC login URL:', error);
-    throw error;
   }
 };
 
 export const loginWithOIDC = async (redirectUrl: string): Promise<void> => {
   try {
-    const params = { redirectUrl };
-    console.log('Initiating OIDC login with params:', params);
-    const response = await api.get('/auth/oidc/login', { params });
-    console.log('OIDC login response:', response.data);
+    console.log('Initiating OIDC login flow');
     
-    if (response.data?.data?.url) {
-      // Check if the URL is valid
-      if (response.data.data.url.startsWith('undefined')) {
-        console.error('Invalid OIDC authorization URL:', response.data.data.url);
-        throw new Error('Invalid OIDC authorization URL. Please check your OIDC configuration.');
-      }
-      window.location.href = response.data.data.url;
-    } else {
-      throw new Error('No redirect URL received from OIDC provider');
+    // Get the OIDC configuration first
+    const oidcConfig = await getOIDCConfig();
+    
+    if (!oidcConfig.config?.enabled) {
+      console.error('OIDC is not enabled');
+      throw new Error('OIDC authentication is not enabled');
     }
+    
+    console.log('OIDC is enabled, proceeding with login');
+    
+    // Normalize the redirect URL to ensure we only store the path
+    let normalizedRedirectUrl = redirectUrl;
+    if (redirectUrl.startsWith('http')) {
+      try {
+        const url = new URL(redirectUrl);
+        normalizedRedirectUrl = url.pathname + url.search + url.hash;
+      } catch (e) {
+        console.error('Error parsing redirect URL, using as is:', e);
+      }
+    }
+    console.log('Original redirect URL:', redirectUrl);
+    console.log('Normalized redirect URL:', normalizedRedirectUrl);
+    
+    // Store the redirect URL in localStorage to use after successful authentication
+    localStorage.setItem('oidcRedirectUrl', normalizedRedirectUrl);
+    
+    // Generate a nonce for security
+    const nonce = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    localStorage.setItem('oidcNonce', nonce);
+    
+    // Generate a state parameter for security
+    const state = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    localStorage.setItem('oidcState', state);
+    console.log('Generated state parameter:', state);
+    
+    // Use a frontend callback URL instead of the API route to avoid conflicts
+    // This callback will be handled by our React router
+    const callbackUrl = `${window.location.origin}/auth/callback`;
+    console.log('Using callback URL:', callbackUrl);
+    
+    // Construct the authorization URL with the proper parameters
+    const params = new URLSearchParams({
+      client_id: oidcConfig.config?.clientId || 'colourstream-admin',
+      redirect_uri: callbackUrl,
+      response_type: 'code',
+      scope: oidcConfig.config?.scope || 'openid profile email',
+      nonce: nonce,
+      state: state // Add explicit state parameter
+    });
+    
+    // Use the correct authorization endpoint for sso.shed.gay
+    const authEndpoint = 'https://sso.shed.gay/authorize';
+    const authUrl = `${authEndpoint}?${params.toString()}`;
+    
+    console.log('Redirecting to SSO provider:', authUrl);
+    
+    // Redirect to the authorization URL
+    window.location.href = authUrl;
   } catch (error) {
-    console.error('OIDC login error:', error);
+    console.error('Failed to initiate OIDC login:', error);
     throw error;
   }
 };
 
-export const handleOIDCCallback = (token: string): void => {
-  console.log('Handling OIDC callback with token:', token.substring(0, 10) + '...');
-  localStorage.setItem('adminToken', token);
-  localStorage.setItem('isAdminAuthenticated', 'true');
-  window.location.href = '/admin/dashboard';
+export const getOIDCUserProfile = async (): Promise<any> => {
+  try {
+    const response = await api.get('/auth/oidc/profile');
+    return response.data;
+  } catch (error) {
+    console.error('Failed to get OIDC user profile:', error);
+    throw error;
+  }
+};
+
+export const getOIDCToken = async (): Promise<string> => {
+  try {
+    const response = await api.get('/auth/oidc/token');
+    if (response.data?.data?.token) {
+      return response.data.data.token;
+    }
+    throw new Error('No token received');
+  } catch (error) {
+    console.error('Failed to get OIDC token:', error);
+    throw error;
+  }
+};
+
+export const handleOIDCCallback = async (): Promise<AuthResult> => {
+  try {
+    console.log('Handling OIDC callback');
+    
+    // First check if we already have a token in the URL (backend redirect scenario)
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    
+    if (token) {
+      console.log('Token found directly in URL, setting auth state');
+      
+      // Store auth token consistently with same pattern as passkey auth
+      localStorage.setItem('adminToken', token);
+      localStorage.setItem('isAdminAuthenticated', 'true');
+      localStorage.setItem('authToken', token);
+      localStorage.setItem('authTimestamp', Date.now().toString());
+      
+      // Apply token to axios default headers for subsequent requests
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      
+      // Remove token from URL (for security)
+      window.history.replaceState({}, document.title, window.location.pathname);
+      
+      // Get the stored redirect URL if any
+      const redirectUrl = localStorage.getItem('oidcRedirectUrl');
+      if (redirectUrl) {
+        localStorage.removeItem('oidcRedirectUrl'); // Clean up
+        setTimeout(() => {
+          window.location.href = redirectUrl;
+        }, 300);
+      }
+      
+      return { success: true, token: token };
+    }
+    
+    // If no token in URL, proceed with the original flow
+    const code = urlParams.get('code');
+    
+    if (!code) {
+      console.error('No authorization code found in callback URL');
+      return { success: false, error: 'No authorization code found in callback URL' };
+    }
+    
+    console.log('Got authorization code, exchanging for token');
+    
+    try {
+      // The backend should handle the code exchange and state validation
+      const response = await axios.get(`${baseURL}/api/auth/oidc/callback${window.location.search}`);
+      
+      console.log('OIDC callback response:', response);
+      
+      if (response.data && response.data.token) {
+        const responseToken = response.data.token;
+        console.log('OIDC authentication token received, setting auth state');
+        
+        // Store auth token consistently with same pattern as passkey auth
+        localStorage.setItem('adminToken', responseToken);
+        localStorage.setItem('isAdminAuthenticated', 'true');
+        localStorage.setItem('authToken', responseToken);
+        localStorage.setItem('authTimestamp', Date.now().toString());
+        
+        // Apply token to axios default headers for subsequent requests
+        axios.defaults.headers.common['Authorization'] = `Bearer ${responseToken}`;
+        
+        // Get the stored redirect URL if any
+        const redirectUrl = localStorage.getItem('oidcRedirectUrl');
+        if (redirectUrl) {
+          localStorage.removeItem('oidcRedirectUrl'); // Clean up
+          console.log('Redirecting to:', redirectUrl);
+          setTimeout(() => {
+            window.location.href = redirectUrl;
+          }, 300);
+        }
+        
+        return { success: true, token: responseToken };
+      } else {
+        console.error('No token received from OIDC callback');
+        return { success: false, error: 'No token received from OIDC callback' };
+      }
+    } catch (error: any) {
+      console.error('OIDC callback error:', error);
+      
+      // Check for specific OIDC errors
+      if (error.response?.status === 400) {
+        return { 
+          success: false, 
+          error: 'Invalid OIDC authorization request. This may be due to an invalid state parameter or expired session. Please try logging in again.' 
+        };
+      }
+      
+      return { 
+        success: false, 
+        error: error.response?.data?.message || error.message || 'Failed to process OIDC callback' 
+      };
+    }
+  } catch (error: any) {
+    console.error('OIDC callback error:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Failed to process OIDC callback' 
+    };
+  }
 }; 

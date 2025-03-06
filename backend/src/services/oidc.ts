@@ -69,6 +69,10 @@ const callWrapper = async (action: string, params: Record<string, string> = {}):
     }
     
     const response = await fetch(url.toString());
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || `Wrapper request failed with status ${response.status}`);
+    }
     return await response.json();
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -116,8 +120,6 @@ export async function initializeOIDC(): Promise<boolean> {
           const discoveryResult = await callWrapper('discover', { 
             discoveryUrl: config.discoveryUrl 
           });
-          
-          logger.info('Discovery result:', discoveryResult);
           
           // Update the config with discovered endpoints
           await (prisma as any).OIDCConfig.update({
@@ -254,7 +256,7 @@ export async function getAuthorizationUrl(redirectUrl: string): Promise<AuthUrlD
     // Construct authorization URL
     const params = new URLSearchParams();
     if (config.clientId) params.append('client_id', config.clientId);
-    params.append('redirect_uri', `${process.env.PUBLIC_URL}/api/auth/callback`);
+    params.append('redirect_uri', `${process.env.PUBLIC_URL}/api/auth/oidc/callback`);
     params.append('response_type', 'code');
     params.append('state', state);
     params.append('nonce', nonce);
@@ -308,51 +310,15 @@ export async function handleCallback(code: string, state: string) {
     }
 
     try {
-      // Exchange code for tokens
-      if (!config.tokenUrl) {
-        throw new Error('Token URL is not configured');
-      }
-      
-      const tokenParams = new URLSearchParams();
-      tokenParams.append('grant_type', 'authorization_code');
-      if (config.clientId) tokenParams.append('client_id', config.clientId);
-      if (config.clientSecret) tokenParams.append('client_secret', config.clientSecret);
-      tokenParams.append('code', code);
-      tokenParams.append('redirect_uri', `${process.env.PUBLIC_URL}/api/auth/callback`);
-      tokenParams.append('code_verifier', authRequest.codeVerifier);
-      
-      const tokenResponse = await fetch(config.tokenUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: tokenParams,
+      // Use the wrapper to exchange code for tokens
+      const exchangeResult = await callWrapper('exchangeToken', {
+        clientId: config.clientId || '',
+        clientSecret: config.clientSecret || '',
+        discoveryUrl: config.discoveryUrl || '',
+        code,
+        redirectUri: `${process.env.PUBLIC_URL}/api/auth/oidc/callback`,
+        codeVerifier: authRequest.codeVerifier
       });
-
-      if (!tokenResponse.ok) {
-        const errorData = await tokenResponse.text();
-        logger.error('Token exchange failed:', errorData);
-        throw new Error(`Failed to exchange code for tokens: ${tokenResponse.status}`);
-      }
-
-      const tokenSet = await tokenResponse.json();
-
-      // Get user info
-      if (!config.userInfoUrl) {
-        throw new Error('User info URL is not configured');
-      }
-      
-      const userInfoResponse = await fetch(config.userInfoUrl, {
-        headers: {
-          'Authorization': `Bearer ${tokenSet.access_token}`,
-        },
-      });
-
-      if (!userInfoResponse.ok) {
-        throw new Error(`Failed to get user info: ${userInfoResponse.status}`);
-      }
-
-      const userInfo = await userInfoResponse.json();
 
       // Clean up the auth request
       await (prisma as any).OIDCAuthRequest.delete({
@@ -360,8 +326,8 @@ export async function handleCallback(code: string, state: string) {
       });
 
       return {
-        tokenSet,
-        userInfo,
+        tokenSet: exchangeResult.tokenSet,
+        userInfo: exchangeResult.userInfo,
         redirectUrl: authRequest.redirectUrl,
       };
     } catch (error) {
@@ -441,5 +407,38 @@ export async function initializeOIDCFromEnv(): Promise<boolean> {
   } catch (error) {
     logger.error('Error initializing OIDC from environment variables:', error);
     return false;
+  }
+}
+
+/**
+ * Validate an OIDC token
+ */
+export async function validateOIDCToken(tokenSet: any): Promise<any> {
+  try {
+    // Get the OIDC configuration
+    const config = await (prisma as any).OIDCConfig.findUnique({
+      where: { id: 'default' },
+    });
+    
+    if (!config || !config.enabled) {
+      throw new Error('OIDC is not enabled or configured');
+    }
+    
+    // Use the wrapper to validate the token
+    const validationResult = await callWrapper('validateToken', {
+      clientId: config.clientId || '',
+      clientSecret: config.clientSecret || '',
+      discoveryUrl: config.discoveryUrl || '',
+      tokenSet: JSON.stringify(tokenSet)
+    });
+    
+    if (!validationResult.valid) {
+      throw new Error('Token validation failed');
+    }
+    
+    return validationResult.userInfo;
+  } catch (error) {
+    logger.error('Error validating OIDC token:', error);
+    throw error;
   }
 } 
