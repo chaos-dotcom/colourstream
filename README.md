@@ -29,7 +29,7 @@ The ColourStream platform consists of several integrated components:
                     └─────────────┘            │
                           │                    ▼
 ┌─────────────┐           │             ┌─────────────┐
-│ OBS/Encoder │────┐      │             │   Backend   │
+│ OBS/Encoder │◀───┐      │             │   Backend   │
 └─────────────┘    │      │             └─────────────┘
                    ▼      ▼                    │
 ┌─────────────┐   ┌─────────────┐      ┌─────────────┐
@@ -108,9 +108,32 @@ For more security information, see [SECURITY.md](SECURITY.md).
 
 ## 🚀 Getting Started
 
-Please run the setup-template.sh script 
+### Option 1: Local Build Setup
+Run the setup-template.sh script to configure your environment with local builds:
+```bash
+./setup-template.sh
+```
 
-## 📚 Documentation
+### Option 2: Pre-built Container Images
+For a faster setup using pre-built images from GitHub Container Registry:
+```bash
+curl -s https://raw.githubusercontent.com/johnr24/colourstream/main/setup-ghcr.sh | bash
+```
+
+This script will:
+1. Download the necessary configuration files
+2. Generate secure random passwords and secrets
+3. Configure the application to use the GHCR images
+4. Create all required directories and environment files
+
+After setup, start the application with:
+```bash
+docker-compose up -d
+```
+
+For more information about using the GitHub Container Registry images, see [GHCR.md](GHCR.md).
+
+## �� Documentation
 
 - [API Endpoints](docs/api-endpoints.md)
 - [Authentication Flow](docs/authentication.md)
