@@ -21,7 +21,7 @@ ColourStream is a self-hosted livestreaming review platform designed for colouri
 ## 🏗️ System Architecture
 
 The ColourStream platform consists of several integrated components:
-```
+```mermaid
 graph TD
     %% Client connections
     Client([User/Client Browser]) --> Traefik
