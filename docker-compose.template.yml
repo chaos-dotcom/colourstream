@@ -58,9 +58,10 @@ services:
     restart: always
     expose:
       - "5432"
+    env_file:
+      - ./global.env
     environment:
       POSTGRES_USER: colourstream
-      POSTGRES_PASSWORD: your_secure_password_here
       POSTGRES_DB: colourstream
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
@@ -86,10 +87,7 @@ services:
       - ./backend/.env
       - ./global.env
     environment:
-      DATABASE_URL: "postgresql://colourstream:your_secure_password_here@colourstream-postgres:5432/colourstream"
       NODE_ENV: production
-      JWT_KEY: your_jwt_key_here
-      ADMIN_AUTH_SECRET: your_admin_auth_secret_here
       WEBAUTHN_RP_ID: live.colourstream.example.com
       WEBAUTHN_ORIGIN: https://live.colourstream.example.com
       DOMAIN: example.com
@@ -97,6 +95,8 @@ services:
       FRONTEND_URL: https://live.colourstream.example.com
       BASE_PATH: /api
       OME_WEBHOOK_SECRET: "your_webhook_secret_here"
+      POSTGRES_USER: colourstream
+      POSTGRES_DB: colourstream
     depends_on:
       postgres:
         condition: service_healthy
@@ -178,7 +178,7 @@ services:
       - "traefik.enable=true"
 
   origin:
-    image: ghcr.io/johnr24/colourstream-ovenmediaengine:latest
+    image: airensoft/ovenmediaengine:latest
     ports:
       - "8081:8081/tcp" # OVT(Origin)1
       - "8082:8082/tcp" # OVT(Origin)2
@@ -255,7 +255,7 @@ services:
       - "traefik.http.routers.ome-webrtc-tls-video.middlewares=ome-websocket-tls-video"
 
   edge:
-    image: ghcr.io/johnr24/colourstream-ovenmediaengine:latest
+    image: airensoft/ovenmediaengine:0.18.0
     ports:
       - "4333:3333/tcp" # WebRTC Signaling / LLHLS
       - "3479:3479/tcp" # WebRTC TURN
@@ -349,6 +349,7 @@ services:
 
 volumes:
   postgres_data:
+    name: colourstream_postgres_data
 
 networks:
   network:

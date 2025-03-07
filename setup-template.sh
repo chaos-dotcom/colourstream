@@ -7,6 +7,23 @@ echo "ColourStream Template Setup"
 echo "=========================="
 echo
 
+# Function to check if a command exists
+command_exists() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+# Check for required commands
+echo "Checking dependencies..."
+for cmd in docker docker-compose curl git openssl; do
+  if ! command_exists $cmd; then
+    echo "Error: $cmd is not installed."
+    echo "Please install $cmd and run this script again."
+    exit 1
+  fi
+done
+echo "All dependencies found."
+echo
+
 # Cleanup function to remove incorrect files with quotes in their names
 cleanup_quoted_files() {
   echo "Cleaning up any existing files with quotes in their names..."
@@ -55,6 +72,8 @@ check_configured() {
     # Extract domain from global.env
     if grep -q "DOMAIN=" global.env; then
       configured_domain=$(grep "DOMAIN=" global.env | cut -d'=' -f2)
+      # Strip any 'live.colourstream.' or 'video.colourstream.' prefix
+      configured_domain=$(echo "$configured_domain" | sed -e 's/^live\.colourstream\.//' -e 's/^video\.colourstream\.//')
       echo "Found existing configuration for domain: $configured_domain"
       return 0
     fi
@@ -93,11 +112,13 @@ generate_password() {
 rotate_secrets() {
   echo "Rotating secrets for existing installation..."
   
-  # Extract current domain and email from global.env
+  # Extract current domain and email
   domain_name=$(grep "DOMAIN=" global.env | cut -d'=' -f2)
+  # Strip any 'live.colourstream.' or 'video.colourstream.' prefix
+  domain_name=$(echo "$domain_name" | sed -e 's/^live\.colourstream\.//' -e 's/^video\.colourstream\.//')
   # Clean the domain name to ensure no newlines or extra spaces
   domain_name=$(echo "$domain_name" | tr -d '\n\r' | xargs)
-  admin_email=$(grep "ADMIN_EMAIL=" global.env | cut -d'=' -f2 2>/dev/null || echo "admin@$domain_name")
+  admin_email=$(grep "ADMIN_EMAIL=" global.env | cut -d'=' -f2)
   
   echo "Domain: $domain_name"
   echo "Admin Email: $admin_email"
@@ -116,21 +137,18 @@ rotate_secrets() {
   echo "Updating configuration files with new secrets..."
   
   # Update global.env with new secrets
-  if [ -f "global.env" ]; then
-    sed_inplace "s/DB_PASSWORD=.*/DB_PASSWORD=${db_password}/g" global.env
-    sed_inplace "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${db_password}/g" global.env
-    sed_inplace "s/JWT_KEY=.*/JWT_KEY=${jwt_key}/g" global.env
-    sed_inplace "s/ADMIN_PASSWORD=.*/ADMIN_PASSWORD=${admin_password}/g" global.env
-    sed_inplace "s/ADMIN_AUTH_SECRET=.*/ADMIN_AUTH_SECRET=${admin_auth_secret}/g" global.env
-    sed_inplace "s/MIROTALK_API_KEY=.*/MIROTALK_API_KEY=${mirotalk_api_key}/g" global.env
-    sed_inplace "s/MIROTALK_API_KEY_SECRET=.*/MIROTALK_API_KEY_SECRET=${mirotalk_api_key}/g" global.env
-    sed_inplace "s/TURN_SERVER_CREDENTIAL=.*/TURN_SERVER_CREDENTIAL=${turn_password}/g" global.env
-    sed_inplace "s/OME_API_ACCESS_TOKEN=.*/OME_API_ACCESS_TOKEN=${ome_api_token}/g" global.env
-    sed_inplace "s/OME_WEBHOOK_SECRET=.*/OME_WEBHOOK_SECRET=${ome_webhook_secret}/g" global.env
-    echo "✅ Updated global.env"
-  else
-    echo "❌ global.env not found"
-  fi
+  sed_inplace "s/DB_PASSWORD=.*/DB_PASSWORD=${db_password}/g" global.env
+  sed_inplace "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${db_password}/g" global.env
+  sed_inplace "s/JWT_KEY=.*/JWT_KEY=${jwt_key}/g" global.env
+  sed_inplace "s/JWT_SECRET=.*/JWT_SECRET=${jwt_secret}/g" global.env
+  sed_inplace "s/ADMIN_PASSWORD=.*/ADMIN_PASSWORD=${admin_password}/g" global.env
+  sed_inplace "s/ADMIN_AUTH_SECRET=.*/ADMIN_AUTH_SECRET=${admin_auth_secret}/g" global.env
+  sed_inplace "s/MIROTALK_API_KEY=.*/MIROTALK_API_KEY=${mirotalk_api_key}/g" global.env
+  sed_inplace "s/MIROTALK_API_KEY_SECRET=.*/MIROTALK_API_KEY_SECRET=${mirotalk_api_key}/g" global.env
+  sed_inplace "s/TURN_SERVER_CREDENTIAL=.*/TURN_SERVER_CREDENTIAL=${turn_password}/g" global.env
+  sed_inplace "s/OME_API_ACCESS_TOKEN=.*/OME_API_ACCESS_TOKEN=${ome_api_token}/g" global.env
+  sed_inplace "s/OME_WEBHOOK_SECRET=.*/OME_WEBHOOK_SECRET=${ome_webhook_secret}/g" global.env
+  echo "✅ Updated global.env"
   
   # Update backend/.env with new secrets
   if [ -f "backend/.env" ]; then
@@ -161,7 +179,7 @@ rotate_secrets() {
   # Update coturn config
   if [ -f "coturn/turnserver.conf" ]; then
     sed_inplace "s/user=colourstream:.*/user=colourstream:${turn_password}/g" coturn/turnserver.conf
-    echo "✅ Updated turnserver.conf"
+    echo "✅ Updated coturn/turnserver.conf"
   else
     echo "❌ coturn/turnserver.conf not found"
   fi
