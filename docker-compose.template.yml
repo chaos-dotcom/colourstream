@@ -178,7 +178,7 @@ services:
       - "traefik.enable=true"
 
   origin:
-    image: airensoft/ovenmediaengine:latest
+    image: airensoft/ovenmediaengine:latest #it must come from airensoft! 
     ports:
       - "8081:8081/tcp" # OVT(Origin)1
       - "8082:8082/tcp" # OVT(Origin)2
@@ -255,7 +255,7 @@ services:
       - "traefik.http.routers.ome-webrtc-tls-video.middlewares=ome-websocket-tls-video"
 
   edge:
-    image: airensoft/ovenmediaengine:0.18.0
+    image: airensoft/ovenmediaengine:latest #it must come from airensoft! 
     ports:
       - "4333:3333/tcp" # WebRTC Signaling / LLHLS
       - "3479:3479/tcp" # WebRTC TURN

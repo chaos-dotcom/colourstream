@@ -8,6 +8,7 @@ import Login from './pages/Login';
 import AdminLoginPage from './components/AdminLoginPage';
 import AdminDashboard from './components/AdminDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
+import RequirePasskey from './components/RequirePasskey';
 import RoomView from './components/RoomView';
 import PresenterView from './components/PresenterView';
 import govukTheme from './lib/govukTheme';
@@ -59,7 +60,9 @@ function App() {
               element={
                 <GovUkLayout serviceName="ColourStream">
                   <ProtectedRoute>
-                    <AdminDashboard />
+                    <RequirePasskey>
+                      <AdminDashboard />
+                    </RequirePasskey>
                   </ProtectedRoute>
                 </GovUkLayout>
               }
