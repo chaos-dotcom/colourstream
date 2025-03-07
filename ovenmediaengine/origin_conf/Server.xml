@@ -119,6 +119,16 @@
 				</TLS>
 			</Host>
 
+			<AdmissionWebhooks>
+				<ControlServerUrl>http://backend:5001/api/ome-webhook/admission</ControlServerUrl>
+				<SecretKey>${env:OME_WEBHOOK_SECRET:}</SecretKey>
+				<Timeout>3000</Timeout>
+				<Enables>
+					<Providers>rtmp,webrtc,srt</Providers>
+					<Publishers>webrtc,llhls,thumbnail</Publishers>
+				</Enables>
+			</AdmissionWebhooks>
+
 			<CrossDomains>
 				<Url>*</Url>
 			</CrossDomains>
