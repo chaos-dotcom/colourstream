@@ -30,7 +30,7 @@ router.post('/admission', async (req: Request, res: Response) => {
     if (
       body.request &&
       body.request.url &&
-      body.request.direction === 'incoming' &&
+      body.request.direction &&
       body.request.status === 'opening'
     ) {
       const request = body.request;
@@ -38,7 +38,12 @@ router.post('/admission', async (req: Request, res: Response) => {
       const pathParts = url.pathname.split('/');
       const streamKey = pathParts[pathParts.length - 1];
       
-      logger.info('Processing stream key', { streamKey });
+      logger.info('Processing stream key', { 
+        streamKey,
+        protocol: request.protocol,
+        direction: request.direction,
+        url: request.url 
+      });
       
       // Development mode bypass - allow any stream key
       if (process.env.NODE_ENV !== 'production') {
@@ -47,7 +52,7 @@ router.post('/admission', async (req: Request, res: Response) => {
         return res.json({
           allowed: true,
           new_url: request.url,
-          lifetime: 3600,
+          lifetime: 3600000,
           reason: 'Development mode - all streams allowed'
         });
       }
@@ -72,10 +77,34 @@ router.post('/admission', async (req: Request, res: Response) => {
 
       logger.info('Valid stream key for room', { roomId: room.id, streamKey });
       
-      return res.json({
-        allowed: true,
-        new_url: request.url
-      });
+      // Format response based on protocol to ensure proper WebRTC signaling
+      // Convert protocol to lowercase for case-insensitive comparison
+      const protocolLower = request.protocol?.toLowerCase() || '';
+      
+      if (protocolLower === 'webrtc') {
+        logger.info('Handling WebRTC connection', { 
+          originalUrl: request.url,
+          protocol: request.protocol,
+          direction: request.direction
+        });
+        
+        return res.json({
+          allowed: true,
+          new_url: request.url,
+          lifetime: 3600000 // Set a default lifetime of 1 hour
+        });
+      } else {
+        // For non-WebRTC protocols (RTMP, SRT, etc.)
+        logger.info('Handling non-WebRTC connection', {
+          protocol: request.protocol,
+          direction: request.direction
+        });
+        
+        return res.json({
+          allowed: true,
+          new_url: request.url
+        });
+      }
     } else if (body.request && body.request.status === 'closing') {
       // Stream is closing - just acknowledge
       return res.json({ allowed: true });

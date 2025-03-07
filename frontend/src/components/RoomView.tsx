@@ -28,7 +28,8 @@ import {
   WEBRTC_WS_PORT, 
   WEBRTC_WS_PROTOCOL, 
   WEBRTC_APP_PATH,
-  VIDEO_URL 
+  VIDEO_URL,
+  API_URL
 } from '../config';
 
 export interface RoomViewProps {
@@ -116,7 +117,8 @@ const RoomView: React.FC<RoomViewProps> = ({ isPasswordProtected = false, isPres
       const script = document.createElement('script');
       script.src = OVENPLAYER_SCRIPT_URL;
       script.async = true;
-      script.onload = () => {
+      
+      script.onload = async () => {
         const player = (window as any).OvenPlayer;
         if (player && player.create) {
           // Log stream key for debugging (will be removed in production)
@@ -127,29 +129,50 @@ const RoomView: React.FC<RoomViewProps> = ({ isPasswordProtected = false, isPres
           const wsPort = WEBRTC_WS_PORT;
           const wsProtocol = WEBRTC_WS_PROTOCOL;
           const appPath = WEBRTC_APP_PATH;
+          
+          // Format: wss://host:port/app/streamKey
           const streamUrl = roomConfig.streamKey
             ? `${wsProtocol}://${wsHost}:${wsPort}/${appPath}/${roomConfig.streamKey}`
             : `${wsProtocol}://${wsHost}:${wsPort}/${appPath}/stream`;
             
           console.log('Using stream URL:', streamUrl);
           
+          // Simple WebRTC streaming configuration
           playerRef.current = player.create('player_id', {
             autoStart: true,
             mute: true,
+            webrtcConfig: {
+              // Standard STUN server configuration
+              iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' }
+              ],
+              debug: true
+            },
             sources: [
               {
-                label: 'Secure Live Stream',
+                label: 'WebRTC Stream',
                 type: 'webrtc',
-                file: streamUrl,
+                file: streamUrl
               }
             ]
           });
           
           playerRef.current.on('ready', () => {
             setIsPlayerReady(true);
+            console.log('OvenPlayer ready - attempting to connect to stream');
           });
           
-          // Add error event handler to debug connection issues
+          // Add event listeners for troubleshooting
+          playerRef.current.on('stateChanged', (state: any) => {
+            console.log('Player state changed:', state);
+            
+            // If the player reaches the playing state, clear any error messages
+            if (state && state.newstate === 'playing') {
+              setPlayerError('');
+            }
+          });
+          
+          // Basic error handling
           playerRef.current.on('error', (error: any) => {
             console.error('OvenPlayer error:', error);
             setPlayerError(`Connection error: ${error.message || 'Failed to connect to stream'}`);
