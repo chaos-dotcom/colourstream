@@ -552,7 +552,7 @@ export const loginWithOIDC = async (redirectUrl: string): Promise<void> => {
     
     // Construct the authorization URL with the proper parameters
     const params = new URLSearchParams({
-      client_id: oidcConfig.config?.clientId || 'colourstream-admin',
+      client_id: oidcConfig.config?.clientId || '',
       redirect_uri: callbackUrl,
       response_type: 'code',
       scope: oidcConfig.config?.scope || 'openid profile email',
@@ -568,8 +568,8 @@ export const loginWithOIDC = async (redirectUrl: string): Promise<void> => {
     
     // Redirect to the authorization URL
     window.location.href = authUrl;
-  } catch (error) {
-    console.error('Failed to initiate OIDC login:', error);
+  } catch (error: any) {
+    console.error('Error during OIDC login:', error);
     throw error;
   }
 };

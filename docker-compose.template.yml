@@ -1,9 +1,12 @@
 services:
   frontend:
-    image: ghcr.io/johnr24/colourstream-frontend:latest
+    # image: ghcr.io/johnr24/colourstream-frontend:latest
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     environment:
       VITE_API_URL: https://live.colourstream.example.com/api
-      VITE_OIDC_AUTH_ENDPOINT: https://sso.example.com/authorize
+      VITE_OIDC_AUTH_ENDPOINT: ${OIDC_AUTH_ENDPOINT:-https://sso.example.com/authorize}
       VITE_WEBRTC_WS_HOST: live.colourstream.example.com
       VITE_WEBRTC_WS_PORT: 3334
       VITE_WEBRTC_WS_PROTOCOL: wss
