@@ -72,28 +72,25 @@ This document describes the token authentication flow between different componen
    | Expiration: 24 hours
 
 2. **Backend to OvenMediaEngine:**
-   - Uses Basic Authentication
-   - Token from environment variable: `OVENMEDIA_API_TOKEN`
-   - Format: `Basic <base64_encoded_token>`
+   - Backend passes API requests to OvenMediaEngine with Basic Auth
+   - Token from environment variable: `OME_API_ACCESS_TOKEN`
+   - Encoded as Base64 in the Authorization header
 
 ### OvenMediaEngine Authentication
-- Expects Basic Authentication
-- Validates against configured access token
-- Returns 401 if token is invalid or missing
+- Configured to accept Basic Auth with a token
+- No sensitive tokens exposed to frontend
+- All API calls proxied through backend
 
 ## Environment Configuration
 
 ```env
 # Backend Environment Variables
 JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
-OVENMEDIA_API_URL=http://origin:8081
-OVENMEDIA_API_TOKEN=0fc62ea62790ad7c
+OME_API_URL=http://origin:8081
+OME_API_ACCESS_TOKEN=0fc62ea62790ad7c
 
 # Frontend Environment Variables
 VITE_API_URL=https://live.colourstream.johnrogerscolour.co.uk/api
-
-# OvenMediaEngine Environment Variables
-OME_API_ACCESS_TOKEN=0fc62ea62790ad7c
 ```
 
 ## Security Notes

@@ -169,6 +169,22 @@ if [ -f "backend/.env.template" ]; then
     sed_inplace "s/OME_API_ACCESS_TOKEN=.*/OME_API_ACCESS_TOKEN=$ome_api_token/g" backend/.env
   fi
   
+  # Ensure OME_API_URL is properly set
+  if ! grep -q "OME_API_URL" backend/.env; then
+    echo "OME_API_URL=http://origin:8081" >> backend/.env
+  else
+    sed_inplace "s|OME_API_URL=.*|OME_API_URL=http://origin:8081|g" backend/.env
+  fi
+  
+  # Remove any old variable names to prevent confusion
+  if grep -q "OVENMEDIA_API_URL" backend/.env; then
+    sed_inplace "/OVENMEDIA_API_URL/d" backend/.env
+  fi
+  
+  if grep -q "OVENMEDIA_API_TOKEN" backend/.env; then
+    sed_inplace "/OVENMEDIA_API_TOKEN/d" backend/.env
+  fi
+  
   echo "✅ Created backend/.env"
 else
   echo "❌ backend/.env.template not found"
@@ -214,8 +230,13 @@ if [ -f "docker-compose.yml" ]; then
   # Update ADMIN_AUTH_SECRET in docker-compose.yml
   sed_inplace "s/ADMIN_AUTH_SECRET: [a-f0-9]*/ADMIN_AUTH_SECRET: $admin_auth_secret/g" docker-compose.yml
   
-  # Update OvenMediaEngine API Token
+  # Update OvenMediaEngine API Token - handle both possible variable names
   sed_inplace "s/OME_API_ACCESS_TOKEN: \"[a-f0-9]*\"/OME_API_ACCESS_TOKEN: \"$ome_api_token\"/g" docker-compose.yml
+  sed_inplace "s/OVENMEDIA_API_TOKEN: \"[a-f0-9]*\"/OME_API_ACCESS_TOKEN: \"$ome_api_token\"/g" docker-compose.yml
+  
+  # Update any hardcoded tokens that might be in the file
+  sed_inplace "s/0fc62ea62790ad7c/$ome_api_token/g" docker-compose.yml
+  sed_inplace "s/41b20d4a33dcca381396b5b83053ef2f/$ome_api_token/g" docker-compose.yml
   
   # Update TURN Server Credential
   sed_inplace "s/TURN_SERVER_CREDENTIAL: \"[^\"]*\"/TURN_SERVER_CREDENTIAL: \"$turn_password\"/g" docker-compose.yml
