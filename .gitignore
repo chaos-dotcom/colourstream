@@ -58,3 +58,4 @@ backend/combined.log
 backend/error.log
 backend/backend/combined.log
 backend/backend/error.log
+leaks.json
