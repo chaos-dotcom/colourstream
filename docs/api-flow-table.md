@@ -37,16 +37,13 @@ Accept: application/json
 
 ## Environment Variables
 
-### Frontend
-```env
-VITE_API_URL=https://live.colourstream.johnrogerscolour.co.uk/api
 ```
+# Backend Environment
+OME_API_URL=http://origin:8081
+OME_API_ACCESS_TOKEN=0fc62ea62790ad7c
 
-### Backend
-```env
-OVENMEDIA_API_URL=http://origin:8081
-OVENMEDIA_API_TOKEN=0fc62ea62790ad7c
-JWT_SECRET=your-super-secret-jwt-key
+# Frontend Environment
+VITE_API_URL=https://live.colourstream.johnrogerscolour.co.uk/api
 ```
 
 ## Notes

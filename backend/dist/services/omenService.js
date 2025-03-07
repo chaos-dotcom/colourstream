@@ -38,9 +38,19 @@ const axios_1 = __importStar(require("axios"));
 const logger_1 = require("../utils/logger");
 class OvenMediaEngineService {
     constructor() {
-        this.baseURL = process.env.OVENMEDIA_API_URL || 'http://origin:8081';
-        this.accessToken = process.env.OVENMEDIA_API_TOKEN || '0fc62ea62790ad7c';
+        this.baseURL = process.env.OME_API_URL || 'http://origin:8081';
+        this.accessToken = process.env.OME_API_ACCESS_TOKEN || '0fc62ea62790ad7c';
+        
         logger_1.logger.info(`Initialized OvenMediaEngine Service with URL: ${this.baseURL}`);
+        logger_1.logger.info(`Using API access token: ${this.accessToken ? '********' : 'default token'}`);
+        
+        if (!this.baseURL) {
+            logger_1.logger.error('OvenMediaEngine API URL is not configured! Set OME_API_URL environment variable.');
+        }
+        
+        if (!this.accessToken) {
+            logger_1.logger.error('OvenMediaEngine API access token is not configured! Set OME_API_ACCESS_TOKEN environment variable.');
+        }
     }
     validateParameters(...params) {
         const invalidParams = params.filter(param => !param || typeof param !== 'string');

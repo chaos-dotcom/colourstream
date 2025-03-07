@@ -142,7 +142,7 @@ VIDEO_DOMAIN=video.colourstream.${domain_name}
 FRONTEND_URL=https://live.colourstream.${domain_name}
 BASE_PATH=/api
 OME_API_ACCESS_TOKEN=${ome_api_token}
-OME_API_URL=https://live.colourstream.${domain_name}:8081/v1/
+OME_API_URL=http://origin:8081
 EOL
 chmod 600 backend/.env
 echo "✅ Created backend/.env"
@@ -210,6 +210,8 @@ sed -i.bak "s/628db0ebd5d8c8fc4f539e7192fa6ff1/${db_password}/g" docker-compose.
 sed -i.bak "s/015a8afab726389330e5002945d9d27a7de31bc813/${jwt_key}/g" docker-compose.yml
 sed -i.bak "s/a4097b976531c94f5e4cf9d2676751c7/${admin_auth_secret}/g" docker-compose.yml
 sed -i.bak "s/0fc62ea62790ad7c/${ome_api_token}/g" docker-compose.yml
+sed -i.bak "s/41b20d4a33dcca381396b5b83053ef2f/${ome_api_token}/g" docker-compose.yml
+sed -i.bak "s/OME_API_ACCESS_TOKEN: \"[a-f0-9]*\"/OME_API_ACCESS_TOKEN: \"${ome_api_token}\"/g" docker-compose.yml
 sed -i.bak "s/turnserver123/${turn_password}/g" docker-compose.yml
 rm docker-compose.yml.bak
 echo "✅ Updated docker-compose.yml"

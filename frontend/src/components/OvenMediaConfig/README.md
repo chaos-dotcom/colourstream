@@ -118,9 +118,9 @@ const streamStats = await api.getStreamStats('default', 'app', 'stream');
 
 ```typescript
 // Frontend
-VITE_API_URL=https://your-domain.com/api  // Points to your backend API
+VITE_API_URL=https://your-api-endpoint.com
 
 // Backend (internal only)
-OVENMEDIA_API_URL=http://origin:8081       // Never expose to frontend
-OVENMEDIA_API_TOKEN=your-secret-token      // Never expose to frontend
+OME_API_URL=http://origin:8081       // Never expose to frontend
+OME_API_ACCESS_TOKEN=your-secret-token      // Never expose to frontend
 ``` 
