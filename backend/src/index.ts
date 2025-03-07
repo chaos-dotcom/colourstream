@@ -10,6 +10,7 @@ import obsRoutes from './routes/obs';
 import omenRoutes from './routes/omen';
 import securityRoutes from './routes/security';
 import healthRoutes from './routes/health';
+import omeWebhookRoutes from './routes/omeWebhook';
 import { logger } from './utils/logger';
 import { initializePassword } from './utils/initPassword';
 import mirotalkRoutes from './routes/mirotalk';
@@ -71,6 +72,7 @@ app.use(`${basePath}/obs`, obsRoutes);
 app.use(`${basePath}/omen`, omenRoutes);
 app.use(`${basePath}/security`, securityRoutes);
 app.use('/api/mirotalk', mirotalkRoutes);
+app.use(`${basePath}/ome-webhook`, omeWebhookRoutes);
 
 // Error handling
 app.use(errorHandler);
