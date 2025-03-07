@@ -1,15 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
-import { Box, Typography, Container, Paper, CircularProgress, Alert, Button } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
+import { Box, Typography, Container, Paper, CircularProgress, Alert } from '@mui/material';
 import { getPasskeys, registerPasskey } from '../utils/api';
 import KeyIcon from '@mui/icons-material/Key';
-import { Button as GovUkButton } from './GovUkComponents';
+import { Button } from '@mui/material';
+import { PageHeading } from './GovUkComponents';
 
-interface RequirePasskeyProps {
-  children: React.ReactNode;
-}
-
-const RequirePasskey: React.FC<RequirePasskeyProps> = ({ children }) => {
+const PasskeyRegistrationPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [passkeyRegistered, setPasskeyRegistered] = useState(false);
   const [registering, setRegistering] = useState(false);
@@ -42,11 +39,19 @@ const RequirePasskey: React.FC<RequirePasskeyProps> = ({ children }) => {
     const checkPasskeyRegistration = async () => {
       try {
         const passkeys = await getPasskeys();
-        setPasskeyRegistered(passkeys.length > 0);
+        if (passkeys.length > 0) {
+          setPasskeyRegistered(true);
+          // If passkey is already registered, redirect to dashboard
+          setTimeout(() => {
+            navigate('/admin/dashboard');
+          }, 1000);
+        } else {
+          setPasskeyRegistered(false);
+        }
       } catch (error) {
         console.error('Error checking passkey registration:', error);
-        // If we can't check, we'll assume they have one to avoid blocking access
-        setPasskeyRegistered(true);
+        // If we can't check, we'll assume they need to register
+        setPasskeyRegistered(false);
       } finally {
         setLoading(false);
       }
@@ -54,7 +59,7 @@ const RequirePasskey: React.FC<RequirePasskeyProps> = ({ children }) => {
 
     checkPasskeySupport();
     checkPasskeyRegistration();
-  }, []);
+  }, [navigate]);
 
   const handleRegisterPasskey = async () => {
     setError(null);
@@ -65,15 +70,15 @@ const RequirePasskey: React.FC<RequirePasskeyProps> = ({ children }) => {
       setSuccess(true);
       // After successful registration, wait a moment and then proceed
       setTimeout(() => {
-        setPasskeyRegistered(true);
-      }, 1500);
+        navigate('/admin/dashboard');
+      }, 2000);
     } catch (error: any) {
       console.error('Error registering passkey:', error);
       if (error.response?.status === 400 && error.response?.data?.message === 'Passkey already registered') {
         setSuccess(true); // Already registered is considered success
         setTimeout(() => {
-          setPasskeyRegistered(true);
-        }, 1500);
+          navigate('/admin/dashboard');
+        }, 2000);
       } else {
         setError(error.response?.data?.message || 'Failed to register passkey');
       }
@@ -96,35 +101,84 @@ const RequirePasskey: React.FC<RequirePasskeyProps> = ({ children }) => {
     );
   }
 
-  // If passkey is registered, render children
-  if (passkeyRegistered) {
-    return <>{children}</>;
-  }
-
   // If browser doesn't support passkeys
   if (!passkeySupported) {
     return (
       <Container component="main" maxWidth="md">
+        <PageHeading>Passkey Not Supported</PageHeading>
         <Paper elevation={3} sx={{ p: 4, mt: 4 }}>
-          <Typography variant="h5" component="h1" gutterBottom>
-            Passkey Not Supported
-          </Typography>
           <Alert severity="warning" sx={{ mb: 3 }}>
             Your browser does not support passkeys. Please use a modern browser that supports WebAuthn.
           </Alert>
-          <GovUkButton 
-            variant="secondary"
+          <Button 
+            variant="contained"
+            color="primary"
             onClick={() => navigate('/admin/dashboard')}
           >
             Continue to Dashboard
-          </GovUkButton>
+          </Button>
         </Paper>
       </Container>
     );
   }
 
-  // If no passkey is registered, redirect to passkey registration page
-  return <Navigate to="/admin/setup-passkey" replace />;
+  // If passkey is already registered
+  if (passkeyRegistered) {
+    return (
+      <Container component="main" maxWidth="md">
+        <PageHeading>Passkey Already Registered</PageHeading>
+        <Paper elevation={3} sx={{ p: 4, mt: 4 }}>
+          <Alert severity="success" sx={{ mb: 3 }}>
+            You already have a passkey registered. Redirecting to dashboard...
+          </Alert>
+          <CircularProgress size={24} sx={{ ml: 2 }} />
+        </Paper>
+      </Container>
+    );
+  }
+
+  // If no passkey is registered, show registration screen
+  return (
+    <Container component="main" maxWidth="md">
+      <PageHeading>Passkey Registration Required</PageHeading>
+      <Paper elevation={3} sx={{ p: 4, mt: 4 }}>
+        <Typography variant="h6" component="h2" gutterBottom>
+          Secure Your Account
+        </Typography>
+
+        <Typography variant="body1" sx={{ mb: 3 }}>
+          For security reasons, you need to register a passkey as a backup authentication method. 
+          This will allow you to sign in even if the SSO provider is unavailable.
+        </Typography>
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
+        )}
+
+        {success ? (
+          <Box>
+            <Alert severity="success" sx={{ mb: 3 }}>
+              Passkey successfully registered! You will be redirected to the dashboard shortly...
+            </Alert>
+            <CircularProgress size={24} sx={{ ml: 2 }} />
+          </Box>
+        ) : (
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<KeyIcon />}
+            onClick={handleRegisterPasskey}
+            disabled={registering}
+            size="large"
+          >
+            {registering ? <CircularProgress size={24} color="inherit" /> : 'Register Passkey'}
+          </Button>
+        )}
+      </Paper>
+    </Container>
+  );
 };
 
-export default RequirePasskey; 
+export default PasskeyRegistrationPage; 

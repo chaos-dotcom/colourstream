@@ -2,9 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Box, Typography, CircularProgress } from '@mui/material';
 import axios from 'axios';
+import { getPasskeys } from '../utils/api';
+import { API_URL } from '../config';
 
-// Define the base URL correctly
-const baseURL = process.env.REACT_APP_API_URL || '/api';
+// Use the API_URL from config
+const baseURL = API_URL;
 
 const OIDCCallback: React.FC = () => {
   const navigate = useNavigate();
@@ -73,17 +75,36 @@ const OIDCCallback: React.FC = () => {
         try {
           console.log('Exchanging code for token with backend');
           
-          // Make a direct request to the backend API token endpoint
-          const response = await axios.post(`${baseURL}/auth/oidc/token-exchange`, {
-            code,
-            state,
-            redirectUri: `${window.location.origin}/auth/callback`
-          });
+          // Try a different approach using fetch directly
+          const fullUrl = `${baseURL}/auth/oidc/token-exchange`;
+          console.log('Token exchange URL:', fullUrl);
           
+          // Make a direct request to the backend API token endpoint
+          const response = await fetch(fullUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              code,
+              state,
+              // Use the same callback URL that's configured in the SSO provider
+              redirectUri: `${window.location.origin}/api/auth/oidc/callback`
+            })
+          });
+
+          // Check if the response was successful
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Token exchange failed:', response.status, errorText);
+            throw new Error(`Token exchange failed: ${response.status} ${response.statusText}`);
+          }
+          
+          const data = await response.json();
           console.log('Token exchange successful');
           
-          if (response.data && response.data.data && response.data.data.token) {
-            const token = response.data.data.token;
+          if (data && data.data && data.data.token) {
+            const token = data.data.token;
             
             // Store auth token
             localStorage.setItem('adminToken', token);
@@ -124,10 +145,31 @@ const OIDCCallback: React.FC = () => {
             
             console.log('Final redirect URL:', parsedRedirectUrl);
             
-            // Redirect after a short delay
-            setTimeout(() => {
-              navigate(parsedRedirectUrl, { replace: true });
-            }, 300);
+            // Check if the user has a passkey registered
+            try {
+              const passkeys = await getPasskeys();
+              console.log('Checking for passkeys:', passkeys);
+              
+              if (passkeys.length === 0) {
+                console.log('No passkey registered, redirecting to passkey registration page');
+                // Redirect to passkey registration page
+                setTimeout(() => {
+                  navigate('/admin/setup-passkey', { replace: true });
+                }, 300);
+              } else {
+                console.log('Passkey(s) found, continuing to dashboard');
+                // Redirect after a short delay
+                setTimeout(() => {
+                  navigate(parsedRedirectUrl, { replace: true });
+                }, 300);
+              }
+            } catch (passkeyError) {
+              console.error('Error checking passkeys:', passkeyError);
+              // If we can't check passkeys, continue to dashboard
+              setTimeout(() => {
+                navigate(parsedRedirectUrl, { replace: true });
+              }, 300);
+            }
           } else {
             throw new Error('No token received from backend');
           }

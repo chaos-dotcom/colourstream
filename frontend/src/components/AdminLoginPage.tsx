@@ -137,7 +137,11 @@ const AdminLoginPage: React.FC = () => {
     if (error.message === 'User declined to authenticate with passkey') {
       setError('Authentication cancelled by user');
     } else if (error.response?.status === 400 && error.response?.data?.message === 'No passkey registered') {
-      setError('No passkey registered. Please complete the first-time setup.');
+      console.log('No passkey registered, redirecting to passkey registration page');
+      // Redirect to passkey registration page
+      setTimeout(() => {
+        navigate('/admin/setup-passkey');
+      }, 300);
     } else if (error.name === 'NotAllowedError') {
       setError('Authentication cancelled by user');
     } else if (error.name === 'SecurityError') {
