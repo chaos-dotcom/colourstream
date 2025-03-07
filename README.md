@@ -24,29 +24,55 @@ The ColourStream platform consists of several integrated components:
 ```mermaid
 graph TD
     %% Client connections
-    Client([User/Client Browser]) --> Traefik
-    OBS([OBS/Encoder]) --> OME_Origin
+    Client([User/Client Browser]) --> |HTTPS| Traefik
+    OBS([OBS/Encoder]) --> |RTMP/SRT| OME_Origin
     
     %% Traefik routing
-    Traefik[(Traefik Proxy)] --> Frontend
-    Traefik --> Backend
-    Traefik --> Mirotalk
-    Traefik --> OME_Origin
+    Traefik[(Traefik Proxy)] <--> |Route: live.colourstream...| Frontend
+    Traefik --> |Route: /api| Backend
+    Traefik --> |Route: video.colourstream...| Mirotalk
+    Traefik --> |Route: /app, /ws| OME_Origin
     
     %% Backend connections
-    Backend --> PostgreSQL[(PostgreSQL DB)]
-    Backend <--> Frontend
-    Backend --> OME_Origin
+    Backend <--> PostgreSQL[(PostgreSQL DB)]
+    Backend <--> |WebSockets| Frontend
+    Backend --> |API Calls| OME_Origin
     
     %% Media connections
     OME_Origin[OvenMediaEngine Origin] --> OME_Edge[OvenMediaEngine Edge]
-    OME_Origin --> Frontend
-    OME_Edge --> Frontend
+    OME_Origin --> |WebRTC Stream| Frontend
+    OME_Edge --> |WebRTC Stream| Frontend
     
     %% WebRTC components
     Mirotalk[Mirotalk WebRTC] --> Coturn[Coturn TURN Server]
     OME_Origin --> Coturn
     OME_Edge --> Coturn
+    
+    %% Component subgraphs
+    subgraph "Media Streaming"
+        OME_Origin
+        OME_Edge
+        Coturn
+    end
+    
+    subgraph "Application Layer"
+        Frontend
+        Backend
+        Mirotalk
+    end
+    
+    %% Styling
+    classDef proxy fill:,stroke:#333,stroke-width:2px;
+    classDef app fill,stroke:#33f,stroke-width:1px;
+    classDef db fill:,stroke:#3f3,stroke-width:1px;
+    classDef media fill:,stroke:#f3f,stroke-width:1px;
+    classDef client fill:,stroke:#999,stroke-width:1px;
+
+    class Traefik proxy;
+    class Frontend,Backend,Mirotalk app;
+    class PostgreSQL db;
+    class OME_Origin,OME_Edge,Coturn media;
+    class Client,OBS client;
 ```
 
 ### 🧩 Components
