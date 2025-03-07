@@ -62,3 +62,11 @@ security-reports
 *.DS_Store
 .DS_Store
 leaks.json
+.log
+
+#LOGS
+backend/logs/error.log
+backend/combined.log
+backend/error.log
+backend/backend/combined.log
+backend/backend/error.log
