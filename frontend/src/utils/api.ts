@@ -343,45 +343,59 @@ export const authenticateWithPasskey = async (): Promise<AuthResult> => {
     console.log('Starting passkey authentication');
     
     // Step 1: Get authentication options from the server
-    const optionsResponse = await axios.post(`${baseURL}/auth/webauthn/authenticate`);
-    console.log('Authentication options response:', optionsResponse);
-    
-    if (!optionsResponse.data) {
-      console.error('No authentication options received');
-      return { success: false, error: 'No authentication options received' };
-    }
-    
-    const options = optionsResponse.data;
-    console.log('Authentication options:', options);
-    
-    // Step 2: Create authentication credential in the browser
-    const credential = await startAuthentication(options);
-    console.log('Created authentication credential:', credential);
-    
-    // Step 3: Send the credential to the server for verification
-    const verificationResponse = await axios.post(`${baseURL}/auth/webauthn/authenticate/verify`, credential);
-    console.log('Verification response:', verificationResponse);
-    
-    // Extract token from the correct location in the response
-    const responseData = verificationResponse.data;
-    
-    if (responseData?.status === 'success' && responseData?.data?.token) {
-      const token = responseData.data.token;
-      console.log('Authentication token received, setting auth state');
+    try {
+      const optionsResponse = await axios.post(`${baseURL}/auth/webauthn/authenticate`);
+      console.log('Authentication options response:', optionsResponse);
       
-      // Store auth token consistently
-      localStorage.setItem('adminToken', token);
-      localStorage.setItem('isAdminAuthenticated', 'true');
-      localStorage.setItem('authToken', token);
-      localStorage.setItem('authTimestamp', Date.now().toString());
+      if (!optionsResponse.data) {
+        console.error('No authentication options received');
+        return { success: false, error: 'No authentication options received' };
+      }
       
-      // Apply token to axios default headers for subsequent requests
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      const options = optionsResponse.data;
+      console.log('Authentication options:', options);
       
-      return { success: true, token: token };
-    } else {
-      console.error('No token received from verification, response data:', responseData);
-      return { success: false, error: 'No token received from verification. Please check server logs.' };
+      // Step 2: Create authentication credential in the browser
+      const credential = await startAuthentication(options);
+      console.log('Created authentication credential:', credential);
+      
+      // Step 3: Send the credential to the server for verification
+      const verificationResponse = await axios.post(`${baseURL}/auth/webauthn/authenticate/verify`, credential);
+      console.log('Verification response:', verificationResponse);
+      
+      // Extract token from the correct location in the response
+      const responseData = verificationResponse.data;
+      
+      if (responseData?.status === 'success' && responseData?.data?.token) {
+        const token = responseData.data.token;
+        console.log('Authentication token received, setting auth state');
+        
+        // Store auth token consistently
+        localStorage.setItem('adminToken', token);
+        localStorage.setItem('isAdminAuthenticated', 'true');
+        localStorage.setItem('authToken', token);
+        localStorage.setItem('authTimestamp', Date.now().toString());
+        
+        // Apply token to axios default headers for subsequent requests
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        
+        return { success: true, token: token };
+      } else {
+        console.error('No token received from verification, response data:', responseData);
+        return { success: false, error: 'No token received from verification. Please check server logs.' };
+      }
+    } catch (apiError: any) {
+      // Specifically catch the "No passkey registered" error
+      if (apiError.response?.status === 400 && apiError.response?.data?.message === 'No passkey registered') {
+        console.log('No passkey registered, need to set one up');
+        // Set a flag to redirect to passkey registration page
+        localStorage.setItem('needsPasskeySetup', 'true');
+        // Redirect to passkey registration page (unprotected route)
+        window.location.href = '/setup-passkey';
+        return { success: false, error: 'No passkey registered. Redirecting to registration...' };
+      }
+      // Re-throw other API errors
+      throw apiError;
     }
   } catch (error: any) {
     console.error('Passkey authentication error:', error);
@@ -684,5 +698,73 @@ export const handleOIDCCallback = async (): Promise<AuthResult> => {
       success: false, 
       error: error.message || 'Failed to process OIDC callback' 
     };
+  }
+};
+
+// Register a passkey without requiring authentication
+export const registerFirstPasskey = async (): Promise<ApiResponse<AuthResponse>> => {
+  try {
+    // Step 1: Get registration options from the server
+    const response = await axios.post(`${baseURL}/auth/webauthn/first-time-setup`);
+    if (!response.data) {
+      throw new Error('No registration options received from server');
+    }
+    
+    // Step 2: Start the registration process in the browser
+    try {
+      const credential = await startRegistration(response.data);
+      
+      // Step 3: Send the credential back to the server for verification
+      const verificationResponse = await axios.post(`${baseURL}/auth/webauthn/first-time-setup/verify`, credential);
+      
+      // Step 4: Store the authentication token
+      const result = verificationResponse.data;
+      console.log('Verification response received:', JSON.stringify(result, null, 2));
+      
+      // Check if the token is in the expected location in the response
+      if (result.data && result.data.token) {
+        localStorage.setItem('adminToken', result.data.token);
+        localStorage.setItem('isAdminAuthenticated', 'true');
+        localStorage.setItem('authToken', result.data.token);
+        localStorage.setItem('authTimestamp', Date.now().toString());
+        
+        // Apply token to axios default headers for subsequent requests
+        axios.defaults.headers.common['Authorization'] = `Bearer ${result.data.token}`;
+        
+        return {
+          status: 'success',
+          data: {
+            token: result.data.token,
+            verified: true
+          }
+        };
+      } else if (result.token) {
+        // Alternative location - directly in the result
+        localStorage.setItem('adminToken', result.token);
+        localStorage.setItem('isAdminAuthenticated', 'true');
+        localStorage.setItem('authToken', result.token);
+        localStorage.setItem('authTimestamp', Date.now().toString());
+        
+        // Apply token to axios default headers for subsequent requests
+        axios.defaults.headers.common['Authorization'] = `Bearer ${result.token}`;
+        
+        return {
+          status: 'success',
+          data: {
+            token: result.token,
+            verified: true
+          }
+        };
+      } else {
+        console.error('Token not found in response:', result);
+        throw new Error('Registration successful but no token received');
+      }
+    } catch (error: any) {
+      console.error('WebAuthn registration error:', error);
+      throw new Error('Failed to register passkey');
+    }
+  } catch (error: any) {
+    console.error('Passkey registration error:', error);
+    throw new Error('Failed to register passkey');
   }
 }; 

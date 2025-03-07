@@ -14,6 +14,7 @@ import PresenterView from './components/PresenterView';
 import govukTheme from './lib/govukTheme';
 import GovUkLayout from './components/GovUkLayout';
 import OIDCCallback from './components/OIDCCallback';
+import PasskeySetupPage from './components/PasskeySetupPage';
 
 // Debug component to verify rendering
 const DebugAdminLoginPage = () => {
@@ -64,6 +65,25 @@ function App() {
                       <AdminDashboard />
                     </RequirePasskey>
                   </ProtectedRoute>
+                </GovUkLayout>
+              }
+            />
+            <Route
+              path="/admin/setup-passkey"
+              element={
+                <GovUkLayout serviceName="ColourStream">
+                  <ProtectedRoute>
+                    <PasskeySetupPage />
+                  </ProtectedRoute>
+                </GovUkLayout>
+              }
+            />
+            {/* Unprotected Passkey Setup */}
+            <Route
+              path="/setup-passkey"
+              element={
+                <GovUkLayout serviceName="ColourStream">
+                  <PasskeySetupPage />
                 </GovUkLayout>
               }
             />

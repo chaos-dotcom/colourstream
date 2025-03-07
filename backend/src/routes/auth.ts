@@ -143,6 +143,55 @@ router.get('/oidc/token', requiresAuth(), (req: Request, res: Response) => {
   }
 });
 
+// OIDC token URL fix (public endpoint for quick fix)
+router.post('/oidc/fix-token-url-public', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Get discovery document to get the real token URL
+    const discoveryResponse = await fetch('https://sso.shed.gay/.well-known/openid-configuration');
+    if (!discoveryResponse.ok) {
+      throw new AppError(500, 'Failed to fetch OIDC discovery document');
+    }
+    
+    const discovery = await discoveryResponse.json();
+    const tokenUrl = discovery.token_endpoint;
+    const userInfoUrl = discovery.userinfo_endpoint;
+    
+    logger.info('Retrieved token and userinfo URLs from discovery document', {
+      tokenUrl,
+      userInfoUrl
+    });
+    
+    // Update the OIDC config in the database
+    const updatedConfig = await prisma.oIDCConfig.update({
+      where: { id: 'default' },
+      data: {
+        tokenUrl,
+        userInfoUrl
+      }
+    });
+    
+    logger.info('Updated OIDC configuration with correct token and userinfo URLs', {
+      tokenUrl: updatedConfig.tokenUrl,
+      userInfoUrl: updatedConfig.userInfoUrl
+    });
+    
+    res.json({
+      status: 'success',
+      message: 'Updated OIDC configuration with correct token and userinfo URLs',
+      data: {
+        tokenUrl: updatedConfig.tokenUrl,
+        userInfoUrl: updatedConfig.userInfoUrl
+      }
+    });
+  } catch (error: any) {
+    logger.error('Error fixing OIDC token URL', {
+      error: error.message,
+      stack: error.stack
+    });
+    next(error);
+  }
+});
+
 // OIDC token exchange endpoint - exchanges authorization code for token
 router.post('/oidc/token-exchange', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -168,18 +217,20 @@ router.post('/oidc/token-exchange', async (req: Request, res: Response, next: Ne
       throw new AppError(500, 'OIDC configuration is missing or invalid');
     }
     
-    // For SSO.shed.gay, we can derive the token and userinfo endpoints if they're not set
+    // Check if we're using SSO.shed.gay and apply hardcoded fixes for known URLs
     let tokenUrl = config.tokenUrl;
     let userInfoUrl = config.userInfoUrl;
     
-    if (!tokenUrl && config.discoveryUrl) {
-      // If we have a discovery URL, try to use it to derive the token URL
-      // For example, if discoveryUrl is https://sso.shed.gay, the token URL would be https://sso.shed.gay/token
+    // If the discoveryUrl contains sso.shed.gay, we know the correct endpoints
+    if (config.discoveryUrl && config.discoveryUrl.includes('sso.shed.gay')) {
+      tokenUrl = 'https://sso.shed.gay/api/oidc/token';
+      userInfoUrl = 'https://sso.shed.gay/api/oidc/userinfo';
+      logger.info('Using hardcoded SSO.shed.gay token and userinfo URLs', { tokenUrl, userInfoUrl });
+    } else if (!tokenUrl && config.discoveryUrl) {
       logger.info('Token URL not configured, deriving from discovery URL', { discoveryUrl: config.discoveryUrl });
       tokenUrl = `${config.discoveryUrl.replace(/\/$/, '')}/token`;
     } else if (!tokenUrl && config.authorizationUrl) {
       // If we have an authorization URL, try to derive the token URL from it
-      // For example, if authorizationUrl is https://sso.shed.gay/authorize, the token URL would be https://sso.shed.gay/token
       logger.info('Token URL not configured, deriving from authorization URL', { authorizationUrl: config.authorizationUrl });
       const baseUrl = config.authorizationUrl.split('/').slice(0, -1).join('/');
       tokenUrl = `${baseUrl}/token`;
@@ -217,6 +268,10 @@ router.post('/oidc/token-exchange', async (req: Request, res: Response, next: Ne
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
+        'Origin': process.env.PUBLIC_URL || 'https://live.colourstream.johnrogerscolour.co.uk',
+        'Referer': process.env.PUBLIC_URL || 'https://live.colourstream.johnrogerscolour.co.uk',
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
       },
       body: params.toString(),
     });
