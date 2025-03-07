@@ -69,6 +69,8 @@ get_domain() {
     echo "Domain name cannot be empty. Please try again."
     get_domain
   fi
+  # Clean the domain name to ensure no newlines or extra spaces
+  domain_name=$(echo "$domain_name" | tr -d '\n\r' | xargs)
   echo $domain_name
 }
 
@@ -93,6 +95,8 @@ rotate_secrets() {
   
   # Extract current domain and email from global.env
   domain_name=$(grep "DOMAIN=" global.env | cut -d'=' -f2)
+  # Clean the domain name to ensure no newlines or extra spaces
+  domain_name=$(echo "$domain_name" | tr -d '\n\r' | xargs)
   admin_email=$(grep "ADMIN_EMAIL=" global.env | cut -d'=' -f2 2>/dev/null || echo "admin@$domain_name")
   
   echo "Domain: $domain_name"
@@ -101,6 +105,7 @@ rotate_secrets() {
   # Generate new passwords
   db_password=$(generate_password)
   jwt_key=$(generate_password)
+  jwt_secret=$(generate_password)  # Generate separate JWT_SECRET
   admin_password=$(generate_password)
   admin_auth_secret=$(generate_password)
   mirotalk_api_key=$(generate_password)
@@ -113,10 +118,12 @@ rotate_secrets() {
   # Update global.env with new secrets
   if [ -f "global.env" ]; then
     sed_inplace "s/DB_PASSWORD=.*/DB_PASSWORD=${db_password}/g" global.env
+    sed_inplace "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${db_password}/g" global.env
     sed_inplace "s/JWT_KEY=.*/JWT_KEY=${jwt_key}/g" global.env
     sed_inplace "s/ADMIN_PASSWORD=.*/ADMIN_PASSWORD=${admin_password}/g" global.env
     sed_inplace "s/ADMIN_AUTH_SECRET=.*/ADMIN_AUTH_SECRET=${admin_auth_secret}/g" global.env
     sed_inplace "s/MIROTALK_API_KEY=.*/MIROTALK_API_KEY=${mirotalk_api_key}/g" global.env
+    sed_inplace "s/MIROTALK_API_KEY_SECRET=.*/MIROTALK_API_KEY_SECRET=${mirotalk_api_key}/g" global.env
     sed_inplace "s/TURN_SERVER_CREDENTIAL=.*/TURN_SERVER_CREDENTIAL=${turn_password}/g" global.env
     sed_inplace "s/OME_API_ACCESS_TOKEN=.*/OME_API_ACCESS_TOKEN=${ome_api_token}/g" global.env
     sed_inplace "s/OME_WEBHOOK_SECRET=.*/OME_WEBHOOK_SECRET=${ome_webhook_secret}/g" global.env
@@ -129,6 +136,7 @@ rotate_secrets() {
   if [ -f "backend/.env" ]; then
     sed_inplace "s/DATABASE_URL=.*/DATABASE_URL=postgresql:\/\/colourstream:${db_password}@colourstream-postgres:5432\/colourstream/g" backend/.env
     sed_inplace "s/JWT_KEY=.*/JWT_KEY=${jwt_key}/g" backend/.env
+    sed_inplace "s/JWT_SECRET=.*/JWT_SECRET=${jwt_secret}/g" backend/.env
     sed_inplace "s/ADMIN_PASSWORD=.*/ADMIN_PASSWORD=${admin_password}/g" backend/.env
     sed_inplace "s/ADMIN_AUTH_SECRET=.*/ADMIN_AUTH_SECRET=${admin_auth_secret}/g" backend/.env
     sed_inplace "s/OME_API_ACCESS_TOKEN=.*/OME_API_ACCESS_TOKEN=${ome_api_token}/g" backend/.env
@@ -142,6 +150,7 @@ rotate_secrets() {
   if [ -f "mirotalk/.env" ]; then
     sed_inplace "s/TURN_SERVER_CREDENTIAL=.*/TURN_SERVER_CREDENTIAL=${turn_password}/g" mirotalk/.env
     sed_inplace "s/API_KEY_SECRET=.*/API_KEY_SECRET=${mirotalk_api_key}/g" mirotalk/.env
+    sed_inplace "s/MIROTALK_API_KEY_SECRET=.*/MIROTALK_API_KEY_SECRET=${mirotalk_api_key}/g" mirotalk/.env
     sed_inplace "s/JWT_KEY=.*/JWT_KEY=${jwt_key}/g" mirotalk/.env
     sed_inplace "s/HOST_PASSWORD=.*/HOST_PASSWORD=${admin_password}/g" mirotalk/.env
     echo "✅ Updated mirotalk/.env"
@@ -162,10 +171,13 @@ rotate_secrets() {
     sed_inplace "s/POSTGRES_PASSWORD: \"[^\"]*\"/POSTGRES_PASSWORD: \"${db_password}\"/g" docker-compose.yml
     sed_inplace "s/DATABASE_URL: \"postgresql:\/\/colourstream:.*@colourstream-postgres/DATABASE_URL: \"postgresql:\/\/colourstream:${db_password}@colourstream-postgres/g" docker-compose.yml
     sed_inplace "s/JWT_KEY: \"[^\"]*\"/JWT_KEY: \"${jwt_key}\"/g" docker-compose.yml
+    sed_inplace "s/JWT_SECRET: \"[^\"]*\"/JWT_SECRET: \"${jwt_secret}\"/g" docker-compose.yml
     sed_inplace "s/ADMIN_AUTH_SECRET: \"[^\"]*\"/ADMIN_AUTH_SECRET: \"${admin_auth_secret}\"/g" docker-compose.yml
     sed_inplace "s/OME_API_ACCESS_TOKEN: \"[^\"]*\"/OME_API_ACCESS_TOKEN: \"${ome_api_token}\"/g" docker-compose.yml
     sed_inplace "s/OME_WEBHOOK_SECRET: \"[^\"]*\"/OME_WEBHOOK_SECRET: \"${ome_webhook_secret}\"/g" docker-compose.yml
     sed_inplace "s/TURN_SERVER_CREDENTIAL: \"[^\"]*\"/TURN_SERVER_CREDENTIAL: \"${turn_password}\"/g" docker-compose.yml
+    sed_inplace "s/MIROTALK_API_KEY: \"[^\"]*\"/MIROTALK_API_KEY: \"${mirotalk_api_key}\"/g" docker-compose.yml
+    sed_inplace "s/MIROTALK_API_KEY_SECRET: \"[^\"]*\"/MIROTALK_API_KEY_SECRET: \"${mirotalk_api_key}\"/g" docker-compose.yml
     echo "✅ Updated docker-compose.yml"
   else
     echo "❌ docker-compose.yml not found"
@@ -182,6 +194,7 @@ DOMAIN_NAME=${domain_name}
 ADMIN_EMAIL=${admin_email}
 DB_PASSWORD=${db_password}
 JWT_KEY=${jwt_key}
+JWT_SECRET=${jwt_secret}
 ADMIN_PASSWORD=${admin_password}
 ADMIN_AUTH_SECRET=${admin_auth_secret}
 MIROTALK_API_KEY=${mirotalk_api_key}
@@ -211,12 +224,13 @@ perform_full_setup() {
   # Generate random passwords
   db_password=$(generate_password)
   jwt_key=$(generate_password)
+  jwt_secret=$(generate_password)  # Generate separate JWT_SECRET
   admin_password=$(generate_password)
-  admin_auth_secret=$(generate_password)  # Added for ADMIN_AUTH_SECRET
+  admin_auth_secret=$(generate_password)
   mirotalk_api_key=$(generate_password)
   turn_password=$(generate_password)
   ome_api_token=$(generate_password)
-  ome_webhook_secret=$(generate_password)  # Added for OME_WEBHOOK_SECRET
+  ome_webhook_secret=$(generate_password)
 
   echo
   echo "Creating configuration files..."
@@ -308,7 +322,7 @@ perform_full_setup() {
     cp backend/.env.template backend/.env
     sed_inplace "s/example.com/$domain_name/g" backend/.env
     sed_inplace "s/your_secure_password_here/$db_password/g" backend/.env
-    sed_inplace "s/your_jwt_secret_here/$jwt_key/g" backend/.env
+    sed_inplace "s/your_jwt_secret_here/$jwt_secret/g" backend/.env
     sed_inplace "s/your_secure_admin_password_here/$admin_password/g" backend/.env
     sed_inplace "s/your_ovenmedia_api_token_here/$ome_api_token/g" backend/.env
     # Add ADMIN_AUTH_SECRET if it exists in the template
@@ -389,6 +403,7 @@ DOMAIN_NAME=${domain_name}
 ADMIN_EMAIL=${admin_email}
 DB_PASSWORD=${db_password}
 JWT_KEY=${jwt_key}
+JWT_SECRET=${jwt_secret}
 ADMIN_PASSWORD=${admin_password}
 ADMIN_AUTH_SECRET=${admin_auth_secret}
 MIROTALK_API_KEY=${mirotalk_api_key}
@@ -447,8 +462,8 @@ echo "Setup completed successfully!"
 echo
 echo "Next steps:"
 echo "1. Set up DNS records:"
-echo "   - live.colourstream.${domain_name} -> Your server IP"
-echo "   - video.colourstream.${domain_name} -> Your server IP"
+printf "   - live.colourstream.%s -> Your server IP\n" "${domain_name}"
+printf "   - video.colourstream.%s -> Your server IP\n" "${domain_name}"
 echo
 echo "2. Start the application:"
 echo "   docker-compose up -d"
