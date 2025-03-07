@@ -1,9 +1,22 @@
+# Data and Runtime Files
 db-data
 data
 node_modules
 .   
 ssl
 .log
+
+# Log Files
+*.log
+logs/
+*/logs/
+backend/logs/
+backend/*/logs/
+backend/error.log
+backend/combined.log
+backend/backend/error.log
+backend/backend/combined.log
+
 # Environment Variables
 global.env
 backend/.env
@@ -42,14 +55,13 @@ traefik/ome
 # Docker Compose
 docker-compose.yml
 
-
+# Miscellaneous
 .git-filtered-backup
 letsencrypt
 security-reports
-backend/logs/combined.log
 *.DS_Store
-backend/logs/combined.log
 .DS_Store
+leaks.json
 .log
 
 #LOGS

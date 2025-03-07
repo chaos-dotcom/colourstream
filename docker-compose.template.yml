@@ -1,17 +1,18 @@
 services:
   frontend:
     image: ghcr.io/johnr24/colourstream-frontend:latest
-    restart: always
-    expose:
-      - 3000
     environment:
       VITE_API_URL: https://live.colourstream.example.com/api
+      VITE_OIDC_AUTH_ENDPOINT: https://sso.example.com/authorize
       VITE_WEBRTC_WS_HOST: live.colourstream.example.com
       VITE_WEBRTC_WS_PORT: 3334
       VITE_WEBRTC_WS_PROTOCOL: wss
       VITE_WEBRTC_APP_PATH: app
       VITE_VIDEO_URL: https://video.colourstream.example.com/join
       VITE_OVENPLAYER_SCRIPT_URL: https://cdn.jsdelivr.net/npm/ovenplayer/dist/ovenplayer.js
+    restart: always
+    expose:
+      - 3000
     networks:
       - network
     labels:
@@ -59,7 +60,7 @@ services:
       - "5432"
     environment:
       POSTGRES_USER: colourstream
-      POSTGRES_PASSWORD: 628db0ebd5d8c8fc4f539e7192fa6ff1
+      POSTGRES_PASSWORD: your_secure_password_here
       POSTGRES_DB: colourstream
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
@@ -85,16 +86,17 @@ services:
       - ./backend/.env
       - ./global.env
     environment:
-      DATABASE_URL: "postgresql://colourstream:628db0ebd5d8c8fc4f539e7192fa6ff1@colourstream-postgres:5432/colourstream"
+      DATABASE_URL: "postgresql://colourstream:your_secure_password_here@colourstream-postgres:5432/colourstream"
       NODE_ENV: production
-      JWT_KEY: 015a8afab726389330e5002945d9d27a7de31bc813
-      ADMIN_AUTH_SECRET: a4097b976531c94f5e4cf9d2676751c7
+      JWT_KEY: your_jwt_key_here
+      ADMIN_AUTH_SECRET: your_admin_auth_secret_here
       WEBAUTHN_RP_ID: live.colourstream.example.com
       WEBAUTHN_ORIGIN: https://live.colourstream.example.com
-      DOMAIN: live.colourstream.example.com
+      DOMAIN: example.com
       VIDEO_DOMAIN: video.colourstream.example.com
       FRONTEND_URL: https://live.colourstream.example.com
       BASE_PATH: /api
+      OME_WEBHOOK_SECRET: "your_webhook_secret_here"
     depends_on:
       postgres:
         condition: service_healthy
@@ -153,6 +155,11 @@ services:
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
       - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
       - "--entrypoints.websecure.address=:443"
+      - "--ping=true"
+      - "--ping.entrypoint=websecure"
+      - "--entrypoints.websecure.transport.respondingTimeouts.readTimeout=300s"
+      - "--entrypoints.websecure.transport.respondingTimeouts.writeTimeout=300s"
+      - "--entrypoints.websecure.transport.respondingTimeouts.idleTimeout=300s"
       - "--certificatesresolvers.myresolver.acme.httpchallenge=true"
       - "--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web"
       - "--certificatesresolvers.myresolver.acme.email=admin@example.com"
@@ -179,11 +186,12 @@ services:
       - "1935:1935/tcp" # RTMP Provider
       - "9999:9999" # SRT
       - "3333:3333" # WebRTC Signaling / LLHLS
-      - "3334:3334" # TLS WebRTC Signaling / LLHLS - Optional unless TLS is enabled
+      - "3334:3334" # TLS WebRTC Signaling / LLHLS
       - "3478:3478/tcp" # WebRTC TURN
       - "10000-10004:10000-10004/udp" # WebRTC Candidate
     environment:
-      OME_HOST_IP: "192.168.0.160"
+      # Use domain name instead of IP address for WebRTC ICE candidates
+      OME_HOST_IP: "live.colourstream.example.com"
       OME_ORIGIN_PORT: "9000"
       OME_RTMP_PROV_PORT: "1935"
       OME_SRT_PROV_PORT: "9999"
@@ -194,7 +202,8 @@ services:
       OME_WEBRTC_CANDIDATE_PORT: "10002-10004/udp"
       OME_API_PORT: "8081"
       OME_API_TLS_PORT: "8082"
-      OME_API_ACCESS_TOKEN: "0fc62ea62790ad7c"
+      OME_WEBHOOK_SECRET: "your_webhook_secret_here"
+      OME_API_ACCESS_TOKEN: "your_ome_api_token_here"
     env_file:
       - global.env
     restart: always
@@ -206,31 +215,43 @@ services:
       - ./certs/private/live.colourstream.example.com.key:/opt/ovenmediaengine/bin/cert/priv.key
     labels:
       - "traefik.enable=true"
-      # WebRTC WebSocket
+      # WebRTC WebSocket for /ws path
       - "traefik.http.routers.ome-webrtc.rule=Host(`video.colourstream.example.com`) && PathPrefix(`/ws`)"
       - "traefik.http.routers.ome-webrtc.entrypoints=websecure"
       - "traefik.http.routers.ome-webrtc.tls.certresolver=myresolver"
       - "traefik.http.routers.ome-webrtc.service=ome-webrtc-service"
       - "traefik.http.services.ome-webrtc-service.loadbalancer.server.port=3333"
+      - "traefik.http.services.ome-webrtc-service.loadbalancer.server.scheme=ws"
+      # WebSocket middleware for WebRTC
       - "traefik.http.middlewares.ome-websocket.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.middlewares.ome-websocket.headers.customrequestheaders.Connection=Upgrade"
+      - "traefik.http.middlewares.ome-websocket.headers.customrequestheaders.Upgrade=websocket"
       - "traefik.http.routers.ome-webrtc.middlewares=ome-websocket"
       
-      # WebRTC TLS Signaling
+      # WebRTC TLS Signaling for /app path on live domain
       - "traefik.http.routers.ome-webrtc-tls.rule=Host(`live.colourstream.example.com`) && PathPrefix(`/app`)"
       - "traefik.http.routers.ome-webrtc-tls.entrypoints=websecure"
       - "traefik.http.routers.ome-webrtc-tls.tls.certresolver=myresolver"
       - "traefik.http.routers.ome-webrtc-tls.service=ome-webrtc-tls-service"
       - "traefik.http.services.ome-webrtc-tls-service.loadbalancer.server.port=3334"
+      - "traefik.http.services.ome-webrtc-tls-service.loadbalancer.server.scheme=ws"
+      # WebSocket middleware for TLS WebRTC
       - "traefik.http.middlewares.ome-websocket-tls.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.middlewares.ome-websocket-tls.headers.customrequestheaders.Connection=Upgrade"
+      - "traefik.http.middlewares.ome-websocket-tls.headers.customrequestheaders.Upgrade=websocket"
       - "traefik.http.routers.ome-webrtc-tls.middlewares=ome-websocket-tls"
       
-      # WebRTC TLS Signaling for video domain
+      # WebRTC TLS Signaling for /app path on video domain
       - "traefik.http.routers.ome-webrtc-tls-video.rule=Host(`video.colourstream.example.com`) && PathPrefix(`/app`)"
       - "traefik.http.routers.ome-webrtc-tls-video.entrypoints=websecure"
       - "traefik.http.routers.ome-webrtc-tls-video.tls.certresolver=myresolver"
       - "traefik.http.routers.ome-webrtc-tls-video.service=ome-webrtc-tls-video-service"
       - "traefik.http.services.ome-webrtc-tls-video-service.loadbalancer.server.port=3334"
+      - "traefik.http.services.ome-webrtc-tls-video-service.loadbalancer.server.scheme=ws"
+      # WebSocket middleware for TLS WebRTC on video domain
       - "traefik.http.middlewares.ome-websocket-tls-video.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.middlewares.ome-websocket-tls-video.headers.customrequestheaders.Connection=Upgrade"
+      - "traefik.http.middlewares.ome-websocket-tls-video.headers.customrequestheaders.Upgrade=websocket"
       - "traefik.http.routers.ome-webrtc-tls-video.middlewares=ome-websocket-tls-video"
 
   edge:
@@ -240,18 +261,19 @@ services:
       - "3479:3479/tcp" # WebRTC TURN
       - "10005-10009:10005-10009/udp" # WebRTC Candidate
     environment:
-      OME_HOST_IP: "192.168.0.160"
-      DEFAULT_ORIGIN_SERVER: "192.168.0.160"
+      # Also use domain name for edge instead of IP address
+      OME_HOST_IP: "live.colourstream.example.com"
+      DEFAULT_ORIGIN_SERVER: "origin"
       DEFAULT_ORIGIN_PORT: "9000"
       OME_LLHLS_STREAM_PORT: "3330"
       OME_WEBRTC_SIGNALLING_PORT: "3333"
-      OME_WEBRTC_SIGNALLING_TLS_PORT: "3000"
+      OME_WEBRTC_SIGNALLING_TLS_PORT: "3334"
       OME_WEBRTC_TCP_RELAY_PORT: "3479"
       OME_WEBRTC_CANDIDATE_PORT: "10005-10009/udp"
+      OME_API_ACCESS_TOKEN: "your_ome_api_token_here"
     env_file:
       - global.env
     restart: always
-
     volumes:
       - ./ovenmediaengine/edge_conf:/opt/ovenmediaengine/bin/edge_conf
       - ./ovenmediaengine/edge_conf:/opt/ovenmediaengine/bin/origin_conf
@@ -259,6 +281,7 @@ services:
       - ./certs/private/live.colourstream.example.com.key:/opt/ovenmediaengine/bin/cert/priv.key
     networks:
       - network
+
   mirotalk:
     image: mirotalk/p2p:latest
     restart: always
@@ -274,7 +297,7 @@ services:
       TURN_SERVER_ENABLED: "true"
       TURN_SERVER_URL: "turn:video.colourstream.example.com:3480"
       TURN_SERVER_USERNAME: "colourstream"
-      TURN_SERVER_CREDENTIAL: "turnserver123"
+      TURN_SERVER_CREDENTIAL: "your_turn_password"
       OIDC_ENABLED: "false"
       HOST_PROTECTED: "true"
       TRUST_PROXY: "true"
@@ -292,7 +315,7 @@ services:
       - "traefik.http.routers.mirotalk.service=mirotalk-service"
       - "traefik.http.services.mirotalk-service.loadbalancer.server.port=3000"
       
-      # WebSocket route - Reverted to previous working configuration
+      # WebSocket route for socket.io
       - "traefik.http.routers.mirotalk-ws.rule=Host(`video.colourstream.example.com`) && PathPrefix(`/socket.io`)"
       - "traefik.http.routers.mirotalk-ws.entrypoints=websecure"
       - "traefik.http.routers.mirotalk-ws.tls.certresolver=myresolver"
