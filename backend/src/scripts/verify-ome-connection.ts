@@ -14,10 +14,15 @@ async function testOmeApiConnection() {
   
   try {
     logger.info(`Testing connection to OvenMediaEngine API at ${apiUrl}`);
+    logger.info(`Using API access token: ${accessToken ? '********' : 'default token'}`);
+    logger.info(`Environment variables:
+      - OME_API_URL: ${process.env.OME_API_URL ? 'set' : 'not set'}
+      - OME_API_ACCESS_TOKEN: ${process.env.OME_API_ACCESS_TOKEN ? 'set' : 'not set'}
+    `);
     
     const response = await fetch(`${apiUrl}/v1/stats`, {
       headers: {
-        'Authorization': `Basic ${accessToken}`
+        'Authorization': `Basic ${Buffer.from(accessToken).toString('base64')}`
       }
     });
     

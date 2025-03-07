@@ -28,15 +28,24 @@ interface ApiResponse<T> {
     response: T;
 }
 
-class OvenMediaEngineService {
+export class OvenMediaEngineService {
     private baseURL: string;
     private accessToken: string;
 
     constructor() {
-        this.baseURL = process.env.OVENMEDIA_API_URL || 'http://origin:8081';
-        this.accessToken = process.env.OVENMEDIA_API_TOKEN || '0fc62ea62790ad7c';
+        this.baseURL = process.env.OME_API_URL || 'http://origin:8081';
+        this.accessToken = process.env.OME_API_ACCESS_TOKEN || '0fc62ea62790ad7c';
         
         logger.info(`Initialized OvenMediaEngine Service with URL: ${this.baseURL}`);
+        logger.info(`Using API access token: ${this.accessToken ? '********' : 'default token'}`);
+        
+        if (!this.baseURL) {
+            logger.error('OvenMediaEngine API URL is not configured! Set OME_API_URL environment variable.');
+        }
+        
+        if (!this.accessToken) {
+            logger.error('OvenMediaEngine API access token is not configured! Set OME_API_ACCESS_TOKEN environment variable.');
+        }
     }
 
     private validateParameters(...params: string[]) {
@@ -128,4 +137,5 @@ class OvenMediaEngineService {
     }
 }
 
+// Create singleton instance for the service
 export const omenService = new OvenMediaEngineService(); 
