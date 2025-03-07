@@ -50,3 +50,5 @@ backend/logs/combined.log
 *.DS_Store
 backend/logs/combined.log
 .DS_Store
+.log
+backend/logs/error.log
