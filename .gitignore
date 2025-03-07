@@ -61,3 +61,4 @@ letsencrypt
 security-reports
 *.DS_Store
 .DS_Store
+leaks.json
