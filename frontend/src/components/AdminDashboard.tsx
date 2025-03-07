@@ -25,6 +25,7 @@ import {
 import { ContentCopy, OpenInNew } from '@mui/icons-material';
 import { OBSSettings } from './settings/OBSSettings';
 import OIDCSettings from './settings/OIDCSettings';
+import OBSControls from './settings/OBSControls';
 import {
   Button as GovUkButton,
   InsetText,
@@ -32,7 +33,8 @@ import {
 import { 
   adminLogout, 
   generateMirotalkToken, 
-  TokenGenerationRequest
+  TokenGenerationRequest,
+  stopOBSStream
 } from '../utils/api';
 import { useNavigate } from 'react-router-dom';
 import RoomManagement from './rooms/RoomManagement';
@@ -84,6 +86,7 @@ const AdminDashboard: React.FC = () => {
   const [generatedUrl, setGeneratedUrl] = useState('');
   const [isGeneratingToken, setIsGeneratingToken] = useState(false);
   const [value, setValue] = useState(0);
+  const [stoppingStream, setStoppingStream] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -106,6 +109,20 @@ const AdminDashboard: React.FC = () => {
       setError('Failed to logout. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleStopStream = async () => {
+    setStoppingStream(true);
+    setError(null);
+    try {
+      await stopOBSStream();
+      setSuccess('OBS stream stopped successfully');
+    } catch (error: any) {
+      console.error('Failed to stop OBS stream:', error);
+      setError(error.response?.data?.message || 'Failed to stop OBS stream. Make sure OBS is connected.');
+    } finally {
+      setStoppingStream(false);
     }
   };
 
@@ -163,13 +180,16 @@ const AdminDashboard: React.FC = () => {
             <Tab label="OBS SETTINGS" {...a11yProps(2)} />
             <Tab label="OVEN MEDIA" {...a11yProps(3)} />
           </Tabs>
-          <GovUkButton 
-            variant="red" 
-            onClick={handleLogout}
-            disabled={loading}
-          >
-            {loading ? <CircularProgress size={24} /> : 'Logout'}
-          </GovUkButton>
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+            <OBSControls showLabel={false} />
+            <GovUkButton 
+              variant="red" 
+              onClick={handleLogout}
+              disabled={loading}
+            >
+              {loading ? <CircularProgress size={24} /> : 'Logout'}
+            </GovUkButton>
+          </Box>
         </Box>
         
         {error && (
