@@ -39,3 +39,28 @@
 2dbed7e5f72c29a8b3128cb93d322479f65d8df7:docker-compose.template.yml:generic-api-key:55
 2dbed7e5f72c29a8b3128cb93d322479f65d8df7:docker-compose.template.yml:generic-api-key:84
 2dbed7e5f72c29a8b3128cb93d322479f65d8df7:docker-compose.template.yml:generic-api-key:85
+
+# New Docker Compose Template secrets with updated commit hash
+f7c579630c7d20559b8efa448efd1c87db7a3604:docker-compose.template.yml:generic-api-key:55
+f7c579630c7d20559b8efa448efd1c87db7a3604:docker-compose.template.yml:generic-api-key:84
+f7c579630c7d20559b8efa448efd1c87db7a3604:docker-compose.template.yml:generic-api-key:85
+
+# New Mirotalk README.md secrets with updated commit hash
+f26cd84b59672d3dc29076ad82c9acf9ef958369:mirotalk/README.md:curl-auth-header:238
+f26cd84b59672d3dc29076ad82c9acf9ef958369:mirotalk/README.md:curl-auth-header:239
+f26cd84b59672d3dc29076ad82c9acf9ef958369:mirotalk/README.md:curl-auth-header:240
+f26cd84b59672d3dc29076ad82c9acf9ef958369:mirotalk/README.md:curl-auth-header:242
+f26cd84b59672d3dc29076ad82c9acf9ef958369:mirotalk/README.md:curl-auth-header:243
+f26cd84b59672d3dc29076ad82c9acf9ef958369:mirotalk/README.md:curl-auth-header:244
+f26cd84b59672d3dc29076ad82c9acf9ef958369:mirotalk/README.md:curl-auth-header:246
+f26cd84b59672d3dc29076ad82c9acf9ef958369:mirotalk/README.md:curl-auth-header:247
+f26cd84b59672d3dc29076ad82c9acf9ef958369:mirotalk/README.md:curl-auth-header:248
+f26cd84b59672d3dc29076ad82c9acf9ef958369:mirotalk/README.md:curl-auth-header:250
+f26cd84b59672d3dc29076ad82c9acf9ef958369:mirotalk/README.md:curl-auth-header:251
+f26cd84b59672d3dc29076ad82c9acf9ef958369:mirotalk/README.md:curl-auth-header:252
+f26cd84b59672d3dc29076ad82c9acf9ef958369:mirotalk/README.md:curl-auth-header:254
+f26cd84b59672d3dc29076ad82c9acf9ef958369:mirotalk/README.md:curl-auth-header:255
+f26cd84b59672d3dc29076ad82c9acf9ef958369:mirotalk/README.md:curl-auth-header:256
+f26cd84b59672d3dc29076ad82c9acf9ef958369:mirotalk/README.md:curl-auth-header:258
+f26cd84b59672d3dc29076ad82c9acf9ef958369:mirotalk/README.md:curl-auth-header:259
+f26cd84b59672d3dc29076ad82c9acf9ef958369:mirotalk/README.md:curl-auth-header:260
