@@ -171,7 +171,7 @@ docker-compose up -d
 
 For more information about using the GitHub Container Registry images, see [GHCR.md](GHCR.md).
 
-## �� Documentation
+## 📜 Documentation
 
 - [API Endpoints](docs/api-endpoints.md)
 - [Authentication Flow](docs/authentication.md)
@@ -186,6 +186,14 @@ For advanced configuration options, refer to Docker Compose files and environmen
 - `global.env.template`: Global environment variables
 - `backend/.env.template`: Backend-specific configuration
 - `frontend/.env`: Frontend configuration
+- `coturn/turnserver.conf.template`: TURN server configuration template
+
+### TURN Server Configuration
+To set up the TURN server:
+1. Copy `coturn/turnserver.conf.template` to `coturn/turnserver.conf`
+2. Replace `your_turn_credential_here` with a secure credential
+3. Update the domain name in `realm` and certificate paths
+4. The actual `turnserver.conf` is gitignored for security
 
 ## 📜 License
 

@@ -1,0 +1,15 @@
+# TURN server configuration
+listening-port=3480
+fingerprint
+lt-cred-mech
+user=colourstream:your_turn_credential_here
+realm=video.colourstream.example.com
+cert=/certs/video.colourstream.example.com.crt
+pkey=/certs/video.colourstream.example.com.key
+no-multicast-peers
+no-cli
+no-tcp-relay
+denied-peer-ip=10.0.0.0-10.255.255.255
+denied-peer-ip=192.168.0.0-192.168.255.255
+denied-peer-ip=172.16.0.0-172.31.255.255
+syslog 

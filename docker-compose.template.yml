@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   frontend:
     # image: ghcr.io/johnr24/colourstream-frontend:latest
@@ -309,23 +311,6 @@ services:
       - mirotalk/.env
     networks:
       - network
-    labels:
-      - "traefik.enable=true"
-      # Main route
-      - "traefik.http.routers.mirotalk.rule=Host(`video.colourstream.example.com`)"
-      - "traefik.http.routers.mirotalk.entrypoints=websecure"
-      - "traefik.http.routers.mirotalk.tls.certresolver=myresolver"
-      - "traefik.http.routers.mirotalk.service=mirotalk-service"
-      - "traefik.http.services.mirotalk-service.loadbalancer.server.port=3000"
-      
-      # WebSocket route for socket.io
-      - "traefik.http.routers.mirotalk-ws.rule=Host(`video.colourstream.example.com`) && PathPrefix(`/socket.io`)"
-      - "traefik.http.routers.mirotalk-ws.entrypoints=websecure"
-      - "traefik.http.routers.mirotalk-ws.tls.certresolver=myresolver"
-      - "traefik.http.routers.mirotalk-ws.service=mirotalk-ws-service"
-      - "traefik.http.services.mirotalk-ws-service.loadbalancer.server.port=3000"
-      - "traefik.http.middlewares.sio.headers.customrequestheaders.X-Forwarded-Proto=https"
-      - "traefik.http.routers.mirotalk-ws.middlewares=sio"
 
   coturn:
     image: coturn/coturn

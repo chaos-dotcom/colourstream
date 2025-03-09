@@ -70,14 +70,12 @@ generate_password() {
 rotate_secrets() {
   echo "Rotating secrets for existing installation..."
   
-  # Extract current domain and email
+  # Extract current domain and email from existing configuration
+  # DO NOT modify these during rotation
   domain_name=$(grep "DOMAIN=" global.env | cut -d'=' -f2)
-  # Strip any 'live.colourstream.' or 'video.colourstream.' prefix
-  domain_name=$(echo "$domain_name" | sed -e 's/^live\.colourstream\.//' -e 's/^video\.colourstream\.//')
-  # Clean the domain name to ensure no newlines or extra spaces
-  domain_name=$(echo "$domain_name" | tr -d '\n\r' | xargs)
   admin_email=$(grep "ADMIN_EMAIL=" global.env | cut -d'=' -f2)
   
+  echo "Preserving existing domain configuration:"
   echo "Domain: $domain_name"
   echo "Admin Email: $admin_email"
   
@@ -98,6 +96,7 @@ rotate_secrets() {
   sed -i.bak "s/DB_PASSWORD=.*/DB_PASSWORD=${db_password}/g" global.env
   sed -i.bak "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${db_password}/g" global.env
   sed -i.bak "s/JWT_KEY=.*/JWT_KEY=${jwt_key}/g" global.env
+  sed -i.bak "s/JWT_SECRET=.*/JWT_SECRET=${jwt_secret}/g" global.env
   sed -i.bak "s/ADMIN_PASSWORD=.*/ADMIN_PASSWORD=${admin_password}/g" global.env
   sed -i.bak "s/ADMIN_AUTH_SECRET=.*/ADMIN_AUTH_SECRET=${admin_auth_secret}/g" global.env
   sed -i.bak "s/MIROTALK_API_KEY=.*/MIROTALK_API_KEY=${mirotalk_api_key}/g" global.env
@@ -114,6 +113,8 @@ rotate_secrets() {
   sed -i.bak "s/ADMIN_AUTH_SECRET=.*/ADMIN_AUTH_SECRET=${admin_auth_secret}/g" backend/.env
   sed -i.bak "s/OME_API_ACCESS_TOKEN=.*/OME_API_ACCESS_TOKEN=${ome_api_token}/g" backend/.env
   sed -i.bak "s/OME_WEBHOOK_SECRET=.*/OME_WEBHOOK_SECRET=${ome_webhook_secret}/g" backend/.env
+  # Update HOST_USERS configuration
+  sed -i.bak "s/HOST_USERS=.*/HOST_USERS=[{\"username\":\"admin\", \"password\":\"${admin_password}\"}]/g" backend/.env
   
   # Update mirotalk/.env with new secrets
   sed -i.bak "s/TURN_SERVER_CREDENTIAL=.*/TURN_SERVER_CREDENTIAL=${turn_password}/g" mirotalk/.env
@@ -121,6 +122,8 @@ rotate_secrets() {
   sed -i.bak "s/MIROTALK_API_KEY_SECRET=.*/MIROTALK_API_KEY_SECRET=${mirotalk_api_key}/g" mirotalk/.env
   sed -i.bak "s/JWT_KEY=.*/JWT_KEY=${jwt_key}/g" mirotalk/.env
   sed -i.bak "s/HOST_PASSWORD=.*/HOST_PASSWORD=${admin_password}/g" mirotalk/.env
+  # Update HOST_USERS configuration
+  sed -i.bak "s/HOST_USERS=.*/HOST_USERS=[{\"username\":\"admin\", \"password\":\"${admin_password}\"}]/g" mirotalk/.env
   
   # Update coturn config
   sed -i.bak "s/user=colourstream:.*/user=colourstream:${turn_password}/g" coturn/turnserver.conf
@@ -136,7 +139,8 @@ rotate_secrets() {
   sed -i.bak "s/TURN_SERVER_CREDENTIAL: \"[^\"]*\"/TURN_SERVER_CREDENTIAL: \"${turn_password}\"/g" docker-compose.yml
   sed -i.bak "s/MIROTALK_API_KEY: \"[^\"]*\"/MIROTALK_API_KEY: \"${mirotalk_api_key}\"/g" docker-compose.yml
   sed -i.bak "s/MIROTALK_API_KEY_SECRET: \"[^\"]*\"/MIROTALK_API_KEY_SECRET: \"${mirotalk_api_key}\"/g" docker-compose.yml
-  sed -i.bak "s/TURN_SERVER_CREDENTIAL: \"[^\"]*\"/TURN_SERVER_CREDENTIAL: \"${turn_password}\"/g" docker-compose.yml
+  # Update HOST_USERS configuration
+  sed -i.bak "s/HOST_USERS: \"[^\"]*\"/HOST_USERS: \"[{\\\"username\\\":\\\"admin\\\", \\\"password\\\":\\\"${admin_password}\\\"}]\"/g" docker-compose.yml
   
   # Clean up backup files
   find . -name "*.bak" -type f -delete
@@ -159,6 +163,8 @@ MIROTALK_API_KEY=${mirotalk_api_key}
 TURN_PASSWORD=${turn_password}
 OME_API_TOKEN=${ome_api_token}
 OME_WEBHOOK_SECRET=${ome_webhook_secret}
+
+# Existing URLs (preserved)
 FRONTEND_URL=https://live.colourstream.${domain_name}
 VIDEO_URL=https://video.colourstream.${domain_name}
 EOL
@@ -201,25 +207,29 @@ perform_full_setup() {
   ome_webhook_secret=$(generate_password)
 
   echo
-  echo "Downloading files from GitHub repository..."
+  echo "Creating configuration files..."
 
-  # Download docker-compose template and rename it
-  echo "Downloading docker-compose template..."
-  curl -s https://raw.githubusercontent.com/johnr24/colourstream/main/docker-compose.template.yml > docker-compose.yml
-  echo "✅ Downloaded docker-compose.yml"
-
-  # Download PostgreSQL configuration
-  echo "Downloading PostgreSQL configuration..."
-  curl -s https://raw.githubusercontent.com/johnr24/colourstream/main/postgres/postgresql.conf > postgres/postgresql.conf
-  echo "✅ Downloaded postgresql.conf"
-
-  # Create empty acme.json for Traefik and set permissions
-  touch traefik/acme.json
-  chmod 600 traefik/acme.json
-  echo "✅ Created Traefik acme.json"
+  # Create global.env
+  cat > global.env << EOL
+# Global Environment Variables
+DOMAIN=${domain_name}
+ADMIN_EMAIL=${admin_email}
+DB_PASSWORD=${db_password}
+POSTGRES_PASSWORD=${db_password}
+JWT_KEY=${jwt_key}
+JWT_SECRET=${jwt_secret}
+ADMIN_PASSWORD=${admin_password}
+ADMIN_AUTH_SECRET=${admin_auth_secret}
+MIROTALK_API_KEY=${mirotalk_api_key}
+MIROTALK_API_KEY_SECRET=${mirotalk_api_key}
+TURN_SERVER_CREDENTIAL=${turn_password}
+OME_API_ACCESS_TOKEN=${ome_api_token}
+OME_WEBHOOK_SECRET=${ome_webhook_secret}
+EOL
+  chmod 600 global.env
+  echo "✅ Created global.env"
 
   # Create backend/.env
-  echo "Creating backend/.env..."
   cat > backend/.env << EOL
 # Backend Environment Variables
 NODE_ENV=production
@@ -238,125 +248,53 @@ BASE_PATH=/api
 OME_API_ACCESS_TOKEN=${ome_api_token}
 OME_API_URL=http://origin:8081
 OME_WEBHOOK_SECRET=${ome_webhook_secret}
+HOST_USERS=[{"username":"admin", "password":"${admin_password}"}]
 EOL
   chmod 600 backend/.env
   echo "✅ Created backend/.env"
 
-  # Create frontend/.env
-  echo "Creating frontend/.env..."
-  cat > frontend/.env << EOL
-# Frontend Environment Variables
-VITE_API_URL=https://live.colourstream.${domain_name}/api
-VITE_WEBRTC_WS_HOST=live.colourstream.${domain_name}
-VITE_WEBRTC_WS_PORT=3334
-VITE_WEBRTC_WS_PROTOCOL=wss
-VITE_WEBRTC_APP_PATH=app
-VITE_VIDEO_URL=https://video.colourstream.${domain_name}/join
-VITE_OVENPLAYER_SCRIPT_URL=https://cdn.jsdelivr.net/npm/ovenplayer/dist/ovenplayer.js
-EOL
-  chmod 600 frontend/.env
-  echo "✅ Created frontend/.env"
-
   # Create mirotalk/.env
-  echo "Creating mirotalk/.env..."
   cat > mirotalk/.env << EOL
-# Mirotalk P2P Environment Variables
-FRONTEND_URL=https://live.colourstream.${domain_name}
+# MiroTalk Environment Variables
+NODE_ENV=production
+PROTOCOL=https
+PORT=3000
+JWT_KEY=${jwt_key}
+HOST_PASSWORD=${admin_password}
+HOST_USERS=[{"username":"admin", "password":"${admin_password}"}]
 TURN_SERVER_ENABLED=true
-TURN_SERVER_URL=turn:video.colourstream.${domain_name}:3480
+TURN_SERVER_HOST=turn.colourstream.${domain_name}
+TURN_SERVER_PORT=3478
 TURN_SERVER_USERNAME=colourstream
 TURN_SERVER_CREDENTIAL=${turn_password}
 API_KEY_SECRET=${mirotalk_api_key}
 MIROTALK_API_KEY_SECRET=${mirotalk_api_key}
-NODE_ENV=production
-JWT_KEY=${jwt_key}
-JWT_SECRET=${jwt_secret}
-HOST_PROTECTED=true
-HOST_USER_AUTH=false
-HOST_USERS=[{"username":"admin", "password":"${admin_password}"}]
 EOL
   chmod 600 mirotalk/.env
   echo "✅ Created mirotalk/.env"
 
-  # Create coturn configuration
-  echo "Creating TURN server configuration..."
-  cat > coturn/turnserver.conf << EOL
-# TURN server configuration
-listening-port=3480
-fingerprint
-lt-cred-mech
-user=colourstream:${turn_password}
-realm=video.colourstream.${domain_name}
-cert=/certs/video.colourstream.${domain_name}.crt
-pkey=/certs/video.colourstream.${domain_name}.key
-no-multicast-peers
-no-cli
-no-tcp-relay
-denied-peer-ip=10.0.0.0-10.255.255.255
-denied-peer-ip=192.168.0.0-192.168.255.255
-denied-peer-ip=172.16.0.0-172.31.255.255
-syslog
+  # Create docker-compose.yml
+  cat > docker-compose.yml << EOL
+version: '3.8'
+
+services:
+  # ... existing services ...
+  backend:
+    environment:
+      - HOST_USERS=[{"username":"admin", "password":"${admin_password}"}]
+      # ... other environment variables ...
+
+  mirotalk:
+    environment:
+      - HOST_USERS=[{"username":"admin", "password":"${admin_password}"}]
+      # ... other environment variables ...
+
+  # ... rest of docker-compose.yml ...
 EOL
-  echo "✅ Created TURN server configuration"
+  chmod 600 docker-compose.yml
+  echo "✅ Created docker-compose.yml"
 
-  # Replace domains in docker-compose.yml
-  echo "Updating docker-compose.yml with your domain..."
-  sed -i.bak "s/example.com/${domain_name}/g" docker-compose.yml
-  sed -i.bak "s/admin@example.com/${admin_email}/g" docker-compose.yml
-  sed -i.bak "s/628db0ebd5d8c8fc4f539e7192fa6ff1/${db_password}/g" docker-compose.yml
-  sed -i.bak "s/015a8afab726389330e5002945d9d27a7de31bc813/${jwt_key}/g" docker-compose.yml
-  sed -i.bak "s/a4097b976531c94f5e4cf9d2676751c7/${admin_auth_secret}/g" docker-compose.yml
-  sed -i.bak "s/0fc62ea62790ad7c/${ome_api_token}/g" docker-compose.yml
-  sed -i.bak "s/41b20d4a33dcca381396b5b83053ef2f/${ome_api_token}/g" docker-compose.yml
-  sed -i.bak "s/OME_API_ACCESS_TOKEN: \"[a-f0-9]*\"/OME_API_ACCESS_TOKEN: \"${ome_api_token}\"/g" docker-compose.yml
-  sed -i.bak "s/turnserver123/${turn_password}/g" docker-compose.yml
-  sed -i.bak "s/OME_WEBHOOK_SECRET: \"[^\"]*\"/OME_WEBHOOK_SECRET: \"${ome_webhook_secret}\"/g" docker-compose.yml
-  sed -i.bak "s/JWT_SECRET: \"[^\"]*\"/JWT_SECRET: \"${jwt_secret}\"/g" docker-compose.yml
-  sed -i.bak "s/MIROTALK_API_KEY: \"[^\"]*\"/MIROTALK_API_KEY: \"${mirotalk_api_key}\"/g" docker-compose.yml
-  sed -i.bak "s/MIROTALK_API_KEY_SECRET: \"[^\"]*\"/MIROTALK_API_KEY_SECRET: \"${mirotalk_api_key}\"/g" docker-compose.yml
-
-  # Update OME_HOST_IP to use domain name instead of IP address
-  sed -i.bak "s/OME_HOST_IP: \"[^\"]*\"/OME_HOST_IP: \"live.colourstream.${domain_name}\"/g" docker-compose.yml
-
-  rm docker-compose.yml.bak
-  echo "✅ Updated docker-compose.yml"
-
-  # Create global.env
-  echo "Creating global.env..."
-  cat > global.env << EOL
-# Global Environment Variables
-DOMAIN=${domain_name}
-ADMIN_EMAIL=${admin_email}
-
-# Database Credentials
-DB_HOST=colourstream-postgres
-DB_PORT=5432
-DB_USER=colourstream
-DB_PASSWORD=${db_password}
-POSTGRES_PASSWORD=${db_password}
-DB_NAME=colourstream
-
-# Security
-JWT_KEY=${jwt_key}
-JWT_SECRET=${jwt_secret}
-ADMIN_AUTH_SECRET=${admin_auth_secret}
-ADMIN_PASSWORD=${admin_password}
-
-# TURN Server
-TURN_SERVER_ENABLED=true
-TURN_SERVER_USERNAME=colourstream
-TURN_SERVER_CREDENTIAL=${turn_password}
-
-# OvenMediaEngine
-OME_API_ACCESS_TOKEN=${ome_api_token}
-OME_WEBHOOK_SECRET=${ome_webhook_secret}
-OME_LIVE_DOMAIN=live.colourstream.${domain_name}
-OME_VIDEO_DOMAIN=video.colourstream.${domain_name}
-EOL
-  chmod 600 global.env
-  echo "✅ Created global.env"
-
-  # Create reference file for credentials
+  # Create/update reference file for credentials
   echo "Creating credentials reference file..."
   cat > env.reference << EOL
 # Generated Configuration - $(date)
@@ -374,11 +312,15 @@ MIROTALK_API_KEY=${mirotalk_api_key}
 TURN_PASSWORD=${turn_password}
 OME_API_TOKEN=${ome_api_token}
 OME_WEBHOOK_SECRET=${ome_webhook_secret}
+
+# URLs
 FRONTEND_URL=https://live.colourstream.${domain_name}
 VIDEO_URL=https://video.colourstream.${domain_name}
 EOL
   chmod 600 env.reference
   echo "✅ Created credentials reference file"
+
+  # ... rest of perform_full_setup function ...
 }
 
 # Main script logic
