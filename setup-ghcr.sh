@@ -136,6 +136,7 @@ rotate_secrets() {
   sed -i.bak "s/TURN_SERVER_CREDENTIAL: \"[^\"]*\"/TURN_SERVER_CREDENTIAL: \"${turn_password}\"/g" docker-compose.yml
   sed -i.bak "s/MIROTALK_API_KEY: \"[^\"]*\"/MIROTALK_API_KEY: \"${mirotalk_api_key}\"/g" docker-compose.yml
   sed -i.bak "s/MIROTALK_API_KEY_SECRET: \"[^\"]*\"/MIROTALK_API_KEY_SECRET: \"${mirotalk_api_key}\"/g" docker-compose.yml
+  sed -i.bak "s/TURN_SERVER_CREDENTIAL: \"[^\"]*\"/TURN_SERVER_CREDENTIAL: \"${turn_password}\"/g" docker-compose.yml
   
   # Clean up backup files
   find . -name "*.bak" -type f -delete
@@ -269,9 +270,10 @@ API_KEY_SECRET=${mirotalk_api_key}
 MIROTALK_API_KEY_SECRET=${mirotalk_api_key}
 NODE_ENV=production
 JWT_KEY=${jwt_key}
+JWT_SECRET=${jwt_secret}
 HOST_PROTECTED=true
-HOST_USERNAME=admin
-HOST_PASSWORD=${admin_password}
+HOST_USER_AUTH=false
+HOST_USERS=[{"username":"admin", "password":"${admin_password}"}]
 EOL
   chmod 600 mirotalk/.env
   echo "✅ Created mirotalk/.env"
@@ -339,12 +341,6 @@ JWT_KEY=${jwt_key}
 JWT_SECRET=${jwt_secret}
 ADMIN_AUTH_SECRET=${admin_auth_secret}
 ADMIN_PASSWORD=${admin_password}
-
-# MiroTalk Configuration
-MIROTALK_API_KEY=${mirotalk_api_key}
-MIROTALK_API_KEY_SECRET=${mirotalk_api_key}
-MIROTALK_USERNAME=admin
-MIROTALK_PASSWORD=${admin_password}
 
 # TURN Server
 TURN_SERVER_ENABLED=true

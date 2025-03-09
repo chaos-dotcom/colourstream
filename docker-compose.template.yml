@@ -300,13 +300,13 @@ services:
       TURN_SERVER_ENABLED: "true"
       TURN_SERVER_URL: "turn:video.colourstream.example.com:3480"
       TURN_SERVER_USERNAME: "colourstream"
-      TURN_SERVER_CREDENTIAL: "your_turn_password"
       OIDC_ENABLED: "false"
       HOST_PROTECTED: "true"
       TRUST_PROXY: "true"
       SEVER_TUNNEL: "false"
     env_file:
       - global.env
+      - mirotalk/.env
     networks:
       - network
     labels:

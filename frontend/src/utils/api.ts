@@ -260,9 +260,21 @@ export const firstTimeSetup = async (): Promise<ApiResponse<AuthResponse>> => {
       throw new Error('No registration options received from server');
     }
     
+    // Check if the options are nested in an 'options' property
+    const registrationOptions = response.data.options || response.data;
+    
+    // Log the registration options for debugging
+    console.log('Server registration options:', response.data);
+    
+    // Validate that we have the expected WebAuthn options structure
+    if (!registrationOptions.challenge || !registrationOptions.rp) {
+      console.log('Invalid options received from server:', response.data);
+      throw new Error('Server returned invalid registration options');
+    }
+    
     // Step 2: Start the registration process in the browser
     try {
-      const credential = await startRegistration(response.data);
+      const credential = await startRegistration(registrationOptions);
       
       // Step 3: Send the credential back to the server for verification
       const verificationResponse = await api.post('/auth/webauthn/first-time-setup/verify', credential);
@@ -317,9 +329,21 @@ export const registerPasskey = async (): Promise<ApiResponse<WebAuthnRegistratio
       throw new Error('No registration options received from server');
     }
     
+    // Check if the options are nested in an 'options' property
+    const registrationOptions = response.data.options || response.data;
+    
+    // Log the registration options for debugging
+    console.log('Server registration options:', response.data);
+    
+    // Validate that we have the expected WebAuthn options structure
+    if (!registrationOptions.challenge || !registrationOptions.rp) {
+      console.log('Invalid options received from server:', response.data);
+      throw new Error('Server returned invalid registration options');
+    }
+    
     // Step 2: Start the registration process in the browser
     try {
-      const credential = await startRegistration(response.data);
+      const credential = await startRegistration(registrationOptions);
       
       // Step 3: Send the credential back to the server for verification
       const verificationResponse = await api.post('/auth/webauthn/register/verify', credential);
@@ -710,9 +734,21 @@ export const registerFirstPasskey = async (): Promise<ApiResponse<AuthResponse>>
       throw new Error('No registration options received from server');
     }
     
+    // Check if the options are nested in an 'options' property
+    const registrationOptions = response.data.options || response.data;
+    
+    // Log the registration options for debugging
+    console.log('Server registration options:', response.data);
+    
+    // Validate that we have the expected WebAuthn options structure
+    if (!registrationOptions.challenge || !registrationOptions.rp) {
+      console.log('Invalid options received from server:', response.data);
+      throw new Error('Server returned invalid registration options');
+    }
+    
     // Step 2: Start the registration process in the browser
     try {
-      const credential = await startRegistration(response.data);
+      const credential = await startRegistration(registrationOptions);
       
       // Step 3: Send the credential back to the server for verification
       const verificationResponse = await axios.post(`${baseURL}/auth/webauthn/first-time-setup/verify`, credential);
