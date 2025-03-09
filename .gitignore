@@ -71,3 +71,5 @@ backend/error.log
 backend/backend/combined.log
 backend/backend/error.log
 leaks.json
+coturn/turnserver.conf
+coturn/turnserver.conf
