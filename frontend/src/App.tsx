@@ -15,6 +15,7 @@ import govukTheme from './lib/govukTheme';
 import GovUkLayout from './components/GovUkLayout';
 import OIDCCallback from './components/OIDCCallback';
 import PasskeySetupPage from './components/PasskeySetupPage';
+import UploadPortal from './components/upload/UploadPortal';
 
 // Debug component to verify rendering
 const DebugAdminLoginPage = () => {
@@ -84,6 +85,20 @@ function App() {
               element={
                 <GovUkLayout serviceName="ColourStream">
                   <PasskeySetupPage />
+                </GovUkLayout>
+              }
+            />
+            
+            {/* Upload Portal Routes */}
+            <Route
+              path="/upload/*"
+              element={
+                <GovUkLayout serviceName="ColourStream">
+                  <ProtectedRoute>
+                    <RequirePasskey>
+                      <UploadPortal />
+                    </RequirePasskey>
+                  </ProtectedRoute>
                 </GovUkLayout>
               }
             />

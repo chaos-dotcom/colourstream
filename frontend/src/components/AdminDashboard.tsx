@@ -179,6 +179,7 @@ const AdminDashboard: React.FC = () => {
             <Tab label="SECURITY" {...a11yProps(1)} />
             <Tab label="OBS SETTINGS" {...a11yProps(2)} />
             <Tab label="OVEN MEDIA" {...a11yProps(3)} />
+            <Tab label="UPLOAD PORTAL" {...a11yProps(4)} />
           </Tabs>
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
             <OBSControls showLabel={false} />
@@ -244,6 +245,25 @@ const AdminDashboard: React.FC = () => {
             Oven Media Configuration
           </Typography>
           <OvenMediaConfig />
+        </TabPanel>
+
+        <TabPanel value={value} index={4}>
+          <Typography variant="h6" gutterBottom component="div">
+            Upload Portal
+          </Typography>
+          <Box sx={{ mt: 2 }}>
+            <GovUkButton
+              href="/upload"
+              target="_blank"
+              onClick={(e) => {
+                e.preventDefault();
+                window.open('/upload', '_blank');
+              }}
+              endIcon={<OpenInNew />}
+            >
+              Open Upload Portal
+            </GovUkButton>
+          </Box>
         </TabPanel>
       </Paper>
 

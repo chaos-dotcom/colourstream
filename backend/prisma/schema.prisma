@@ -89,4 +89,25 @@ model OIDCAuthRequest {
   redirectUrl  String
   expiresAt    DateTime
   createdAt    DateTime @default(now())
+}
+
+model Client {
+  id          String    @id @default(uuid())
+  name        String
+  code        String    @unique  // Business code/identifier
+  projects    Project[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Project {
+  id          String        @id @default(uuid())
+  name        String
+  description String?
+  clientId    String        // Reference to client
+  client      Client        @relation(fields: [clientId], references: [id])
+  uploadLinks UploadLink[]
+  files       UploadedFile[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 } 
