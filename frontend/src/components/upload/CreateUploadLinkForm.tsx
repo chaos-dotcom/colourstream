@@ -94,7 +94,7 @@ const CreateUploadLinkForm: React.FC<CreateUploadLinkFormProps> = ({
           <DateTimePicker
             label="Expires At"
             value={expiresAt}
-            onChange={(newValue) => setExpiresAt(newValue)}
+            onChange={(newValue: Date | null) => setExpiresAt(newValue)}
             slotProps={{
               textField: {
                 fullWidth: true,

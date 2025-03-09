@@ -253,13 +253,8 @@ const AdminDashboard: React.FC = () => {
           </Typography>
           <Box sx={{ mt: 2 }}>
             <GovUkButton
-              href="/upload"
-              target="_blank"
-              onClick={(e) => {
-                e.preventDefault();
-                window.open('/upload', '_blank');
-              }}
-              endIcon={<OpenInNew />}
+              onClick={() => window.open('/upload', '_blank')}
+              variant="primary"
             >
               Open Upload Portal
             </GovUkButton>
