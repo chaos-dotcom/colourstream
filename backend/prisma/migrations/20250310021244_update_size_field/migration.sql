@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "UploadedFile" ALTER COLUMN "size" SET DATA TYPE BIGINT;

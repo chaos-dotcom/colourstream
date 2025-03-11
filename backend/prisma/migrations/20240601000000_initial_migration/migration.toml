@@ -1,5 +1,0 @@
-# Prisma Migrate lockfile v1
-# Read more about conflict resolution here: https://pris.ly/d/migrate-resolve
-
-migration_id = "20240601000000_initial_migration"
-checksum = "a7c5d3e3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3" 

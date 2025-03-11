@@ -8,50 +8,41 @@ import {
   CreateProjectRequest,
   CreateUploadLinkRequest,
 } from '../types/upload';
-
-const API_BASE = process.env.REACT_APP_API_URL || '';
+import { api } from '../utils/api';
 
 // Client Management
 export const getClients = async (): Promise<ApiResponse<Client[]>> => {
-  const response = await fetch(`${API_BASE}/api/clients`, {
-    credentials: 'include',
-  });
-  return response.json();
+  const response = await api.get('/upload/clients');
+  return response.data;
 };
 
 export const createClient = async (data: CreateClientRequest): Promise<ApiResponse<Client>> => {
-  const response = await fetch(`${API_BASE}/api/clients`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data),
-  });
-  return response.json();
+  const response = await api.post('/upload/clients', data);
+  return response.data;
 };
 
 // Project Management
 export const getClientProjects = async (clientId: string): Promise<ApiResponse<Project[]>> => {
-  const response = await fetch(`${API_BASE}/api/clients/${clientId}/projects`, {
-    credentials: 'include',
-  });
-  return response.json();
+  const response = await api.get(`/upload/clients/${clientId}/projects`);
+  return response.data;
 };
 
 export const createProject = async (
   clientId: string,
   data: CreateProjectRequest
 ): Promise<ApiResponse<Project>> => {
-  const response = await fetch(`${API_BASE}/api/clients/${clientId}/projects`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data),
-  });
-  return response.json();
+  const response = await api.post(`/upload/clients/${clientId}/projects`, data);
+  return response.data;
+};
+
+export const deleteProject = async (projectId: string): Promise<ApiResponse<void>> => {
+  const response = await api.delete(`/upload/projects/${projectId}`);
+  return response.data;
+};
+
+export const getProject = async (projectId: string): Promise<ApiResponse<Project>> => {
+  const response = await api.get(`/upload/projects/${projectId}`);
+  return response.data;
 };
 
 // Upload Link Management
@@ -59,35 +50,24 @@ export const createUploadLink = async (
   projectId: string,
   data: CreateUploadLinkRequest
 ): Promise<ApiResponse<UploadLink>> => {
-  const response = await fetch(`${API_BASE}/api/projects/${projectId}/upload-links`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data),
-  });
-  return response.json();
+  const response = await api.post(`/upload/projects/${projectId}/upload-links`, data);
+  return response.data;
 };
 
 export const getUploadLink = async (token: string): Promise<ApiResponse<UploadLink>> => {
-  const response = await fetch(`${API_BASE}/api/upload-links/${token}`, {
-    credentials: 'include',
-  });
-  return response.json();
+  const response = await api.get(`/upload/upload-links/${token}`);
+  return response.data;
 };
 
 // File Management
 export const getProjectFiles = async (projectId: string): Promise<ApiResponse<UploadedFile[]>> => {
-  const response = await fetch(`${API_BASE}/api/projects/${projectId}/files`, {
-    credentials: 'include',
-  });
-  return response.json();
+  const response = await api.get(`/upload/projects/${projectId}/files`);
+  return response.data;
 };
 
 export const downloadFile = async (fileId: string): Promise<Blob> => {
-  const response = await fetch(`${API_BASE}/api/files/${fileId}/download`, {
-    credentials: 'include',
+  const response = await api.get(`/upload/files/${fileId}/download`, {
+    responseType: 'blob'
   });
-  return response.blob();
+  return response.data;
 }; 

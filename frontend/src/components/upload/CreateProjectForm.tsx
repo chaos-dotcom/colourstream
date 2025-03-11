@@ -25,27 +25,29 @@ const CreateProjectForm: React.FC<CreateProjectFormProps> = ({
 }) => {
   const [formData, setFormData] = useState<CreateProjectRequest>({
     name: '',
-    description: '',
     clientId,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [description, setDescription] = useState('');
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    if (name === 'description') {
+      setDescription(value);
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: value,
+      }));
+    }
+    // Clear error when user starts typing
+    if (error) setError(null);
   };
 
   const validateForm = (): boolean => {
     if (!formData.name.trim()) {
       setError('Project name is required');
-      return false;
-    }
-    if (!formData.description.trim()) {
-      setError('Project description is required');
       return false;
     }
     return true;
@@ -61,14 +63,21 @@ const CreateProjectForm: React.FC<CreateProjectFormProps> = ({
 
     setLoading(true);
     try {
-      const response = await createProject(clientId, formData);
+      const projectData: CreateProjectRequest = {
+        ...formData,
+        description: description.trim() || undefined
+      };
+
+      const response = await createProject(clientId, projectData);
+      
       if (response.status === 'success') {
         onSuccess?.();
       } else {
         setError(response.message || 'Failed to create project');
       }
-    } catch (err) {
-      setError('Failed to create project');
+    } catch (err: any) {
+      console.error('Project creation error:', err);
+      setError(err?.response?.data?.error || err?.message || 'Failed to create project');
     } finally {
       setLoading(false);
     }
@@ -96,19 +105,18 @@ const CreateProjectForm: React.FC<CreateProjectFormProps> = ({
           margin="normal"
           required
           error={!!error && !formData.name}
+          helperText={!!error && !formData.name ? 'Project name is required' : ''}
         />
 
         <TextField
           fullWidth
-          label="Description"
+          label="Description (Optional)"
           name="description"
-          value={formData.description}
+          value={description}
           onChange={handleChange}
           margin="normal"
-          required
           multiline
           rows={3}
-          error={!!error && !formData.description}
         />
 
         <Stack direction="row" spacing={2} mt={2}>

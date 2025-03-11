@@ -1,7 +1,7 @@
 export interface Client {
   id: string;
   name: string;
-  code: string;
+  code?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -23,32 +23,33 @@ export interface UploadLink {
   projectId: string;
   project?: Project;
   expiresAt: string;
-  usageLimit: number | null;
-  usageCount: number;
+  maxUses?: number;
+  usedCount: number;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface UploadedFile {
   id: string;
-  originalFilename: string;
-  storedFilename: string;
+  filename: string;
+  path: string;
   size: number;
-  checksum: string;
-  uploadLinkId: string;
-  uploadLink?: UploadLink;
+  mimeType: string;
+  hash: string;
+  projectId: string;
+  project?: Project;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface CreateClientRequest {
   name: string;
-  code: string;
+  code?: string;
 }
 
 export interface CreateProjectRequest {
   name: string;
-  description: string;
+  description?: string;
   clientId: string;
 }
 

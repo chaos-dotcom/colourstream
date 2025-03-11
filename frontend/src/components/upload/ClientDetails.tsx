@@ -10,9 +10,10 @@ import {
   Button,
   CircularProgress,
   Divider,
+  Stack,
 } from '@mui/material';
 import { Client, Project } from '../../types/upload';
-import { getClients, getClientProjects } from '../../services/uploadService';
+import { getClients, getClientProjects, deleteProject } from '../../services/uploadService';
 import CreateProjectForm from './CreateProjectForm';
 
 const ClientDetails: React.FC = () => {
@@ -64,6 +65,21 @@ const ClientDetails: React.FC = () => {
       }
     } catch (err) {
       setError('Failed to refresh projects');
+    }
+  };
+
+  const handleProjectDelete = async (projectId: string) => {
+    try {
+      const response = await deleteProject(projectId);
+      if (response.status === 'success') {
+        // Refresh the projects list
+        const projectsResponse = await getClientProjects(clientId!);
+        if (projectsResponse.status === 'success') {
+          setProjects(projectsResponse.data);
+        }
+      }
+    } catch (err) {
+      setError('Failed to delete project');
     }
   };
 
@@ -136,13 +152,22 @@ const ClientDetails: React.FC = () => {
                     Created: {new Date(project.createdAt).toLocaleDateString()}
                   </Typography>
                   <Box mt={2}>
-                    <Button
-                      component={RouterLink}
-                      to={`/projects/${project.id}`}
-                      color="primary"
-                    >
-                      View Details
-                    </Button>
+                    <Stack direction="row" spacing={1}>
+                      <Button
+                        component={RouterLink}
+                        to={`/upload/projects/${project.id}`}
+                        color="primary"
+                      >
+                        View Details
+                      </Button>
+                      <Button
+                        variant="contained"
+                        color="error"
+                        onClick={() => handleProjectDelete(project.id)}
+                      >
+                        Delete
+                      </Button>
+                    </Stack>
                   </Box>
                 </CardContent>
               </Card>

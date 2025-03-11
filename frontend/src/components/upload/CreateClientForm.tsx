@@ -18,7 +18,7 @@ interface CreateClientFormProps {
 const CreateClientForm: React.FC<CreateClientFormProps> = ({ onSuccess }) => {
   const [formData, setFormData] = useState<CreateClientRequest>({
     name: '',
-    code: '',
+    code: ''
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,11 +37,7 @@ const CreateClientForm: React.FC<CreateClientFormProps> = ({ onSuccess }) => {
       setError('Client name is required');
       return false;
     }
-    if (!formData.code.trim()) {
-      setError('Client code is required');
-      return false;
-    }
-    if (!/^[A-Z0-9]+$/.test(formData.code)) {
+    if (formData.code && !/^[A-Z0-9]+$/.test(formData.code)) {
       setError('Client code must contain only uppercase letters and numbers');
       return false;
     }
@@ -59,7 +55,12 @@ const CreateClientForm: React.FC<CreateClientFormProps> = ({ onSuccess }) => {
 
     setLoading(true);
     try {
-      const response = await createClient(formData);
+      // If code is empty or whitespace, send undefined so server will auto-generate it
+      const code = formData.code?.trim();
+      const response = await createClient({
+        name: formData.name,
+        code: code === '' ? undefined : code
+      });
       if (response.status === 'success') {
         setSuccess(true);
         setFormData({ name: '', code: '' });
@@ -106,14 +107,13 @@ const CreateClientForm: React.FC<CreateClientFormProps> = ({ onSuccess }) => {
 
         <TextField
           fullWidth
-          label="Client Code"
+          label="Client Code (Optional)"
           name="code"
           value={formData.code}
           onChange={handleChange}
           margin="normal"
-          required
-          error={!!error && !formData.code}
-          helperText="Uppercase letters and numbers only"
+          error={Boolean(error && formData.code && !/^[A-Z0-9]+$/.test(formData.code))}
+          helperText="Optional. Uppercase letters and numbers only. Will be auto-generated if left empty."
           inputProps={{ style: { textTransform: 'uppercase' } }}
         />
 

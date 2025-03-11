@@ -2,7 +2,9 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearchPostgres"]
+  engineType = "binary"
 }
 
 datasource db {
@@ -94,7 +96,7 @@ model OIDCAuthRequest {
 model Client {
   id          String    @id @default(uuid())
   name        String
-  code        String    @unique  // Business code/identifier
+  code        String?   @unique  // Optional business code/identifier
   projects    Project[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -110,4 +112,46 @@ model Project {
   files       UploadedFile[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+}
+
+model UploadLink {
+  id          String    @id @default(uuid())
+  token       String    @unique
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id])
+  expiresAt   DateTime
+  maxUses     Int       @default(1)
+  usedCount   Int       @default(0)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+enum UploadStatus {
+  uploading
+  completed
+  cancelled
+  error
+}
+
+model UploadedFile {
+  id          String       @id @default(uuid())
+  name        String
+  path        String?
+  size        Float        // Changed from BigInt to Float to handle large file sizes
+  status      UploadStatus @default(uploading)
+  tusId       String?      @unique
+  s3Key       String?
+  s3Bucket    String?
+  mimeType    String?
+  hash        String?      // Adding hash field to store file hash
+  projectId   String
+  project     Project      @relation(fields: [projectId], references: [id])
+  uploadedBy  String?      // Could be an email or name of uploader
+  completedAt DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([projectId])
+  @@index([tusId])
 } 

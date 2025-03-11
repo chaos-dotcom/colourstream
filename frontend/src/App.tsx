@@ -16,6 +16,7 @@ import GovUkLayout from './components/GovUkLayout';
 import OIDCCallback from './components/OIDCCallback';
 import PasskeySetupPage from './components/PasskeySetupPage';
 import UploadPortal from './components/upload/UploadPortal';
+import ClientUploadPortal from './pages/UploadPortal';
 
 // Debug component to verify rendering
 const DebugAdminLoginPage = () => {
@@ -102,6 +103,9 @@ function App() {
                 </GovUkLayout>
               }
             />
+            
+            {/* Client Upload Portal Route - Public route for client uploads via token */}
+            <Route path="/files/:token" element={<ClientUploadPortal />} />
             
             {/* OIDC Callback Route - frontend-specific route */}
             <Route path="/auth/callback" element={<OIDCCallback />} />

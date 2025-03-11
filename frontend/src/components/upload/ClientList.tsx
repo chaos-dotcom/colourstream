@@ -35,7 +35,7 @@ const ClientList: React.FC = () => {
     const filtered = clients.filter(
       (client) =>
         client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        client.code.toLowerCase().includes(searchTerm.toLowerCase())
+        (client.code?.toLowerCase() || '').includes(searchTerm.toLowerCase())
     );
     setFilteredClients(filtered);
   }, [searchTerm, clients]);
@@ -81,14 +81,14 @@ const ClientList: React.FC = () => {
                   {client.name}
                 </Typography>
                 <Typography color="textSecondary" gutterBottom>
-                  Code: {client.code}
+                  Code: {client.code || 'Auto-generated'}
                 </Typography>
                 <Typography variant="body2" color="textSecondary">
                   Created: {new Date(client.createdAt).toLocaleDateString()}
                 </Typography>
                 <Box mt={2}>
                   <Link
-                    to={`/clients/${client.id}`}
+                    to={`/upload/clients/${client.id}`}
                     style={{ textDecoration: 'none', color: 'inherit' }}
                   >
                     <Typography color="primary">View Details →</Typography>

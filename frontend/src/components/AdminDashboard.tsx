@@ -41,6 +41,9 @@ import RoomManagement from './rooms/RoomManagement';
 import IPSecurity from './security/IPSecurity';
 import PasskeyManagement from './security/PasskeyManagement';
 import { OvenMediaConfig } from './OvenMediaConfig';
+import ClientList from './upload/ClientList';
+import CreateClientForm from './upload/CreateClientForm';
+import ProjectDetails from './upload/ProjectDetails';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -249,15 +252,25 @@ const AdminDashboard: React.FC = () => {
 
         <TabPanel value={value} index={4}>
           <Typography variant="h6" gutterBottom component="div">
-            Upload Portal
+            Upload Portal Management
           </Typography>
-          <Box sx={{ mt: 2 }}>
-            <GovUkButton
-              onClick={() => window.open('/upload', '_blank')}
-              variant="primary"
-            >
-              Open Upload Portal
-            </GovUkButton>
+          
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="subtitle1" gutterBottom>
+              Manage Clients
+            </Typography>
+            <Paper sx={{ p: 2, mb: 2 }}>
+              <ClientList />
+            </Paper>
+          </Box>
+          
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="subtitle1" gutterBottom>
+              Add New Client
+            </Typography>
+            <CreateClientForm onSuccess={() => {
+              setSuccess('Client created successfully');
+            }} />
           </Box>
         </TabPanel>
       </Paper>
