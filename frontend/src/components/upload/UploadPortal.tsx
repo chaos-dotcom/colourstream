@@ -77,6 +77,13 @@ const FileUploader: React.FC = () => {
       retryDelays: [0, 3000, 5000, 10000, 20000],
       chunkSize: 50 * 1024 * 1024, // 50MB chunks for better reliability
       removeFingerprintOnSuccess: true,
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest', // Add this header to match the tusd-xhr router
+      },
+      onBeforeRequest: (req) => {
+        // Log the request for debugging
+        console.log('Uppy request:', req.getURL(), req.getMethod());
+      },
       // Retry parameters are managed via retryDelays
       limit: 10, // Max number of simultaneous uploads
     });
