@@ -195,7 +195,8 @@ MESSAGE="<b>⏳ Upload Progress: $PROGRESS%</b>
 <b>ID:</b> $ID"
 
 # Try to send to backend's Telegram notification endpoint
-curl -X POST -H "Content-Type: application/json" -d "{
+echo "Sending notification to http://backend:5001/api/upload-hooks/telegram-notify" >> $LOG_FILE
+wget -q -O- --header="Content-Type: application/json" --post-data="{
   \"type\": \"upload_progress\",
   \"uploadId\": \"$ID\",
   \"filename\": \"$FILENAME\",
@@ -204,15 +205,15 @@ curl -X POST -H "Content-Type: application/json" -d "{
   \"progress\": $PROGRESS,
   \"client\": \"$CLIENT\",
   \"project\": \"$PROJECT\"
-}" http://backend:5001/api/upload-hooks/telegram-notify > /dev/null 2>&1
+}" http://backend:5001/api/upload-hooks/telegram-notify >> $LOG_FILE 2>&1
 
-# If curl fails, try a direct Telegram API call
+# If wget fails, try a direct Telegram API call
 if [ $? -ne 0 ]; then
     echo "Backend notification failed, trying direct Telegram API call" >> $LOG_FILE
     
     # Get Telegram config from environment (these should be set in the container)
-    TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN}"
-    TELEGRAM_CHAT_ID="${TELEGRAM_CHAT_ID}"
+    # Check if variables exist in the container environment
+    echo "Trying direct Telegram API, token: ${TELEGRAM_BOT_TOKEN:0:10}... chat ID: ${TELEGRAM_CHAT_ID}" >> $LOG_FILE
     
     # Only proceed if we have the required Telegram credentials
     if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
@@ -222,7 +223,7 @@ if [ $? -ne 0 ]; then
         MESSAGE_ENCODED=$(echo "$MESSAGE" | sed 's/ /%20/g; s/&/%26/g; s/</%3C/g; s/>/%3E/g; s/\n/%0A/g')
         
         # Send to Telegram
-        curl -s "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage?chat_id=$TELEGRAM_CHAT_ID&text=$MESSAGE_ENCODED&parse_mode=HTML" >> $LOG_FILE 2>&1
+        wget -q -O- "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage?chat_id=$TELEGRAM_CHAT_ID&text=$MESSAGE_ENCODED&parse_mode=HTML" >> $LOG_FILE 2>&1
         
         if [ $? -eq 0 ]; then
             echo "Direct Telegram notification sent successfully" >> $LOG_FILE
