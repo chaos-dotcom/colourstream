@@ -451,7 +451,24 @@ const ProjectDetails: React.FC = () => {
               </TableHead>
               <TableBody>
                 {files.map((file) => (
-                  <TableRow key={file.id}>
+                  <TableRow 
+                    key={file.id}
+                    hover
+                    onClick={(event) => {
+                      // Prevent download if clicking on a button or its container
+                      if (event.currentTarget.querySelector('.download-button')?.contains(event.target as Node)) {
+                        return;
+                      }
+                      // Download the file
+                      handleDownload(file.id, file.filename);
+                    }}
+                    sx={{ 
+                      cursor: 'pointer',
+                      '&:hover': {
+                        backgroundColor: 'rgba(0, 0, 0, 0.04)',
+                      } 
+                    }}
+                  >
                     <TableCell>{file.filename}</TableCell>
                     <TableCell>{formatBytes(file.size)}</TableCell>
                     <TableCell>
@@ -474,9 +491,11 @@ const ProjectDetails: React.FC = () => {
                     <TableCell align="right">
                       <Tooltip title="Download">
                         <IconButton
-                          onClick={() =>
-                            handleDownload(file.id, file.filename)
-                          }
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevent row click
+                            handleDownload(file.id, file.filename);
+                          }}
+                          className="download-button"
                         >
                           <DownloadIcon />
                         </IconButton>
