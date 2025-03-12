@@ -23,15 +23,17 @@ const About: React.FC = () => {
                 experience for both professionals and clients.
               </p>
               <p className="govuk-body">
-                Our platform prioritizes security,by utilising zero-trust architecture, and a siloed design principles, 
+                Our platform prioritizes security,by utilising zero-trust architecture, and siloed design principles, 
                 performance with extremly low latency live streams and in browser resumable uploads, 
                 and ease of use and accessibility utilising the UK Government Design System, making it the ideal choice
                 for professional streaming needs in the colour grading industry.
               </p>
               <p className="govuk-body">
-                ColourStream is completely open source, embodying transparency and community-driven development.
+                ColourStream was built on the fundamental belief that colourist tools should be open source.
+                For too long, our industry has been dominated by closed, proprietary software that limits what we can do
+                and how we can collaborate. ColourStream is completely open source, embodying transparency and community-driven development.
                 This means you can inspect the code, contribute improvements, or customize it to your specific needs
-                without restriction. Our open source approach ensures the platform evolves with the actual needs of
+                with limited restriction. Our open source approach ensures the platform evolves with the real-world needs of
                 colourists.
               </p>
               <p className="govuk-body">
@@ -77,6 +79,11 @@ const About: React.FC = () => {
             </div>
             
             <div className="govuk-grid-column-one-half">
+              <SectionHeading>Getting Started</SectionHeading>
+              <p className="govuk-body">
+                To access the platform's features, please log in to your account or contact the administrator
+                for access credentials.
+              </p>
             </div>
           </div>
         </main>
