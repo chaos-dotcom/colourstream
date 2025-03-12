@@ -16,10 +16,20 @@ import {
   DialogContent,
   DialogActions,
   Alert,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Tooltip,
+  IconButton,
 } from '@mui/material';
 import { Client, Project } from '../../types/upload';
 import { getClients, getClientProjects, deleteProject, deleteClient } from '../../services/uploadService';
 import CreateProjectForm from './CreateProjectForm';
+import DeleteIcon from '@mui/icons-material/Delete';
+import OpenInNew from '@mui/icons-material/OpenInNew';
 
 const ClientDetails: React.FC = () => {
   const { clientId } = useParams<{ clientId: string }>();
@@ -183,45 +193,54 @@ const ClientDetails: React.FC = () => {
           </Button>
         </Box>
 
-        <Grid container spacing={2}>
-          {projects.length > 0 ? (
-            projects.map((project) => (
-              <Grid item xs={12} sm={6} md={4} key={project.id}>
-                <Card>
-                  <CardContent>
-                    <Box display="flex" justifyContent="space-between">
-                      <Typography variant="h6">{project.name}</Typography>
-                      <Button 
-                        size="small" 
-                        color="error"
-                        onClick={() => handleDeleteProject(project.id)}
-                      >
-                        Delete
-                      </Button>
-                    </Box>
-                    <Typography variant="body2" color="textSecondary" gutterBottom>
-                      {project.description || 'No description provided'}
-                    </Typography>
-                    <Box mt={2}>
-                      <Button
-                        component={RouterLink}
-                        to={`/upload/projects/${project.id}`}
-                        color="primary"
-                        size="small"
-                      >
-                        View Details
-                      </Button>
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))
-          ) : (
-            <Grid item xs={12}>
-              <Typography color="textSecondary">No projects found for this client</Typography>
-            </Grid>
-          )}
-        </Grid>
+        {projects.length > 0 ? (
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Project Name</TableCell>
+                  <TableCell>Description</TableCell>
+                  <TableCell>Created</TableCell>
+                  <TableCell>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {projects.map((project) => (
+                  <TableRow key={project.id}>
+                    <TableCell>{project.name}</TableCell>
+                    <TableCell>{project.description || 'No description provided'}</TableCell>
+                    <TableCell>{new Date(project.createdAt).toLocaleDateString()}</TableCell>
+                    <TableCell>
+                      <Box display="flex">
+                        <Tooltip title="View Project Details">
+                          <IconButton 
+                            size="small" 
+                            component={RouterLink}
+                            to={`/upload/projects/${project.id}`}
+                            color="primary"
+                          >
+                            <OpenInNew fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete Project">
+                          <IconButton 
+                            size="small"
+                            color="error"
+                            onClick={() => handleDeleteProject(project.id)}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        ) : (
+          <Typography color="textSecondary">No projects found for this client</Typography>
+        )}
       </Box>
 
       {showCreateProject && (

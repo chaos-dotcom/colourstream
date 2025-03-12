@@ -166,7 +166,7 @@ const ProjectDetails: React.FC = () => {
   const handleCopyLink = async (link: string) => {
     try {
       await navigator.clipboard.writeText(
-        `${UPLOAD_ENDPOINT_URL}${link}`
+        `https://upload.colourstream.johnrogerscolour.co.uk/portal/${link}`
       );
       setCopySuccess(link);
       setTimeout(() => setCopySuccess(null), 2000);
@@ -300,53 +300,83 @@ const ProjectDetails: React.FC = () => {
           </Box>
         )}
 
-        {project.uploadLinks && project.uploadLinks.length > 0 ? (
-          <Grid container spacing={2}>
-            {project.uploadLinks.map((link: UploadLink) => (
-              <Grid item xs={12} sm={6} md={4} key={link.id}>
-                <Card>
-                  <CardContent>
-                    <Box display="flex" alignItems="center" justifyContent="space-between">
-                      <Typography variant="subtitle1" component="div">
-                        Upload Link
-                      </Typography>
-                      <Box>
-                        <Tooltip title="Copy Link">
-                          <IconButton
-                            onClick={() => handleCopyLink(link.token)}
-                            color={copySuccess === link.token ? 'success' : 'default'}
-                          >
-                            <ContentCopyIcon />
+        {successMessage && (
+          <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccessMessage(null)}>
+            {successMessage}
+          </Alert>
+        )}
+        
+        {project?.uploadLinks && project.uploadLinks.length > 0 ? (
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Token</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Usage</TableCell>
+                  <TableCell>Expires</TableCell>
+                  <TableCell>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {project.uploadLinks.map((link) => (
+                  <TableRow key={link.id}>
+                    <TableCell>
+                      <Box display="flex" alignItems="center">
+                        {link.token.substring(0, 12)}...
+                        <Tooltip title={copySuccess === link.token ? "Copied!" : "Copy link"}>
+                          <IconButton size="small" onClick={() => handleCopyLink(link.token)}>
+                            <ContentCopyIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                        <Button
-                          variant={selectedUploadLink?.id === link.id ? 'contained' : 'outlined'}
-                          color="primary"
-                          onClick={() => handleUploadLinkSelect(link)}
-                          size="small"
-                          sx={{ ml: 1 }}
-                        >
-                          Select for Upload
-                        </Button>
                       </Box>
-                    </Box>
-                    <Typography variant="body2" color="textSecondary" gutterBottom>
-                      Expires: {new Date(link.expiresAt).toLocaleDateString()}
-                    </Typography>
-                    {link.maxUses && (
-                      <Typography variant="body2" color="textSecondary">
-                        Usage: {link.usedCount} / {link.maxUses}
-                      </Typography>
-                    )}
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
+                    </TableCell>
+                    <TableCell>
+                      {link.isActive === false ? (
+                        <Chip label="Inactive" color="error" size="small" />
+                      ) : new Date(link.expiresAt) < new Date() ? (
+                        <Chip label="Expired" color="warning" size="small" />
+                      ) : (
+                        <Chip label="Active" color="success" size="small" />
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {link.usedCount} / {link.maxUses === 0 ? '∞' : link.maxUses}
+                    </TableCell>
+                    <TableCell>
+                      {new Date(link.expiresAt).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      <Box display="flex">
+                        <Tooltip title="View Upload Interface">
+                          <IconButton 
+                            size="small" 
+                            onClick={() => handleUploadLinkSelect(link)}
+                          >
+                            <OpenInNew fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete Link">
+                          <IconButton 
+                            size="small"
+                            color="error"
+                            onClick={() => {
+                              setLinkToDelete(link);
+                              setDeleteDialogOpen(true);
+                            }}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
         ) : (
-          <Box textAlign="center" mb={4}>
-            <Typography color="textSecondary">No upload links available</Typography>
-          </Box>
+          <Typography color="textSecondary">No upload links created yet</Typography>
         )}
       </Box>
 
@@ -429,92 +459,6 @@ const ProjectDetails: React.FC = () => {
           <Box textAlign="center">
             <Typography color="textSecondary">No files uploaded yet</Typography>
           </Box>
-        )}
-      </Box>
-
-      <Box mt={4}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-          <Typography variant="h6">Upload Links</Typography>
-          <Button
-            variant="contained"
-            onClick={() => setShowCreateLink(true)}
-            size="small"
-          >
-            Create Upload Link
-          </Button>
-        </Box>
-        
-        {project?.uploadLinks && project.uploadLinks.length > 0 ? (
-          <TableContainer component={Paper}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Token</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Usage</TableCell>
-                  <TableCell>Expires</TableCell>
-                  <TableCell>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {project.uploadLinks.map((link) => (
-                  <TableRow key={link.id}>
-                    <TableCell>
-                      <Box display="flex" alignItems="center">
-                        {link.token}
-                        <Tooltip title={copySuccess === link.token ? "Copied!" : "Copy link"}>
-                          <IconButton size="small" onClick={() => handleCopyLink(`${UPLOAD_ENDPOINT_URL}${link.token}`)}>
-                            <ContentCopyIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      {link.isActive === false ? (
-                        <Chip label="Inactive" color="error" size="small" />
-                      ) : new Date(link.expiresAt) < new Date() ? (
-                        <Chip label="Expired" color="warning" size="small" />
-                      ) : (
-                        <Chip label="Active" color="success" size="small" />
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {link.usedCount} / {link.maxUses === 0 ? '∞' : link.maxUses}
-                    </TableCell>
-                    <TableCell>
-                      {new Date(link.expiresAt).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      <Box display="flex">
-                        <Tooltip title="View Upload Interface">
-                          <IconButton 
-                            size="small" 
-                            onClick={() => handleUploadLinkSelect(link)}
-                          >
-                            <OpenInNew fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Delete Link">
-                          <IconButton 
-                            size="small"
-                            color="error"
-                            onClick={() => {
-                              setLinkToDelete(link);
-                              setDeleteDialogOpen(true);
-                            }}
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        ) : (
-          <Typography color="textSecondary">No upload links created yet</Typography>
         )}
       </Box>
 
