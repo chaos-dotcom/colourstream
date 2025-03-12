@@ -8,6 +8,8 @@ import { logger } from '../../utils/logger';
 export const initializeTelegramService = (): void => {
   if (telegramConfig.enabled) {
     try {
+      logger.info(`Initializing Telegram bot with token: ${telegramConfig.botToken.substring(0, 10)}... and chat ID: ${telegramConfig.chatId}`);
+      
       const bot = initTelegramBot({
         botToken: telegramConfig.botToken,
         chatId: telegramConfig.chatId

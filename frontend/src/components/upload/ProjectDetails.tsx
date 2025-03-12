@@ -342,7 +342,8 @@ const ProjectDetails: React.FC = () => {
                   >
                     <TableCell>
                       <Box display="flex" alignItems="center">
-                        {link.token.substring(0, 12)}...
+                        {/* Show full token for debugging */}
+                        {link.token}
                         <Tooltip title={copySuccess === link.token ? "Copied!" : "Copy link"}>
                           <IconButton 
                             size="small" 

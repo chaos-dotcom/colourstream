@@ -22,8 +22,11 @@ export class TelegramBot {
    */
   async sendMessage(message: string): Promise<boolean> {
     try {
+      // Convert the chat_id to a number if it's a numeric string
+      const chatId = !isNaN(Number(this.chatId)) ? Number(this.chatId) : this.chatId;
+      
       const response = await axios.post(`${this.baseUrl}/sendMessage`, {
-        chat_id: this.chatId,
+        chat_id: chatId,
         text: message,
         parse_mode: 'HTML',
       });
