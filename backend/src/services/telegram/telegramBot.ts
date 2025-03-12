@@ -208,9 +208,10 @@ export class TelegramBot {
     metadata?: Record<string, string>;
     isComplete?: boolean;
     createdAt?: Date;
+    uploadSpeed?: number;
     storage?: string;
   }): Promise<boolean> {
-    const { id, size, offset, metadata, isComplete } = uploadInfo;
+    const { id, size, offset, metadata, isComplete, uploadSpeed } = uploadInfo;
     
     console.log('[TELEGRAM-DEBUG] Creating upload notification message for upload:', id);
     
@@ -225,11 +226,24 @@ export class TelegramBot {
       return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
     };
 
+    // Format transfer speed in human-readable format
+    const formatSpeed = (bytesPerSecond: number): string => {
+      if (bytesPerSecond < 1024) return `${bytesPerSecond.toFixed(2)} B/s`;
+      if (bytesPerSecond < 1024 * 1024) return `${(bytesPerSecond / 1024).toFixed(2)} KB/s`;
+      if (bytesPerSecond < 1024 * 1024 * 1024) return `${(bytesPerSecond / (1024 * 1024)).toFixed(2)} MB/s`;
+      return `${(bytesPerSecond / (1024 * 1024 * 1024)).toFixed(2)} GB/s`;
+    };
+
     // Create message with upload details
     let message = `<b>Upload Status${isComplete ? ' - COMPLETED' : ''}</b>\n`;
     message += `<b>ID:</b> ${id}\n`;
     message += `<b>Size:</b> ${formatFileSize(size)}\n`;
     message += `<b>Progress:</b> ${progress}% (${formatFileSize(offset)} / ${formatFileSize(size)})\n`;
+    
+    // Add upload speed if available and not a completed upload
+    if (uploadSpeed && !isComplete && uploadSpeed > 0) {
+      message += `<b>Speed:</b> ${formatSpeed(uploadSpeed)}\n`;
+    }
     
     // Add metadata if available
     if (metadata && Object.keys(metadata).length > 0) {
@@ -241,11 +255,30 @@ export class TelegramBot {
 
     // Add estimated time remaining if not complete
     if (!isComplete && offset > 0 && size > offset) {
-      // This is a very simple estimation and might not be accurate
-      // A more sophisticated approach would track upload speed over time
-      const remainingBytes = size - offset;
-      const remainingTime = remainingBytes > 0 ? 'Calculating...' : 'Almost done';
-      message += `\n<b>Estimated time remaining:</b> ${remainingTime}`;
+      if (uploadSpeed && uploadSpeed > 0) {
+        // Calculate estimated time remaining based on current speed
+        const remainingBytes = size - offset;
+        const remainingTimeSeconds = remainingBytes / uploadSpeed;
+        
+        // Format the remaining time
+        let remainingTimeStr: string;
+        if (remainingTimeSeconds < 60) {
+          remainingTimeStr = `${Math.ceil(remainingTimeSeconds)} seconds`;
+        } else if (remainingTimeSeconds < 3600) {
+          remainingTimeStr = `${Math.ceil(remainingTimeSeconds / 60)} minutes`;
+        } else {
+          const hours = Math.floor(remainingTimeSeconds / 3600);
+          const minutes = Math.ceil((remainingTimeSeconds % 3600) / 60);
+          remainingTimeStr = `${hours} hours, ${minutes} minutes`;
+        }
+        
+        message += `\n<b>Estimated time remaining:</b> ${remainingTimeStr}`;
+      } else {
+        // Fallback if we don't have speed data
+        const remainingBytes = size - offset;
+        const remainingTime = remainingBytes > 0 ? 'Calculating...' : 'Almost done';
+        message += `\n<b>Estimated time remaining:</b> ${remainingTime}`;
+      }
     }
 
     // Delete the message ID if the upload is complete (for cleanup)

@@ -17,7 +17,34 @@ PROGRESS=$((OFFSET * 100 / SIZE))
 # Only log every 10% to avoid log spam
 # Use a temporary file to track last reported progress
 PROGRESS_FILE="$INFO_DIR/$ID.progress"
+LAST_OFFSET_FILE="$INFO_DIR/$ID.last_offset"
+LAST_TIME_FILE="$INFO_DIR/$ID.last_time"
 REPORT_PROGRESS=0
+
+# Calculate upload speed if we have data from the previous call
+UPLOAD_SPEED=""
+if [ -f "$LAST_OFFSET_FILE" ] && [ -f "$LAST_TIME_FILE" ]; then
+  LAST_OFFSET=$(cat "$LAST_OFFSET_FILE")
+  LAST_TIME=$(cat "$LAST_TIME_FILE")
+  CURRENT_TIME=$(date +%s)
+  
+  # Calculate bytes transferred since last update
+  BYTES_DIFF=$((OFFSET - LAST_OFFSET))
+  
+  # Calculate time difference in seconds
+  TIME_DIFF=$((CURRENT_TIME - LAST_TIME))
+  
+  # Avoid division by zero
+  if [ "$TIME_DIFF" -gt 0 ] && [ "$BYTES_DIFF" -gt 0 ]; then
+    # Calculate bytes per second
+    UPLOAD_SPEED=$((BYTES_DIFF / TIME_DIFF))
+    echo "Calculated upload speed: $UPLOAD_SPEED bytes/sec" >> $LOG_FILE
+  fi
+fi
+
+# Store current values for next calculation
+echo "$OFFSET" > "$LAST_OFFSET_FILE"
+date +%s > "$LAST_TIME_FILE"
 
 if [ ! -f "$PROGRESS_FILE" ]; then
   # First time seeing this upload, record progress and report it
@@ -188,7 +215,7 @@ echo "Sending progress notification to backend service" >> $LOG_FILE
 
 # Try to send to backend's Telegram notification endpoint
 echo "Sending notification to http://backend:5001/api/upload-hooks/telegram-notify" >> $LOG_FILE
-wget -q -O- --header="Content-Type: application/json" --post-data="{
+PAYLOAD="{
   \"type\": \"upload_progress\",
   \"uploadId\": \"$ID\",
   \"filename\": \"$FILENAME\",
@@ -196,8 +223,19 @@ wget -q -O- --header="Content-Type: application/json" --post-data="{
   \"offset\": $OFFSET,
   \"progress\": $PROGRESS,
   \"client\": \"$CLIENT\",
-  \"project\": \"$PROJECT\"
-}" http://backend:5001/api/upload-hooks/telegram-notify >> $LOG_FILE 2>&1
+  \"project\": \"$PROJECT\""
+
+# Add upload speed to payload if available
+if [ -n "$UPLOAD_SPEED" ]; then
+  PAYLOAD="$PAYLOAD,
+  \"uploadSpeed\": $UPLOAD_SPEED"
+fi
+
+# Close the JSON object
+PAYLOAD="$PAYLOAD
+}"
+
+wget -q -O- --header="Content-Type: application/json" --post-data="$PAYLOAD" http://backend:5001/api/upload-hooks/telegram-notify >> $LOG_FILE 2>&1
 
 # If wget fails, try a direct Telegram API call
 if [ $? -ne 0 ]; then

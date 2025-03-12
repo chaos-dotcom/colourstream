@@ -377,7 +377,7 @@ router.post('/telegram-notify', async (req: Request, res: Response) => {
       });
     }
     
-    const { type, uploadId, filename, size, offset, progress, client, project, targetPath, status } = req.body;
+    const { type, uploadId, filename, size, offset, progress, client, project, targetPath, status, uploadSpeed } = req.body;
     
     // Get Telegram bot instance
     const telegramBot = getTelegramBot();
@@ -389,11 +389,32 @@ router.post('/telegram-notify', async (req: Request, res: Response) => {
       });
     }
     
+    // Get existing upload information for calculating speed if not provided
+    let calculatedSpeed;
+    if (type === 'upload_progress' && !uploadSpeed && uploadId) {
+      const existingUpload = uploadTracker.getUpload(uploadId);
+      if (existingUpload && existingUpload.previousOffset !== undefined && existingUpload.previousUpdateTime) {
+        const bytesDiff = (offset || 0) - existingUpload.previousOffset;
+        const timeDiffMs = new Date().getTime() - existingUpload.previousUpdateTime.getTime();
+        if (timeDiffMs > 0) {
+          calculatedSpeed = (bytesDiff / timeDiffMs) * 1000; // bytes per second
+        }
+      }
+    }
+    
     // Prepare message based on notification type
     let message = '';
     
     // Determine if we should clean up message ID after completion/termination
     const isCompletionEvent = type === 'upload_complete' || type === 'upload_terminated';
+    
+    // Format transfer speed in human-readable format
+    const formatSpeed = (bytesPerSecond: number): string => {
+      if (bytesPerSecond < 1024) return `${bytesPerSecond.toFixed(2)} B/s`;
+      if (bytesPerSecond < 1024 * 1024) return `${(bytesPerSecond / 1024).toFixed(2)} KB/s`;
+      if (bytesPerSecond < 1024 * 1024 * 1024) return `${(bytesPerSecond / (1024 * 1024)).toFixed(2)} MB/s`;
+      return `${(bytesPerSecond / (1024 * 1024 * 1024)).toFixed(2)} GB/s`;
+    };
     
     switch (type) {
       case 'upload_started':
@@ -408,7 +429,15 @@ router.post('/telegram-notify', async (req: Request, res: Response) => {
       case 'upload_progress':
         message = `<b>⏳ Upload Progress: ${progress || 0}%</b>
 <b>File:</b> ${filename || 'Unknown'}
-<b>Progress:</b> ${formatFileSize(offset || 0)} of ${formatFileSize(size)}
+<b>Progress:</b> ${formatFileSize(offset || 0)} of ${formatFileSize(size)}`;
+        
+        // Add speed information if available
+        if (uploadSpeed || calculatedSpeed) {
+          const speedValue = uploadSpeed || calculatedSpeed;
+          message += `\n<b>Speed:</b> ${formatSpeed(speedValue)}`;
+        }
+        
+        message += `
 <b>Client:</b> ${client || 'Unknown'}
 <b>Project:</b> ${project || 'Unknown'}
 <b>ID:</b> ${uploadId}`;

@@ -8,6 +8,9 @@ interface UploadInfo {
   metadata?: Record<string, string>;
   createdAt: Date;
   lastUpdated: Date;
+  previousOffset?: number;
+  previousUpdateTime?: Date;
+  uploadSpeed?: number; // Speed in bytes per second
   storage?: string;
   isComplete: boolean;
 }
@@ -24,11 +27,28 @@ class UploadTracker {
     
     console.log('[TELEGRAM-DEBUG] trackUpload called for ID:', uploadInfo.id);
     
+    // Calculate upload speed if this is an update
+    let uploadSpeed: number | undefined = undefined;
+    
+    if (existingUpload && existingUpload.offset !== uploadInfo.offset) {
+      const timeDiffMs = now.getTime() - existingUpload.lastUpdated.getTime();
+      if (timeDiffMs > 0) {
+        // Only calculate speed if some time has passed (avoid division by zero)
+        const bytesDiff = uploadInfo.offset - existingUpload.offset;
+        // Convert to bytes per second
+        uploadSpeed = (bytesDiff / timeDiffMs) * 1000;
+        console.log(`[TELEGRAM-DEBUG] Calculated upload speed for ${uploadInfo.id}: ${uploadSpeed.toFixed(2)} bytes/s`);
+      }
+    }
+    
     const updatedUpload: UploadInfo = {
       ...uploadInfo,
       lastUpdated: now,
       isComplete: uploadInfo.isComplete ?? false,
-      createdAt: existingUpload?.createdAt || now
+      createdAt: existingUpload?.createdAt || now,
+      previousOffset: existingUpload?.offset,
+      previousUpdateTime: existingUpload?.lastUpdated,
+      uploadSpeed
     };
     
     this.uploads.set(uploadInfo.id, updatedUpload);
