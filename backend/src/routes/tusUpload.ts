@@ -100,6 +100,14 @@ router.post('/hooks', async (req: Request, res: Response) => {
     switch (Type) {
       case 'pre-create':
         // Validate the upload request
+        // Check for disallowed file extensions
+        if (filename.toLowerCase().endsWith('.turbosort')) {
+          return res.status(400).json({
+            status: 'error',
+            message: 'Files with .turbosort extension are not allowed'
+          });
+        }
+        
         // For the default project, we'll skip project validation
         if (projectId !== 'default') {
           const project = await prisma.project.findUnique({
