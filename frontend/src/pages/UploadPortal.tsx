@@ -340,6 +340,9 @@ const UploadPortal: React.FC = () => {
           <Typography variant="body2" color="text.secondary">
             <strong>© {new Date().getFullYear()} ColourStream</strong>
           </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Powered by <Link href="https://github.com/transloadit/uppy" target="_blank" rel="noopener noreferrer">Uppy</Link> and <Link href="https://github.com/tus/tusd" target="_blank" rel="noopener noreferrer">Tusd</Link>
+          </Typography>
         </Container>
       </Box>
     </Box>
