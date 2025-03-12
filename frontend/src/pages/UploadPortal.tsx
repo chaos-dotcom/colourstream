@@ -22,7 +22,7 @@ import '@uppy/core/dist/style.min.css';
 import '@uppy/dashboard/dist/style.min.css';
 import { getUploadLink } from '../services/uploadService';
 import { ApiResponse } from '../types';
-import { UPLOAD_ENDPOINT_URL } from '../config';
+import { UPLOAD_ENDPOINT_URL, NAMEFORUPLOADCOMPLETION } from '../config';
 
 const StyledDashboard = styled(Box)(({ theme }) => ({
   '& .uppy-Dashboard-inner': {
@@ -127,6 +127,18 @@ const UploadPortal: React.FC = () => {
               client: data.clientName,
               project: data.projectName,
               token: token
+            },
+            locale: {
+              strings: {
+                // Customize the "Complete" text to the requested message
+                complete: `Your upload was successful and ${NAMEFORUPLOADCOMPLETION} has received it successfully 😌`
+              },
+              pluralize: (n) => {
+                if (n === 1) {
+                  return 0;
+                }
+                return 1;
+              }
             }
           }).use(Tus, {
             endpoint: UPLOAD_ENDPOINT_URL, // Base TUS endpoint
@@ -208,6 +220,10 @@ const UploadPortal: React.FC = () => {
         <Box sx={{ flex: 1, bgcolor: '#008026' }}></Box>
         <Box sx={{ flex: 1, bgcolor: '#004DFF' }}></Box>
         <Box sx={{ flex: 1, bgcolor: '#750787' }}></Box>
+        {/* Transgender flag colors */}
+        <Box sx={{ flex: 1, bgcolor: '#5BCEFA' }}></Box>
+        <Box sx={{ flex: 1, bgcolor: '#FFFFFF' }}></Box>
+        <Box sx={{ flex: 1, bgcolor: '#F5A9B8' }}></Box>
       </Box>
       <Toolbar>
         <Box sx={{ display: 'flex', alignItems: 'center' }}>

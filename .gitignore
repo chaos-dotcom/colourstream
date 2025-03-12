@@ -77,3 +77,10 @@ coturn/turnserver.conf
 
 
 backend/uploads/
+
+# Template Checker Reports
+*_report.md
+template_*_report.md
+missing_content_report.md
+template_comparison_report.md
+scripts/template_checker/reports/

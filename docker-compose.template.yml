@@ -17,6 +17,7 @@ services:
       VITE_VIDEO_URL: https://video.colourstream.example.com/join
       VITE_OVENPLAYER_SCRIPT_URL: https://cdn.jsdelivr.net/npm/ovenplayer/dist/ovenplayer.js
       VITE_UPLOAD_ENDPOINT_URL: https://upload.colourstream.example.com/files/
+      VITE_NAMEFORUPLOADCOMPLETION: ${NAMEFORUPLOADCOMPLETION:-John}
     ports:
       - "3000:3000"
     networks:
