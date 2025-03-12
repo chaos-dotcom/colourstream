@@ -1,0 +1,82 @@
+#!/bin/sh
+
+# Get info directory from environment variable or use default
+INFO_DIR="${TUS_INFO_DIR:-/data/tusd-uploads}"
+
+# Log to a file for debugging
+LOG_FILE="$INFO_DIR/hook_log.txt"
+echo "====== PRE-CREATE HOOK INVOKED $(date) ======" >> $LOG_FILE
+echo "FULL FILENAME CHECK: Validating for .turbosort" >> $LOG_FILE
+
+# Function to safely decode base64 with fallback
+decode_metadata() {
+    local value="$1"
+    local default="$2"
+    
+    # If empty, return default
+    if [ -z "$value" ]; then
+        echo "$default"
+        return
+    fi
+    
+    # Try to remove "base64," prefix if present
+    local data="${value#base64,}"
+    
+    # Try to decode
+    local decoded
+    decoded=$(echo "$data" | base64 -d 2>/dev/null) || decoded=""
+    
+    # If decode failed, use default
+    if [ -z "$decoded" ]; then
+        echo "$default"
+    else
+        echo "$decoded"
+    fi
+}
+
+# Log all environment variables for debugging
+echo "All TUS environment variables:" >> $LOG_FILE
+env | grep TUS_ >> $LOG_FILE
+
+# Extract and decode filename from metadata
+FILENAME=$(decode_metadata "$TUS_META_FILENAME" "$(decode_metadata "$TUS_META_filename" "unnamed-file")")
+echo "Validating upload request for: $FILENAME" >> $LOG_FILE
+
+# Explicitly log token information for debugging client uploads
+TOKEN=$(decode_metadata "$TUS_META_TOKEN" "")
+if [ -n "$TOKEN" ]; then
+    echo "Upload with token: $TOKEN" >> $LOG_FILE
+fi
+
+# Check for disallowed file extensions - be very thorough with .turbosort validation
+if [ "$FILENAME" = ".turbosort" ] || echo "$FILENAME" | grep -i "\.turbosort$" > /dev/null; then
+    echo "REJECTED: File with .turbosort extension detected: $FILENAME" >> $LOG_FILE
+    if [ -n "$TOKEN" ]; then
+        echo "REJECTED TOKEN-BASED UPLOAD of .turbosort file. Token: $TOKEN" >> $LOG_FILE
+    fi
+    # Return HTTP 400 (Bad Request) to reject the upload
+    echo "HTTP/1.1 400 Bad Request"
+    echo "Content-Type: application/json"
+    echo ""
+    echo "{\"error\": \"Files with .turbosort extension are not allowed\"}"
+    exit 0
+fi
+
+# Add other validation rules as needed
+# For example, check maximum file size
+MAX_SIZE=10737418240  # 10 GB in bytes
+if [ "${TUS_SIZE:-0}" -gt "$MAX_SIZE" ]; then
+    echo "Rejecting file exceeding maximum size: $TUS_SIZE bytes" >> $LOG_FILE
+    echo "HTTP/1.1 413 Request Entity Too Large"
+    echo "Content-Type: application/json"
+    echo ""
+    echo "{\"error\": \"Maximum file size exceeded. Please upload files smaller than 10 GB.\"}"
+    exit 0
+fi
+
+# If all validations pass, allow the upload to proceed by returning a 2xx status
+echo "Upload validation passed for: $FILENAME" >> $LOG_FILE
+if [ -n "$TOKEN" ]; then
+    echo "Token-based upload passed validation. Token: $TOKEN" >> $LOG_FILE
+fi
+exit 0 

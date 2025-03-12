@@ -8,6 +8,7 @@ interface RuntimeConfig {
   WEBRTC_APP_PATH: string;
   VIDEO_URL: string;
   OVENPLAYER_SCRIPT_URL: string;
+  UPLOAD_ENDPOINT_URL: string;
 }
 
 // Declare the global runtime config
@@ -50,6 +51,8 @@ const getConfig = (key: keyof RuntimeConfig): string => {
       return envValue || `${window.location.protocol}//${window.location.hostname}/join`;
     case 'OVENPLAYER_SCRIPT_URL':
       return envValue || 'https://cdn.jsdelivr.net/npm/ovenplayer/dist/ovenplayer.js';
+    case 'UPLOAD_ENDPOINT_URL':
+      return envValue || 'https://upload.colourstream.johnrogerscolour.co.uk/';
     default:
       return envValue || '';
   }
@@ -64,6 +67,7 @@ export const WEBRTC_WS_PROTOCOL = getConfig('WEBRTC_WS_PROTOCOL');
 export const WEBRTC_APP_PATH = getConfig('WEBRTC_APP_PATH');
 export const VIDEO_URL = getConfig('VIDEO_URL');
 export const OVENPLAYER_SCRIPT_URL = getConfig('OVENPLAYER_SCRIPT_URL');
+export const UPLOAD_ENDPOINT_URL = getConfig('UPLOAD_ENDPOINT_URL');
 
 // For debugging
 if (typeof window !== 'undefined') {
@@ -76,6 +80,7 @@ if (typeof window !== 'undefined') {
     WEBRTC_APP_PATH,
     VIDEO_URL,
     OVENPLAYER_SCRIPT_URL,
+    UPLOAD_ENDPOINT_URL,
     source: window.RUNTIME_CONFIG ? 'runtime' : 'build-time'
   });
 }
@@ -88,5 +93,6 @@ export default {
   WEBRTC_WS_PROTOCOL,
   WEBRTC_APP_PATH,
   VIDEO_URL,
-  OVENPLAYER_SCRIPT_URL
+  OVENPLAYER_SCRIPT_URL,
+  UPLOAD_ENDPOINT_URL
 }; 

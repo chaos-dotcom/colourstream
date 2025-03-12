@@ -10,15 +10,6 @@ import type {
 } from '../types';
 import { API_URL, OIDC_AUTH_ENDPOINT } from '../config';
 
-// Use the environment variable if available, otherwise fall back to window.location.origin
-const baseURL = import.meta.env.VITE_API_URL || `${window.location.origin}/api`;
-
-// Log the API URL for debugging
-console.log('API environment:', import.meta.env.MODE);
-console.log('API baseURL:', baseURL);
-
-export type { PasskeyInfo };
-
 // Create axios instance with retry capability
 export const api = axios.create({
   baseURL: API_URL,
@@ -368,7 +359,7 @@ export const authenticateWithPasskey = async (): Promise<AuthResult> => {
     
     // Step 1: Get authentication options from the server
     try {
-      const optionsResponse = await axios.post(`${baseURL}/auth/webauthn/authenticate`);
+      const optionsResponse = await axios.post(`${API_URL}/auth/webauthn/authenticate`);
       console.log('Authentication options response:', optionsResponse);
       
       if (!optionsResponse.data) {
@@ -384,7 +375,7 @@ export const authenticateWithPasskey = async (): Promise<AuthResult> => {
       console.log('Created authentication credential:', credential);
       
       // Step 3: Send the credential to the server for verification
-      const verificationResponse = await axios.post(`${baseURL}/auth/webauthn/authenticate/verify`, credential);
+      const verificationResponse = await axios.post(`${API_URL}/auth/webauthn/authenticate/verify`, credential);
       console.log('Verification response:', verificationResponse);
       
       // Extract token from the correct location in the response
@@ -471,7 +462,7 @@ export const generateMirotalkToken = async (
 
 export const getDefaultMiroTalkCredentials = async (): Promise<DefaultMiroTalkCredentials> => {
   try {
-    const response = await fetch(`${baseURL}/mirotalk/default-credentials`, {
+    const response = await fetch(`${API_URL}/mirotalk/default-credentials`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -497,8 +488,8 @@ export const getDefaultMiroTalkCredentials = async (): Promise<DefaultMiroTalkCr
 
 export const getOIDCConfig = async (): Promise<OIDCConfigResponse> => {
   try {
-    console.log('Getting OIDC config from:', `${baseURL}/auth/oidc/config`);
-    const response = await axios.get(`${baseURL}/auth/oidc/config`);
+    console.log('Getting OIDC config from:', `${API_URL}/auth/oidc/config`);
+    const response = await axios.get(`${API_URL}/auth/oidc/config`);
     console.log('OIDC config response:', response);
     
     // Check different possible response structures
@@ -519,9 +510,9 @@ export const getOIDCConfig = async (): Promise<OIDCConfigResponse> => {
 
 export const updateOIDCConfig = async (config: OIDCConfig): Promise<OIDCConfigResponse> => {
   try {
-    console.log('Updating OIDC config at:', `${baseURL}/auth/oidc/config`);
+    console.log('Updating OIDC config at:', `${API_URL}/auth/oidc/config`);
     console.log('OIDC config payload:', config);
-    const response = await axios.post(`${baseURL}/auth/oidc/config`, config);
+    const response = await axios.post(`${API_URL}/auth/oidc/config`, config);
     console.log('OIDC config update response:', response);
     return response.data;
   } catch (error: any) {
@@ -668,7 +659,7 @@ export const handleOIDCCallback = async (): Promise<AuthResult> => {
     
     try {
       // The backend should handle the code exchange and state validation
-      const response = await axios.get(`${baseURL}/api/auth/oidc/callback${window.location.search}`);
+      const response = await axios.get(`${API_URL}/api/auth/oidc/callback${window.location.search}`);
       
       console.log('OIDC callback response:', response);
       
@@ -729,7 +720,7 @@ export const handleOIDCCallback = async (): Promise<AuthResult> => {
 export const registerFirstPasskey = async (): Promise<ApiResponse<AuthResponse>> => {
   try {
     // Step 1: Get registration options from the server
-    const response = await axios.post(`${baseURL}/auth/webauthn/first-time-setup`);
+    const response = await axios.post(`${API_URL}/auth/webauthn/first-time-setup`);
     if (!response.data) {
       throw new Error('No registration options received from server');
     }
@@ -751,7 +742,7 @@ export const registerFirstPasskey = async (): Promise<ApiResponse<AuthResponse>>
       const credential = await startRegistration(registrationOptions);
       
       // Step 3: Send the credential back to the server for verification
-      const verificationResponse = await axios.post(`${baseURL}/auth/webauthn/first-time-setup/verify`, credential);
+      const verificationResponse = await axios.post(`${API_URL}/auth/webauthn/first-time-setup/verify`, credential);
       
       // Step 4: Store the authentication token
       const result = verificationResponse.data;

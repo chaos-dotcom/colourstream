@@ -2,10 +2,11 @@ version: '3.8'
 
 services:
   frontend:
-    # image: ghcr.io/johnr24/colourstream-frontend:latest
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    image: ghcr.io/johnr24/colourstream-frontend:latest
+    # build:
+    #   context: ./frontend
+    #   dockerfile: Dockerfile
+    container_name: colourstream-frontend
     environment:
       VITE_API_URL: https://live.colourstream.example.com/api
       VITE_OIDC_AUTH_ENDPOINT: ${OIDC_AUTH_ENDPOINT:-https://sso.example.com/authorize}
@@ -15,30 +16,34 @@ services:
       VITE_WEBRTC_APP_PATH: app
       VITE_VIDEO_URL: https://video.colourstream.example.com/join
       VITE_OVENPLAYER_SCRIPT_URL: https://cdn.jsdelivr.net/npm/ovenplayer/dist/ovenplayer.js
-    restart: always
-    expose:
-      - 3000
+      VITE_UPLOAD_ENDPOINT_URL: https://upload.colourstream.example.com/files/
+    ports:
+      - "3000:3000"
     networks:
       - network
+    restart: unless-stopped
     labels:
       - "traefik.enable=true"
+      
+      # Main frontend application - primary domain
       - "traefik.http.routers.frontend.rule=Host(`live.colourstream.example.com`)"
       - "traefik.http.routers.frontend.entrypoints=websecure"
       - "traefik.http.routers.frontend.tls=true"
       - "traefik.http.routers.frontend.tls.certresolver=myresolver"
       - "traefik.http.routers.frontend.service=frontend"
       - "traefik.http.services.frontend.loadbalancer.server.port=3000"
+      - "traefik.http.routers.frontend.priority=10"  # Lower priority than backend
       
-      # Static assets route - higher priority
-      - "traefik.http.routers.frontend-static.rule=Host(`live.colourstream.example.com`) && (PathPrefix(`/assets`) || PathPrefix(`/static`) || Path(`/favicon.ico`) || Path(`/manifest.json`) || Path(`/robots.txt`) || Path(`/logo192.png`) || Path(`/logo512.png`) || Path(`/security.txt`) || PathPrefix(`/.well-known`))"
+      # Static assets router configuration - primary domain
+      - "traefik.http.routers.frontend-static.rule=Host(`live.colourstream.example.com`) && (PathPrefix(`/assets`) || PathPrefix(`/static`) || Path(`/favicon.ico`) || Path(`/manifest.json`) || Path(`/robots.txt`) || Path(`/config/runtime-config.js`))"
       - "traefik.http.routers.frontend-static.entrypoints=websecure"
       - "traefik.http.routers.frontend-static.tls=true"
       - "traefik.http.routers.frontend-static.tls.certresolver=myresolver"
       - "traefik.http.routers.frontend-static.service=frontend"
       - "traefik.http.routers.frontend-static.priority=200"
       
-      # SPA routes with proper middleware
-      - "traefik.http.routers.frontend-spa.rule=Host(`live.colourstream.example.com`) && (PathPrefix(`/admin`) || PathPrefix(`/login`) || PathPrefix(`/room`))"
+      # SPA router configuration - primary domain
+      - "traefik.http.routers.frontend-spa.rule=Host(`live.colourstream.example.com`) && (PathPrefix(`/admin`) || PathPrefix(`/login`) || PathPrefix(`/room`) || PathPrefix(`/upload`)) && !PathPrefix(`/files`) && !HeadersRegexp(`X-Requested-With`, `XMLHttpRequest`) && !Method(`POST`) && !Method(`PATCH`) && !Method(`HEAD`)"
       - "traefik.http.routers.frontend-spa.entrypoints=websecure"
       - "traefik.http.routers.frontend-spa.tls=true"
       - "traefik.http.routers.frontend-spa.tls.certresolver=myresolver"
@@ -46,16 +51,30 @@ services:
       - "traefik.http.routers.frontend-spa.middlewares=spa-fallback"
       - "traefik.http.routers.frontend-spa.priority=100"
       
-      # Middleware for SPA
-      - "traefik.http.middlewares.spa-fallback.headers.customResponseHeaders.Content-Type=text/html; charset=utf-8"
+      # Fallback middleware setup - primary domain
+      - "traefik.http.middlewares.spa-fallback.replacepathregex.regex=^/(admin|login|room|upload).*"
+      - "traefik.http.middlewares.spa-fallback.replacepathregex.replacement=/"
       
-      # Root path with middleware
-      - "traefik.http.routers.frontend-root.rule=Host(`live.colourstream.example.com`) && Path(`/`)"
+      # Root router configuration - primary domain
+      - "traefik.http.routers.frontend-root.rule=Host(`live.colourstream.example.com`) && Path(`/`) && !PathPrefix(`/files`)"
       - "traefik.http.routers.frontend-root.entrypoints=websecure"
       - "traefik.http.routers.frontend-root.tls=true"
       - "traefik.http.routers.frontend-root.tls.certresolver=myresolver"
       - "traefik.http.routers.frontend-root.service=frontend"
       - "traefik.http.routers.frontend-root.priority=50"
+      
+      # Upload Portal - upload subdomain
+      - "traefik.http.routers.frontend-upload.rule=Host(`upload.colourstream.example.com`)"
+      - "traefik.http.routers.frontend-upload.entrypoints=websecure"
+      - "traefik.http.routers.frontend-upload.tls=true"
+      - "traefik.http.routers.frontend-upload.tls.certresolver=myresolver"
+      - "traefik.http.routers.frontend-upload.service=frontend"
+      - "traefik.http.routers.frontend-upload.priority=10" # Lower priority than tusd for specific paths
+      - "traefik.http.routers.frontend-upload.middlewares=upload-spa-fallback"
+      
+      # SPA fallback middleware for upload portal
+      - "traefik.http.middlewares.upload-spa-fallback.replacepathregex.regex=^/portal/.*"
+      - "traefik.http.middlewares.upload-spa-fallback.replacepathregex.replacement=/"
 
   postgres:
     container_name: colourstream-postgres
@@ -85,6 +104,9 @@ services:
 
   backend:
     image: ghcr.io/johnr24/colourstream-backend:latest
+    # build:
+    #   context: ./backend
+    #   dockerfile: Dockerfile
     restart: always
     expose:
       - 5001
@@ -114,14 +136,23 @@ services:
       - ./backend/logs:/app/logs
     labels:
       - "traefik.enable=true"
-      # API routes
-      - "traefik.http.routers.backend.rule=Host(`live.colourstream.example.com`) && PathPrefix(`/api`) && !PathPrefix(`/api/ws`)"
+      # API routes with higher priority
+      - "traefik.http.routers.backend.rule=Host(`live.colourstream.example.com`) && PathPrefix(`/api`)"
       - "traefik.http.routers.backend.entrypoints=websecure"
       - "traefik.http.routers.backend.tls=true"
       - "traefik.http.routers.backend.tls.certresolver=myresolver"
       - "traefik.http.routers.backend.service=backend"
       - "traefik.http.services.backend.loadbalancer.server.port=5001"
       - "traefik.http.routers.backend.middlewares=backend-headers"
+      - "traefik.http.routers.backend.priority=300"  # Higher priority than frontend
+      
+      # Headers for regular API requests
+      - "traefik.http.middlewares.backend-headers.headers.accesscontrolallowmethods=GET,OPTIONS,PUT,POST,DELETE"
+      - "traefik.http.middlewares.backend-headers.headers.accesscontrolallowheaders=*"
+      - "traefik.http.middlewares.backend-headers.headers.accesscontrolalloworiginlist=https://live.colourstream.example.com,https://upload.colourstream.example.com,http://localhost:8000"
+      - "traefik.http.middlewares.backend-headers.headers.accesscontrolmaxage=100"
+      - "traefik.http.middlewares.backend-headers.headers.addvaryheader=true"
+      - "traefik.http.middlewares.backend-headers.headers.accesscontrolallowcredentials=true"
       
       # WebSocket routes - updated to handle all WebSocket paths
       - "traefik.http.routers.backend-ws.rule=Host(`live.colourstream.example.com`) && PathPrefix(`/api/ws`)"
@@ -131,13 +162,6 @@ services:
       - "traefik.http.routers.backend-ws.service=backend-ws"
       - "traefik.http.services.backend-ws.loadbalancer.server.port=5001"
       - "traefik.http.routers.backend-ws.middlewares=websocket-headers"
-      
-      # Headers for regular API requests
-      - "traefik.http.middlewares.backend-headers.headers.accesscontrolallowmethods=GET,OPTIONS,PUT,POST,DELETE"
-      - "traefik.http.middlewares.backend-headers.headers.accesscontrolallowheaders=*"
-      - "traefik.http.middlewares.backend-headers.headers.accesscontrolalloworiginlist=*"
-      - "traefik.http.middlewares.backend-headers.headers.accesscontrolmaxage=100"
-      - "traefik.http.middlewares.backend-headers.headers.addvaryheader=true"
       
       # Headers for WebSocket connections - updated with proper WebSocket headers
       - "traefik.http.middlewares.websocket-headers.headers.accesscontrolallowmethods=GET,OPTIONS,PUT,POST,DELETE"
@@ -155,21 +179,24 @@ services:
       - "--api.insecure=true"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=true"
-      - "--providers.docker.network=colourstream_network"
+      - "--providers.docker.network=network"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
       - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
       - "--entrypoints.websecure.address=:443"
       - "--ping=true"
       - "--ping.entrypoint=websecure"
-      - "--entrypoints.websecure.transport.respondingTimeouts.readTimeout=300s"
-      - "--entrypoints.websecure.transport.respondingTimeouts.writeTimeout=300s"
-      - "--entrypoints.websecure.transport.respondingTimeouts.idleTimeout=300s"
+      - "--entrypoints.websecure.transport.respondingTimeouts.readTimeout=600s"
+      - "--entrypoints.websecure.transport.respondingTimeouts.writeTimeout=600s"
+      - "--entrypoints.websecure.transport.respondingTimeouts.idleTimeout=600s"
       - "--certificatesresolvers.myresolver.acme.httpchallenge=true"
       - "--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web"
       - "--certificatesresolvers.myresolver.acme.email=admin@example.com"
       - "--certificatesresolvers.myresolver.acme.storage=/acme.json"
       - "--log.level=DEBUG"
+      - "--serversTransport.forwardingTimeouts.dialTimeout=60s"
+      - "--serversTransport.forwardingTimeouts.responseHeaderTimeout=600s"
+      - "--serversTransport.forwardingTimeouts.idleConnTimeout=600s"
     ports:
       - "80:80"
       - "443:443"
@@ -311,6 +338,23 @@ services:
       - mirotalk/.env
     networks:
       - network
+    labels:
+      - "traefik.enable=true"
+      # Main route
+      - "traefik.http.routers.mirotalk.rule=Host(`video.colourstream.example.com`)"
+      - "traefik.http.routers.mirotalk.entrypoints=websecure"
+      - "traefik.http.routers.mirotalk.tls.certresolver=myresolver"
+      - "traefik.http.routers.mirotalk.service=mirotalk-service"
+      - "traefik.http.services.mirotalk-service.loadbalancer.server.port=3000"
+      
+      # WebSocket route for socket.io
+      - "traefik.http.routers.mirotalk-ws.rule=Host(`video.colourstream.example.com`) && PathPrefix(`/socket.io`)"
+      - "traefik.http.routers.mirotalk-ws.entrypoints=websecure"
+      - "traefik.http.routers.mirotalk-ws.tls.certresolver=myresolver"
+      - "traefik.http.routers.mirotalk-ws.service=mirotalk-ws-service"
+      - "traefik.http.services.mirotalk-ws-service.loadbalancer.server.port=3000"
+      - "traefik.http.middlewares.sio.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.routers.mirotalk-ws.middlewares=sio"
 
   coturn:
     image: coturn/coturn
@@ -335,9 +379,73 @@ services:
       - "traefik.tcp.routers.coturn.service=coturn"
       - "traefik.tcp.services.coturn.loadbalancer.server.port=3480"
 
+  tusd:
+    image: tusproject/tusd:latest
+    container_name: colourstream-tusd
+    command: [
+      "-host=0.0.0.0",
+      "-port=1080",
+      "-upload-dir=/data/tusd-uploads",
+      "-behind-proxy",
+      "-hooks-enabled-events=pre-create,post-create,post-receive,post-finish,post-terminate",
+      "-hooks-http=http://backend:5001/api/upload-hooks/hooks",
+      "-hooks-dir=/hooks",
+      "-hooks-http-forward-headers=*",
+      "-hooks-http-retry=5",
+      "-max-size=640000000000",
+      "-base-path=/files",
+      "-verbose"
+    ]
+    restart: unless-stopped
+    expose:
+      - "1080"
+    user: "root"
+    env_file:
+      - ./global.env
+    environment:
+      - TUS_ORGANIZED_DIR=/data/organized
+      - TUS_INFO_DIR=/data/tusd-uploads
+    volumes:
+      - uploads_data:/data
+      - organized_data:/data/organized
+      - ./backend/hooks:/hooks
+    networks:
+      - network
+    healthcheck:
+      # tusd responds with 405 Method Not Allowed for GET requests to /files
+      # Use a non-HTTP health check instead
+      test: ["CMD", "pgrep", "tusd"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      - backend
+    labels:
+      - "traefik.enable=true"
+      # TUS server should handle requests to the /files path with highest priority
+      - "traefik.http.routers.tusd.rule=Host(`upload.colourstream.example.com`) && PathPrefix(`/files`)"
+      - "traefik.http.routers.tusd.entrypoints=websecure"
+      - "traefik.http.routers.tusd.tls=true"
+      - "traefik.http.routers.tusd.tls.certresolver=myresolver"
+      - "traefik.http.routers.tusd.service=tusd"
+      - "traefik.http.services.tusd.loadbalancer.server.port=1080"
+      - "traefik.http.middlewares.tusd-cors.headers.accesscontrolallowmethods=GET,HEAD,POST,PATCH,DELETE,OPTIONS"
+      - "traefik.http.middlewares.tusd-cors.headers.accesscontrolallowheaders=*"
+      - "traefik.http.middlewares.tusd-cors.headers.accesscontrolalloworiginlist=https://live.colourstream.example.com,https://upload.colourstream.example.com,https://video.colourstream.example.com"
+      - "traefik.http.middlewares.tusd-cors.headers.accesscontrolexposeheaders=Location,Upload-Offset,Upload-Length,Upload-Metadata,Tus-Version,Tus-Resumable,Tus-Max-Size,Tus-Extension,Upload-Concat"
+      - "traefik.http.middlewares.tusd-cors.headers.accesscontrolmaxage=86400"
+      - "traefik.http.middlewares.tusd-cors.headers.accesscontrolallowcredentials=true"
+      - "traefik.http.middlewares.tusd-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.routers.tusd.middlewares=tusd-cors,tusd-headers"
+      - "traefik.http.routers.tusd.priority=500" # Much higher priority than frontend-upload (10)
+
 volumes:
   postgres_data:
     name: colourstream_postgres_data
+  uploads_data:
+    name: colourstream_uploads_data
+  organized_data:
+    name: colourstream_organized_data
 
 networks:
   network:

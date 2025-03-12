@@ -11,12 +11,14 @@ import omenRoutes from './routes/omen';
 import securityRoutes from './routes/security';
 import healthRoutes from './routes/health';
 import omeWebhookRoutes from './routes/omeWebhook';
+import uploadRoutes from './routes/upload';
 import { logger } from './utils/logger';
 import { initializePassword } from './utils/initPassword';
 import mirotalkRoutes from './routes/mirotalk';
 import WebSocketService from './services/websocket';
 import OBSService from './services/obsService';
 import { initializeOIDC, initializeOIDCMiddleware } from './services/oidc-express';
+import { initializeTelegramService } from './services/telegram/initTelegram';
 
 dotenv.config();
 
@@ -35,16 +37,22 @@ app.set('trust proxy', 1);
 // CORS configuration
 const corsOptions = {
   origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
-    const allowedOrigins = [process.env.FRONTEND_URL || 'https://live.colourstream.johnrogerscolour.co.uk', 'http://localhost:8000'];
+    const allowedOrigins = [
+      process.env.FRONTEND_URL || 'https://live.colourstream.johnrogerscolour.co.uk', 
+      'http://localhost:8000',
+      'https://upload.colourstream.johnrogerscolour.co.uk'
+    ];
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
+      console.log(`CORS blocked origin: ${origin}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Tus-Resumable', 'Upload-Length', 'Upload-Metadata', 'Upload-Offset', 'X-Requested-With', 'X-HTTP-Method-Override'],
+  exposedHeaders: ['Location', 'Tus-Resumable', 'Upload-Offset', 'Upload-Length']
 };
 
 // Security middleware
@@ -73,6 +81,11 @@ app.use(`${basePath}/omen`, omenRoutes);
 app.use(`${basePath}/security`, securityRoutes);
 app.use('/api/mirotalk', mirotalkRoutes);
 app.use(`${basePath}/ome-webhook`, omeWebhookRoutes);
+app.use(`${basePath}/upload`, uploadRoutes);
+
+// Import routes from the main routes file which includes tusd hooks
+import routes from './routes';
+app.use('/api', routes);
 
 // Error handling
 app.use(errorHandler);
@@ -91,6 +104,9 @@ const startServer = async () => {
     } else {
       logger.warn('OIDC initialization failed, authentication will be limited to passkeys');
     }
+    
+    // Initialize Telegram bot for upload monitoring
+    initializeTelegramService();
     
     const PORT = process.env.PORT || 5001;
     server.listen(PORT, () => {

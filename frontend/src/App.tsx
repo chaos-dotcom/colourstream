@@ -15,6 +15,9 @@ import govukTheme from './lib/govukTheme';
 import GovUkLayout from './components/GovUkLayout';
 import OIDCCallback from './components/OIDCCallback';
 import PasskeySetupPage from './components/PasskeySetupPage';
+import UploadPortal from './components/upload/UploadPortal';
+import ClientUploadPortal from './pages/UploadPortal';
+import AllUploadLinks from './pages/AllUploadLinks';
 
 // Debug component to verify rendering
 const DebugAdminLoginPage = () => {
@@ -25,6 +28,27 @@ const DebugAdminLoginPage = () => {
 function App() {
   console.log('App component rendering');
   
+  // Check if we're on the upload subdomain
+  const isUploadSubdomain = window.location.hostname.startsWith('upload.');
+
+  // If we're on the upload subdomain, only show the client upload portal
+  if (isUploadSubdomain) {
+    return (
+      <ThemeProvider theme={govukTheme}>
+        <CssBaseline />
+        <Router>
+          <Routes>
+            <Route path="/portal/:token" element={<ClientUploadPortal />} />
+            <Route path="/" element={<Navigate to="/portal" replace />} />
+            <Route path="/portal" element={<Navigate to="/portal/" replace />} />
+            <Route path="*" element={<Navigate to="/portal" replace />} />
+          </Routes>
+        </Router>
+      </ThemeProvider>
+    );
+  }
+  
+  // Original app structure for the main domain
   return (
     <ThemeProvider theme={govukTheme}>
       <CssBaseline />
@@ -86,6 +110,45 @@ function App() {
                   <PasskeySetupPage />
                 </GovUkLayout>
               }
+            />
+            
+            {/* Upload Portal Routes */}
+            <Route
+              path="/upload/*"
+              element={
+                <GovUkLayout serviceName="ColourStream">
+                  <ProtectedRoute>
+                    <RequirePasskey>
+                      <UploadPortal />
+                    </RequirePasskey>
+                  </ProtectedRoute>
+                </GovUkLayout>
+              }
+            />
+            
+            {/* All Upload Links Route */}
+            <Route
+              path="/upload-links"
+              element={
+                <GovUkLayout serviceName="ColourStream">
+                  <ProtectedRoute>
+                    <RequirePasskey>
+                      <AllUploadLinks />
+                    </RequirePasskey>
+                  </ProtectedRoute>
+                </GovUkLayout>
+              }
+            />
+            
+            {/* Client Upload Portal Route - Always redirect to upload subdomain */}
+            <Route 
+              path="/files/:token" 
+              element={
+                <Navigate 
+                  to={`https://upload.colourstream.johnrogerscolour.co.uk/portal/${window.location.pathname.split('/files/')[1]}`} 
+                  replace 
+                />
+              } 
             />
             
             {/* OIDC Callback Route - frontend-specific route */}
