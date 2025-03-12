@@ -1,12 +1,18 @@
 #!/bin/sh
 
+# Get organized directory from environment variable or use default
+ORGANIZED_DIR="${TUS_ORGANIZED_DIR:-/data/tusd-uploads/organized}"
+INFO_DIR="${TUS_INFO_DIR:-/data/tusd-uploads}"
+
 # Log to a file for debugging
-LOG_FILE="/data/tusd-uploads/hook_log.txt"
+LOG_FILE="$INFO_DIR/hook_log.txt"
 echo "====== HOOK INVOKED $(date) ======" >> $LOG_FILE
 
 # Get the upload ID
 ID="$TUS_ID"
 echo "Processing upload ID: $ID" >> $LOG_FILE
+echo "Using organized directory: $ORGANIZED_DIR" >> $LOG_FILE
+echo "Using info directory: $INFO_DIR" >> $LOG_FILE
 
 # Function to safely decode base64 with fallback
 decode_metadata() {
@@ -39,7 +45,7 @@ echo "All TUS environment variables:" >> $LOG_FILE
 env | grep TUS_ >> $LOG_FILE
 
 # Read metadata directly from the info file which is more reliable
-INFO_FILE="/data/tusd-uploads/$ID.info"
+INFO_FILE="$INFO_DIR/$ID.info"
 echo "Checking info file: $INFO_FILE" >> $LOG_FILE
 
 if [ -f "$INFO_FILE" ]; then
@@ -125,7 +131,7 @@ echo "  Client: $CLIENT" >> $LOG_FILE
 echo "  Project: $PROJECT" >> $LOG_FILE
 
 # Create target directory
-TARGET_DIR="/data/tusd-uploads/organized/$CLIENT/$PROJECT"
+TARGET_DIR="$ORGANIZED_DIR/$CLIENT/$PROJECT"
 mkdir -p "$TARGET_DIR"
 echo "Created directory: $TARGET_DIR" >> $LOG_FILE
 
@@ -133,8 +139,8 @@ echo "Created directory: $TARGET_DIR" >> $LOG_FILE
 TARGET_FILE="$TARGET_DIR/$FILENAME"
 
 # Move the file to the organized directory (more efficient than copying)
-echo "Moving /data/tusd-uploads/$ID to $TARGET_FILE" >> $LOG_FILE
-mv "/data/tusd-uploads/$ID" "$TARGET_FILE"
+echo "Moving $INFO_DIR/$ID to $TARGET_FILE" >> $LOG_FILE
+mv "$INFO_DIR/$ID" "$TARGET_FILE"
 
 # Check if move was successful
 if [ $? -eq 0 ]; then
@@ -142,7 +148,7 @@ if [ $? -eq 0 ]; then
 else
     echo "WARNING: Move failed, attempting to copy instead" >> $LOG_FILE
     # Try copying instead
-    cp "/data/tusd-uploads/$ID" "$TARGET_FILE"
+    cp "$INFO_DIR/$ID" "$TARGET_FILE"
     if [ $? -eq 0 ]; then
         echo "Successfully copied file to $TARGET_FILE" >> $LOG_FILE
     else
