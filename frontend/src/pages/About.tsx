@@ -23,10 +23,16 @@ const About: React.FC = () => {
                 experience for both professionals and clients.
               </p>
               <p className="govuk-body">
-                Our platform prioritizes security,by utilising zero-trust architecture, and a siloed design, 
+                Our platform prioritizes security,by utilising zero-trust architecture, and a siloed design principles, 
                 performance with extremly low latency live streams and in browser resumable uploads, 
                 and ease of use and accessibility utilising the UK Government Design System, making it the ideal choice
                 for professional streaming needs in the colour grading industry.
+              </p>
+              <p className="govuk-body">
+                ColourStream is completely open source, embodying transparency and community-driven development.
+                This means you can inspect the code, contribute improvements, or customize it to your specific needs
+                without restriction. Our open source approach ensures the platform evolves with the actual needs of
+                colourists.
               </p>
               <p className="govuk-body">
                 ColourStream was written by <a href="https://johnrogerscolour.co.uk" target="_blank" rel="noopener noreferrer" className="govuk-link">John Rogers</a>, 
@@ -66,14 +72,11 @@ const About: React.FC = () => {
                 <li>Secure file upload functionality</li>
                 <li>Modern, responsive user interface</li>
                 <li>British spelling throughout (colour with a 'u', as it should be)</li>
+                <li>100% open source codebase with transparency and community contribution</li>
               </ul>
             </div>
             
             <div className="govuk-grid-column-one-half">
-              <SectionHeading>Getting Started</SectionHeading>
-              <p className="govuk-body">
-
-              </p>
             </div>
           </div>
         </main>
