@@ -1,18 +1,15 @@
 #!/bin/sh
 
-# Get organized directory from environment variable or use default
-ORGANIZED_DIR="${TUS_ORGANIZED_DIR:-/data/tusd-uploads/organized}"
+# Get info directory from environment variable or use default
 INFO_DIR="${TUS_INFO_DIR:-/data/tusd-uploads}"
 
 # Log to a file for debugging
 LOG_FILE="$INFO_DIR/hook_log.txt"
-echo "====== HOOK INVOKED $(date) ======" >> $LOG_FILE
+echo "====== POST-CREATE HOOK INVOKED $(date) ======" >> $LOG_FILE
 
 # Get the upload ID
 ID="$TUS_ID"
-echo "Processing upload ID: $ID" >> $LOG_FILE
-echo "Using organized directory: $ORGANIZED_DIR" >> $LOG_FILE
-echo "Using info directory: $INFO_DIR" >> $LOG_FILE
+echo "New upload started - ID: $ID" >> $LOG_FILE
 
 # Function to safely decode base64 with fallback
 decode_metadata() {
@@ -44,7 +41,7 @@ decode_metadata() {
 echo "All TUS environment variables:" >> $LOG_FILE
 env | grep TUS_ >> $LOG_FILE
 
-# Read metadata directly from the info file which is more reliable
+# Read metadata directly from the info file if it exists
 INFO_FILE="$INFO_DIR/$ID.info"
 echo "Checking info file: $INFO_FILE" >> $LOG_FILE
 
@@ -52,10 +49,9 @@ if [ -f "$INFO_FILE" ]; then
     echo "Info file exists, extracting metadata from it" >> $LOG_FILE
     
     # Extract metadata using grep and cut (basic JSON parsing)
-    # Note: this is a simplified approach and may break with complex JSON
     FILENAME=$(grep -o '"filename":"[^"]*"' "$INFO_FILE" | cut -d'"' -f4 || echo "unknown.bin")
     
-    # Try multiple possible keys for client ID
+    # Try multiple possible keys for client name
     CLIENT=$(grep -o '"clientId":"[^"]*"' "$INFO_FILE" | cut -d'"' -f4)
     if [ -z "$CLIENT" ]; then
         CLIENT=$(grep -o '"clientid":"[^"]*"' "$INFO_FILE" | cut -d'"' -f4)
@@ -73,7 +69,7 @@ if [ -f "$INFO_FILE" ]; then
         CLIENT="default_client"
     fi
     
-    # Try multiple possible keys for project ID
+    # Try multiple possible keys for project name
     PROJECT=$(grep -o '"projectId":"[^"]*"' "$INFO_FILE" | cut -d'"' -f4)
     if [ -z "$PROJECT" ]; then
         PROJECT=$(grep -o '"projectid":"[^"]*"' "$INFO_FILE" | cut -d'"' -f4)
@@ -99,11 +95,11 @@ if [ -f "$INFO_FILE" ]; then
         FILENAME=$(grep -o '"name":"[^"]*"' "$INFO_FILE" | cut -d'"' -f4 || echo "unknown.bin")
     fi
 else
-    echo "Info file not found, falling back to environment variables" >> $LOG_FILE
+    echo "Info file not found or empty, falling back to environment variables" >> $LOG_FILE
     # Fall back to environment variables if info file is not available
     FILENAME=$(decode_metadata "$TUS_META_FILENAME" "$(decode_metadata "$TUS_META_filename" "unknown.bin")")
     
-    # Try multiple environment variable formats for client ID
+    # Try multiple environment variable formats for client name
     CLIENT=$(decode_metadata "$TUS_META_CLIENTID" "")
     if [ -z "$CLIENT" ]; then
         CLIENT=$(decode_metadata "$TUS_META_clientId" "")
@@ -121,7 +117,7 @@ else
         CLIENT=$(decode_metadata "$TUS_META_CLIENT" "default_client")
     fi
     
-    # Try multiple environment variable formats for project ID
+    # Try multiple environment variable formats for project name
     PROJECT=$(decode_metadata "$TUS_META_PROJECTID" "")
     if [ -z "$PROJECT" ]; then
         PROJECT=$(decode_metadata "$TUS_META_projectId" "")
@@ -139,7 +135,7 @@ else
         PROJECT=$(decode_metadata "$TUS_META_PROJECT" "default_project")
     fi
     
-    # Get file size from environment variables
+    # Get file size from environment variable
     FILESIZE="${TUS_SIZE:-0}"
 fi
 
@@ -148,35 +144,6 @@ echo "  Filename: $FILENAME" >> $LOG_FILE
 echo "  Client: $CLIENT" >> $LOG_FILE
 echo "  Project: $PROJECT" >> $LOG_FILE
 echo "  Size: $FILESIZE bytes" >> $LOG_FILE
-
-# Create target directory
-TARGET_DIR="$ORGANIZED_DIR/$CLIENT/$PROJECT"
-mkdir -p "$TARGET_DIR"
-echo "Created directory: $TARGET_DIR" >> $LOG_FILE
-
-# Target file path
-TARGET_FILE="$TARGET_DIR/$FILENAME"
-
-# Move the file to the organized directory (more efficient than copying)
-echo "Moving $INFO_DIR/$ID to $TARGET_FILE" >> $LOG_FILE
-mv "$INFO_DIR/$ID" "$TARGET_FILE"
-
-# Check if move was successful
-if [ $? -eq 0 ]; then
-    echo "Successfully moved file to $TARGET_FILE" >> $LOG_FILE
-    MOVE_STATUS="Successfully moved"
-else
-    echo "WARNING: Move failed, attempting to copy instead" >> $LOG_FILE
-    # Try copying instead
-    cp "$INFO_DIR/$ID" "$TARGET_FILE"
-    if [ $? -eq 0 ]; then
-        echo "Successfully copied file to $TARGET_FILE" >> $LOG_FILE
-        MOVE_STATUS="Successfully copied (move failed)"
-    else
-        echo "ERROR: Both move and copy operations failed" >> $LOG_FILE
-        MOVE_STATUS="ERROR: File organization failed"
-    fi
-fi
 
 # Function to format file size in a human-readable format
 format_size() {
@@ -195,33 +162,28 @@ format_size() {
 # Format file size
 HUMAN_SIZE=$(format_size $FILESIZE)
 
-# Send notification to backend service (which can forward to Telegram)
-# First, try direct HTTP access to the backend service
-echo "Sending completion notification to backend service" >> $LOG_FILE
+# Send notification to backend service
+echo "Sending upload started notification to backend service" >> $LOG_FILE
 
 # Prepare message content
-MESSAGE="<b>✅ Upload Completed</b>
+MESSAGE="<b>🔄 Upload Started</b>
 <b>File:</b> $FILENAME
 <b>Size:</b> $HUMAN_SIZE
 <b>Client:</b> $CLIENT
 <b>Project:</b> $PROJECT
-<b>ID:</b> $ID
-<b>Location:</b> $TARGET_FILE
-<b>Status:</b> $MOVE_STATUS"
+<b>ID:</b> $ID"
 
 # Try to send to backend's Telegram notification endpoint
 curl -X POST -H "Content-Type: application/json" -d "{
-  \"type\": \"upload_complete\",
+  \"type\": \"upload_started\",
   \"uploadId\": \"$ID\",
   \"filename\": \"$FILENAME\",
   \"size\": $FILESIZE,
   \"client\": \"$CLIENT\",
-  \"project\": \"$PROJECT\",
-  \"targetPath\": \"$TARGET_FILE\",
-  \"status\": \"$MOVE_STATUS\"
+  \"project\": \"$PROJECT\"
 }" http://backend:5001/api/upload-hooks/telegram-notify > /dev/null 2>&1
 
-# If curl fails (no response or error), try a direct Telegram API call
+# If curl fails, try a direct Telegram API call
 if [ $? -ne 0 ]; then
     echo "Backend notification failed, trying direct Telegram API call" >> $LOG_FILE
     
@@ -249,5 +211,5 @@ if [ $? -ne 0 ]; then
     fi
 fi
 
-echo "Hook processing complete for $ID" >> $LOG_FILE
+echo "Post-create hook processing complete for $ID" >> $LOG_FILE
 exit 0 
