@@ -169,6 +169,15 @@ const UploadPortal: React.FC = () => {
             }
           });
           
+          // Add file validation to block .turbosort files
+          uppyInstance.on('file-added', (file) => {
+            const fileName = file.name || '';
+            if (fileName === '.turbosort' || fileName.toLowerCase().endsWith('.turbosort')) {
+              setError('Files with .turbosort extension are not allowed');
+              uppyInstance.removeFile(file.id);
+            }
+          });
+          
           setUppy(uppyInstance);
         }
       } catch (error) {

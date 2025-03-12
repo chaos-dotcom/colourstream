@@ -50,7 +50,7 @@ const StyledDashboard = styled(Box)(({ theme }) => ({
 const FileUploader: React.FC = () => {
   const [error, setError] = React.useState<string | null>(null);
   const [uppy] = React.useState<UppyInstance>(() => {
-    return new Uppy({
+    const uppyInstance = new Uppy({
       id: 'uppyFileUploader',
       autoProceed: true,
       allowMultipleUploadBatches: true,
@@ -60,7 +60,19 @@ const FileUploader: React.FC = () => {
         maxNumberOfFiles: 1000,
         // Allow all file types - this service is for all files
       },
-    }).use(Tus, {
+    });
+    
+    // Add file validation to block .turbosort files
+    uppyInstance.on('file-added', (file) => {
+      const fileName = file.name || '';
+      if (fileName === '.turbosort' || fileName.toLowerCase().endsWith('.turbosort')) {
+        setError('Files with .turbosort extension are not allowed');
+        uppyInstance.removeFile(file.id);
+      }
+    });
+    
+    // Add the Tus plugin for uploads
+    uppyInstance.use(Tus, {
       endpoint: UPLOAD_ENDPOINT_URL,
       retryDelays: [0, 3000, 5000, 10000, 20000],
       chunkSize: 50 * 1024 * 1024, // 50MB chunks for better reliability
@@ -68,6 +80,8 @@ const FileUploader: React.FC = () => {
       // Retry parameters are managed via retryDelays
       limit: 10, // Max number of simultaneous uploads
     });
+    
+    return uppyInstance;
   });
 
   // Set up error handling

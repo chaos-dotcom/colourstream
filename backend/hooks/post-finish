@@ -237,13 +237,42 @@ if [ $? -ne 0 ]; then
         # URL encode the message (basic encoding for special characters)
         MESSAGE_ENCODED=$(echo "$MESSAGE" | sed 's/ /%20/g; s/&/%26/g; s/</%3C/g; s/>/%3E/g; s/\n/%0A/g')
         
-        # Send to Telegram
-        wget -q -O- "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage?chat_id=$TELEGRAM_CHAT_ID&text=$MESSAGE_ENCODED&parse_mode=HTML" >> $LOG_FILE 2>&1
+        # Check if we have a stored message ID for this upload
+        MESSAGE_ID_FILE="$INFO_DIR/$ID.msgid"
         
-        if [ $? -eq 0 ]; then
-            echo "Direct Telegram notification sent successfully" >> $LOG_FILE
+        if [ -f "$MESSAGE_ID_FILE" ]; then
+            # Read the message ID
+            MESSAGE_ID=$(cat "$MESSAGE_ID_FILE")
+            echo "Found stored message ID: $MESSAGE_ID for upload $ID" >> $LOG_FILE
+            
+            # Use editMessageText to update the existing message for completion
+            wget -q -O- "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/editMessageText?chat_id=$TELEGRAM_CHAT_ID&message_id=$MESSAGE_ID&text=$MESSAGE_ENCODED&parse_mode=HTML" >> $LOG_FILE 2>&1
+            
+            if [ $? -eq 0 ]; then
+                echo "Telegram message updated successfully (Message ID: $MESSAGE_ID)" >> $LOG_FILE
+                # Clean up the message ID file as we're done with this upload
+                rm -f "$MESSAGE_ID_FILE"
+                echo "Removed message ID file for completed upload" >> $LOG_FILE
+            else
+                echo "Failed to update Telegram message, sending new message" >> $LOG_FILE
+                # Send a new message as fallback
+                wget -q -O- "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage?chat_id=$TELEGRAM_CHAT_ID&text=$MESSAGE_ENCODED&parse_mode=HTML" >> $LOG_FILE 2>&1
+                
+                if [ $? -eq 0 ]; then
+                    echo "Direct Telegram notification sent successfully" >> $LOG_FILE
+                else
+                    echo "Direct Telegram notification failed" >> $LOG_FILE
+                fi
+            fi
         else
-            echo "Direct Telegram notification failed" >> $LOG_FILE
+            # Send to Telegram as a new message
+            wget -q -O- "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage?chat_id=$TELEGRAM_CHAT_ID&text=$MESSAGE_ENCODED&parse_mode=HTML" >> $LOG_FILE 2>&1
+            
+            if [ $? -eq 0 ]; then
+                echo "Direct Telegram notification sent successfully" >> $LOG_FILE
+            else
+                echo "Direct Telegram notification failed" >> $LOG_FILE
+            fi
         fi
     else
         echo "Telegram credentials not available, skipping direct notification" >> $LOG_FILE

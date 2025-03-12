@@ -186,14 +186,6 @@ HUMAN_OFFSET=$(format_size $OFFSET)
 # Send notification to backend service
 echo "Sending progress notification to backend service" >> $LOG_FILE
 
-# Prepare message content
-MESSAGE="<b>⏳ Upload Progress: $PROGRESS%</b>
-<b>File:</b> $FILENAME
-<b>Progress:</b> $HUMAN_OFFSET of $HUMAN_SIZE
-<b>Client:</b> $CLIENT
-<b>Project:</b> $PROJECT
-<b>ID:</b> $ID"
-
 # Try to send to backend's Telegram notification endpoint
 echo "Sending notification to http://backend:5001/api/upload-hooks/telegram-notify" >> $LOG_FILE
 wget -q -O- --header="Content-Type: application/json" --post-data="{
@@ -222,13 +214,46 @@ if [ $? -ne 0 ]; then
         # URL encode the message (basic encoding for special characters)
         MESSAGE_ENCODED=$(echo "$MESSAGE" | sed 's/ /%20/g; s/&/%26/g; s/</%3C/g; s/>/%3E/g; s/\n/%0A/g')
         
-        # Send to Telegram
-        wget -q -O- "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage?chat_id=$TELEGRAM_CHAT_ID&text=$MESSAGE_ENCODED&parse_mode=HTML" >> $LOG_FILE 2>&1
+        # Check if we have a stored message ID for this upload
+        MESSAGE_ID_FILE="$INFO_DIR/$ID.msgid"
         
-        if [ $? -eq 0 ]; then
-            echo "Direct Telegram notification sent successfully" >> $LOG_FILE
+        if [ -f "$MESSAGE_ID_FILE" ]; then
+            # Read the message ID
+            MESSAGE_ID=$(cat "$MESSAGE_ID_FILE")
+            echo "Found stored message ID: $MESSAGE_ID for upload $ID" >> $LOG_FILE
+            
+            # Use editMessageText to update the existing message
+            wget -q -O- "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/editMessageText?chat_id=$TELEGRAM_CHAT_ID&message_id=$MESSAGE_ID&text=$MESSAGE_ENCODED&parse_mode=HTML" >> $LOG_FILE 2>&1
+            
+            if [ $? -eq 0 ]; then
+                echo "Telegram message updated successfully (Message ID: $MESSAGE_ID)" >> $LOG_FILE
+            else
+                echo "Failed to update Telegram message, falling back to sending new message" >> $LOG_FILE
+                # Send a new message as fallback
+                wget -q -O- "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage?chat_id=$TELEGRAM_CHAT_ID&text=$MESSAGE_ENCODED&parse_mode=HTML" >> $LOG_FILE 2>&1
+            fi
         else
-            echo "Direct Telegram notification failed" >> $LOG_FILE
+            echo "No stored message ID found for upload $ID, sending new message" >> $LOG_FILE
+            # Send to Telegram as a new message
+            wget -q -O- "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage?chat_id=$TELEGRAM_CHAT_ID&text=$MESSAGE_ENCODED&parse_mode=HTML" > /tmp/telegram_response.json 2>> $LOG_FILE
+            
+            # Extract and store message ID for future updates
+            if [ $? -eq 0 ]; then
+                # Try to extract message_id using grep and sed
+                MESSAGE_ID=$(grep -o '"message_id":[0-9]*' /tmp/telegram_response.json | sed 's/"message_id"://')
+                
+                if [ -n "$MESSAGE_ID" ]; then
+                    # Store message ID in a file for this upload
+                    echo "$MESSAGE_ID" > "$MESSAGE_ID_FILE"
+                    echo "Stored Telegram message ID: $MESSAGE_ID for upload $ID" >> $LOG_FILE
+                    echo "Direct Telegram notification sent successfully (Message ID: $MESSAGE_ID)" >> $LOG_FILE
+                else
+                    echo "Failed to extract message ID from Telegram response" >> $LOG_FILE
+                    echo "Direct Telegram notification sent but couldn't track message ID" >> $LOG_FILE
+                fi
+            else
+                echo "Direct Telegram notification failed" >> $LOG_FILE
+            fi
         fi
     else
         echo "Telegram credentials not available, skipping direct notification" >> $LOG_FILE

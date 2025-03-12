@@ -6,6 +6,7 @@ INFO_DIR="${TUS_INFO_DIR:-/data/tusd-uploads}"
 # Log to a file for debugging
 LOG_FILE="$INFO_DIR/hook_log.txt"
 echo "====== PRE-CREATE HOOK INVOKED $(date) ======" >> $LOG_FILE
+echo "FULL FILENAME CHECK: Validating for .turbosort" >> $LOG_FILE
 
 # Function to safely decode base64 with fallback
 decode_metadata() {
@@ -41,9 +42,18 @@ env | grep TUS_ >> $LOG_FILE
 FILENAME=$(decode_metadata "$TUS_META_FILENAME" "$(decode_metadata "$TUS_META_filename" "unnamed-file")")
 echo "Validating upload request for: $FILENAME" >> $LOG_FILE
 
-# Check for disallowed file extensions
-if echo "$FILENAME" | grep -i "\.turbosort$" > /dev/null; then
-    echo "Rejecting file with .turbosort extension: $FILENAME" >> $LOG_FILE
+# Explicitly log token information for debugging client uploads
+TOKEN=$(decode_metadata "$TUS_META_TOKEN" "")
+if [ -n "$TOKEN" ]; then
+    echo "Upload with token: $TOKEN" >> $LOG_FILE
+fi
+
+# Check for disallowed file extensions - be very thorough with .turbosort validation
+if [ "$FILENAME" = ".turbosort" ] || echo "$FILENAME" | grep -i "\.turbosort$" > /dev/null; then
+    echo "REJECTED: File with .turbosort extension detected: $FILENAME" >> $LOG_FILE
+    if [ -n "$TOKEN" ]; then
+        echo "REJECTED TOKEN-BASED UPLOAD of .turbosort file. Token: $TOKEN" >> $LOG_FILE
+    fi
     # Return HTTP 400 (Bad Request) to reject the upload
     echo "HTTP/1.1 400 Bad Request"
     echo "Content-Type: application/json"
@@ -66,4 +76,7 @@ fi
 
 # If all validations pass, allow the upload to proceed by returning a 2xx status
 echo "Upload validation passed for: $FILENAME" >> $LOG_FILE
+if [ -n "$TOKEN" ]; then
+    echo "Token-based upload passed validation. Token: $TOKEN" >> $LOG_FILE
+fi
 exit 0 

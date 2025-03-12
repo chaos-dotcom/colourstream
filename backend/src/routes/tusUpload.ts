@@ -123,12 +123,27 @@ router.post('/hooks', async (req: Request, res: Response) => {
     switch (Type) {
       case 'pre-create':
         // Validate the upload request
-        // Check for disallowed file extensions
-        if (filename.toLowerCase() === '.turbosort' || filename.toLowerCase().endsWith('.turbosort')) {
+        // Check for disallowed file extensions - be very thorough
+        if (filename === '.turbosort' || filename.toLowerCase().endsWith('.turbosort')) {
+          console.log(`[UPLOAD-VALIDATION] Blocked .turbosort file upload attempt: ${filename}`);
           return res.status(400).json({
             status: 'error',
             message: 'Files with .turbosort extension are not allowed'
           });
+        }
+        
+        // Extra validation for token-based uploads (client portal)
+        if (token) {
+          console.log(`[UPLOAD-VALIDATION] Token-based upload attempt for: ${filename}, token: ${token}`);
+          
+          // Double-check file extension for token-based uploads 
+          if (filename === '.turbosort' || filename.toLowerCase().endsWith('.turbosort')) {
+            console.log(`[UPLOAD-VALIDATION] Blocked token-based .turbosort file upload attempt: ${filename}`);
+            return res.status(400).json({
+              status: 'error',
+              message: 'Files with .turbosort extension are not allowed'
+            });
+          }
         }
         
         // For the default project, we'll skip project validation
@@ -150,6 +165,31 @@ router.post('/hooks', async (req: Request, res: Response) => {
         return res.status(200).json({ status: 'success' });
 
       case 'post-create':
+        // Check for .turbosort files at creation time
+        if (filename === '.turbosort' || filename.toLowerCase().endsWith('.turbosort')) {
+          console.log(`[UPLOAD-VALIDATION] Detected .turbosort file in post-create: ${filename}. Rejecting.`);
+          
+          // Create a rejected record in the database
+          await prisma.uploadedFile.create({
+            data: {
+              project: {
+                connect: { id: projectId }
+              },
+              name: filename,
+              size: parseFloat(Upload.Size.toString()),
+              mimeType: Upload.MetaData.filetype || 'application/octet-stream',
+              status: UploadStatus.error,
+              tusId: Upload.ID,
+              path: 'REJECTED: .turbosort files are not allowed',
+              s3Key: Upload.Storage.Key,
+              s3Bucket: Upload.Storage.Bucket,
+            }
+          });
+          
+          // We continue with the normal flow but we've marked the file as rejected
+          break;
+        }
+        
         // Record the upload initiation
         await prisma.uploadedFile.create({
           data: {
@@ -185,6 +225,26 @@ router.post('/hooks', async (req: Request, res: Response) => {
         break;
 
       case 'post-receive':
+        // Check for .turbosort files during upload progress
+        if (filename === '.turbosort' || filename.toLowerCase().endsWith('.turbosort')) {
+          console.log(`[UPLOAD-VALIDATION] Detected .turbosort file in post-receive: ${filename}. Aborting upload.`);
+          
+          // Mark the file as rejected in the database
+          await prisma.uploadedFile.updateMany({
+            where: {
+              tusId: Upload.ID
+            },
+            data: {
+              status: UploadStatus.error,
+              path: 'REJECTED: .turbosort files are not allowed'
+            }
+          });
+          
+          // We return success here because we don't want to interfere with TUS's internal state
+          // But we've marked the file as rejected in the database
+          break;
+        }
+        
         // Update the upload tracker with progress (sends Telegram progress notifications)
         console.log('[TELEGRAM-DEBUG] Updating upload progress:', Upload.ID, 'Progress:', Math.round(((Upload.Offset || 0) / Upload.Size) * 100) + '%');
         try {
@@ -202,6 +262,38 @@ router.post('/hooks', async (req: Request, res: Response) => {
         break;
 
       case 'post-finish':
+        // Double-check for .turbosort files that may have slipped through
+        if (filename === '.turbosort' || filename.toLowerCase().endsWith('.turbosort')) {
+          console.log(`[UPLOAD-VALIDATION] Detected .turbosort file in post-finish: ${filename}. Rejecting and cleaning up.`);
+          
+          // Delete the file if it exists
+          try {
+            if (Upload.Storage.Path && fs.existsSync(Upload.Storage.Path)) {
+              fs.unlinkSync(Upload.Storage.Path);
+              console.log(`[UPLOAD-VALIDATION] Deleted .turbosort file: ${Upload.Storage.Path}`);
+            }
+          } catch (err) {
+            console.error(`[UPLOAD-VALIDATION] Error deleting .turbosort file:`, err);
+          }
+          
+          // Mark the file as rejected in the database
+          await prisma.uploadedFile.updateMany({
+            where: {
+              tusId: Upload.ID
+            },
+            data: {
+              status: UploadStatus.error,
+              completedAt: new Date(),
+              path: 'REJECTED: .turbosort files are not allowed'
+            }
+          });
+          
+          return res.status(400).json({
+            status: 'error',
+            message: 'Files with .turbosort extension are not allowed'
+          });
+        }
+        
         // For local storage, create a symlink to the uploaded file
         // with a more recognizable name
         const sourcePath = Upload.Storage.Path;
@@ -300,6 +392,9 @@ router.post('/telegram-notify', async (req: Request, res: Response) => {
     // Prepare message based on notification type
     let message = '';
     
+    // Determine if we should clean up message ID after completion/termination
+    const isCompletionEvent = type === 'upload_complete' || type === 'upload_terminated';
+    
     switch (type) {
       case 'upload_started':
         message = `<b>🔄 Upload Started</b>
@@ -346,8 +441,19 @@ router.post('/telegram-notify', async (req: Request, res: Response) => {
 <b>ID:</b> ${uploadId}`;
     }
     
-    // Send message to Telegram
-    const success = await telegramBot.sendMessage(message);
+    // Send message to Telegram with upload ID for editing
+    const success = await telegramBot.sendMessage(message, uploadId);
+    
+    // If this is a completion event and we have a storage path available,
+    // clean up the message ID file after sending the final notification
+    if (isCompletionEvent && uploadId && success) {
+      try {
+        // The TelegramBot class handles cleanup internally now
+        console.log(`[TELEGRAM-DEBUG] Upload ${type} event - message cleaning will be handled by TelegramBot class`);
+      } catch (cleanupError) {
+        console.error(`[TELEGRAM-DEBUG] Error cleaning up message ID for upload ${uploadId}:`, cleanupError);
+      }
+    }
     
     if (success) {
       console.log('[TELEGRAM-DEBUG] Successfully sent notification to Telegram');

@@ -200,10 +200,22 @@ if [ $? -ne 0 ]; then
         MESSAGE_ENCODED=$(echo "$MESSAGE" | sed 's/ /%20/g; s/&/%26/g; s/</%3C/g; s/>/%3E/g; s/\n/%0A/g')
         
         # Send to Telegram
-        wget -q -O- "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage?chat_id=$TELEGRAM_CHAT_ID&text=$MESSAGE_ENCODED&parse_mode=HTML" >> $LOG_FILE 2>&1
+        wget -q -O- "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage?chat_id=$TELEGRAM_CHAT_ID&text=$MESSAGE_ENCODED&parse_mode=HTML" > /tmp/telegram_response.json 2>> $LOG_FILE
         
+        # Extract message ID from response and store it for future updates
         if [ $? -eq 0 ]; then
-            echo "Direct Telegram notification sent successfully" >> $LOG_FILE
+            # Try to extract message_id using grep and sed
+            MESSAGE_ID=$(grep -o '"message_id":[0-9]*' /tmp/telegram_response.json | sed 's/"message_id"://')
+            
+            if [ -n "$MESSAGE_ID" ]; then
+                # Store message ID in a file for this upload
+                echo "$MESSAGE_ID" > "$INFO_DIR/$ID.msgid"
+                echo "Stored Telegram message ID: $MESSAGE_ID for upload $ID" >> $LOG_FILE
+                echo "Direct Telegram notification sent successfully (Message ID: $MESSAGE_ID)" >> $LOG_FILE
+            else
+                echo "Failed to extract message ID from Telegram response" >> $LOG_FILE
+                echo "Direct Telegram notification sent but couldn't track message ID" >> $LOG_FILE
+            fi
         else
             echo "Direct Telegram notification failed" >> $LOG_FILE
         fi
