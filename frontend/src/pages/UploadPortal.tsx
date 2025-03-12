@@ -22,6 +22,7 @@ import '@uppy/core/dist/style.min.css';
 import '@uppy/dashboard/dist/style.min.css';
 import { getUploadLink } from '../services/uploadService';
 import { ApiResponse } from '../types';
+import { UPLOAD_ENDPOINT_URL } from '../config';
 
 const StyledDashboard = styled(Box)(({ theme }) => ({
   '& .uppy-Dashboard-inner': {
@@ -128,9 +129,9 @@ const UploadPortal: React.FC = () => {
               token: token
             }
           }).use(Tus, {
-            endpoint: 'https://live.colourstream.johnrogerscolour.co.uk/files/', // Base TUS endpoint
+            endpoint: UPLOAD_ENDPOINT_URL, // Base TUS endpoint
             retryDelays: [0, 3000, 5000, 10000, 20000],
-            chunkSize: 5 * 1024 * 1024, // 5MB chunks for better reliability
+            chunkSize: 50 * 1024 * 1024, // 50MB chunks for better reliability
             removeFingerprintOnSuccess: true,
             headers: {
               'X-Requested-With': 'XMLHttpRequest', // Add this header to match the tusd-xhr router

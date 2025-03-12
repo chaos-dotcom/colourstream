@@ -7,8 +7,8 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "noUnusedLocals": true, // Disable unused locals warning- we put this in 
-    "noUnusedParameters": true, // 
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "forceConsistentCasingInFileNames": true,
     "moduleResolution": "node",
     "resolveJsonModule": true,
@@ -17,8 +17,9 @@
       "@/*": ["src/*"],
       ".prisma/client": ["./node_modules/.prisma/client"]
     },
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "allowJs": true
   },
   "include": ["src/**/*", "prisma/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "exclude": ["node_modules", "dist", "**/*.mjs"]
 } 

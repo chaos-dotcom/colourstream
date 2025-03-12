@@ -3,7 +3,6 @@ import { PrismaClient } from '@prisma/client';
 import { authenticateToken } from '../middleware/auth';
 import fs from 'fs';
 import path from 'path';
-import { telegramService } from '../services';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -158,7 +157,7 @@ router.post('/hooks', async (req: Request, res: Response) => {
         }
 
         // Update the file status to completed
-        const updatedFiles = await prisma.uploadedFile.updateMany({
+        await prisma.uploadedFile.updateMany({
           where: {
             tusId: Upload.ID
           },
@@ -168,25 +167,6 @@ router.post('/hooks', async (req: Request, res: Response) => {
             path: destPath, // Update the path to the symlink
           }
         });
-
-        // Get the file details for the notification
-        if (updatedFiles.count > 0) {
-          const fileDetails = await prisma.uploadedFile.findFirst({
-            where: { tusId: Upload.ID },
-            include: {
-              project: {
-                include: {
-                  client: true
-                }
-              }
-            }
-          });
-
-          if (fileDetails) {
-            // Send a Telegram notification
-            await telegramService.sendFileUploadNotification(fileDetails.id);
-          }
-        }
         break;
 
       case 'post-terminate':

@@ -14,7 +14,8 @@ window.RUNTIME_CONFIG = {
   WEBRTC_WS_PROTOCOL: "${VITE_WEBRTC_WS_PROTOCOL}",
   WEBRTC_APP_PATH: "${VITE_WEBRTC_APP_PATH}",
   VIDEO_URL: "${VITE_VIDEO_URL}",
-  OVENPLAYER_SCRIPT_URL: "${VITE_OVENPLAYER_SCRIPT_URL}"
+  OVENPLAYER_SCRIPT_URL: "${VITE_OVENPLAYER_SCRIPT_URL}",
+  UPLOAD_ENDPOINT_URL: "${VITE_UPLOAD_ENDPOINT_URL}"
 };
 console.log("Runtime configuration loaded:", window.RUNTIME_CONFIG);
 EOF
@@ -43,4 +44,4 @@ done
 
 # Start the server
 echo "Starting server..."
-exec serve -s build -l 3000 
+exec serve -s build -l 3000 --single 

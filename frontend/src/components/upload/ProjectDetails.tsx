@@ -18,11 +18,18 @@ import {
   TableHead,
   TableRow,
   Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Alert,
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import DownloadIcon from '@mui/icons-material/Download';
+import OpenInNew from '@mui/icons-material/OpenInNew';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { Project, UploadLink, UploadedFile } from '../../types/upload';
-import { getProject, getProjectFiles, downloadFile } from '../../services/uploadService';
+import { getProject, getProjectFiles, downloadFile, deleteUploadLink } from '../../services/uploadService';
 import CreateUploadLinkForm from './CreateUploadLinkForm';
 import { Link as RouterLink } from 'react-router-dom';
 import Uppy from '@uppy/core';
@@ -30,6 +37,7 @@ import { Dashboard } from '@uppy/react';
 import Tus from '@uppy/tus';
 import '@uppy/core/dist/style.min.css';
 import '@uppy/dashboard/dist/style.min.css';
+import { UPLOAD_ENDPOINT_URL } from '../../config';
 
 // Define Uppy instance type as any to avoid complex typing issues
 type UppyInstance = any;
@@ -51,6 +59,9 @@ const ProjectDetails: React.FC = () => {
   const [showCreateLink, setShowCreateLink] = useState(false);
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
   const [selectedUploadLink, setSelectedUploadLink] = useState<UploadLink | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [linkToDelete, setLinkToDelete] = useState<UploadLink | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [uppy] = useState<UppyInstance>(() => new Uppy({
     restrictions: {
       maxFileSize: 10 * 1024 * 1024 * 1024, // 10GB
@@ -65,9 +76,9 @@ const ProjectDetails: React.FC = () => {
       clientid: project?.clientId || 'default_client'
     },
   }).use(Tus, {
-    endpoint: 'https://live.colourstream.johnrogerscolour.co.uk/files/',
+    endpoint: UPLOAD_ENDPOINT_URL,
     retryDelays: [0, 3000, 5000, 10000, 20000],
-    chunkSize: 5 * 1024 * 1024, // 5MB chunks for better reliability
+    chunkSize: 50 * 1024 * 1024, // 50MB chunks for better reliability
     removeFingerprintOnSuccess: true,
     headers: {
       'X-Requested-With': 'XMLHttpRequest', // Add custom header to help identify TUS requests
@@ -155,7 +166,7 @@ const ProjectDetails: React.FC = () => {
   const handleCopyLink = async (link: string) => {
     try {
       await navigator.clipboard.writeText(
-        `https://live.colourstream.johnrogerscolour.co.uk/files/${link}`
+        `${UPLOAD_ENDPOINT_URL}${link}`
       );
       setCopySuccess(link);
       setTimeout(() => setCopySuccess(null), 2000);
@@ -192,8 +203,35 @@ const ProjectDetails: React.FC = () => {
       meta: { token: link.token },
     });
     uppy.getPlugin('Tus').setOptions({
-      endpoint: `https://live.colourstream.johnrogerscolour.co.uk/files/${link.token}`,
+      endpoint: `${UPLOAD_ENDPOINT_URL}${link.token}`,
     });
+  };
+
+  const handleDeleteUploadLink = async () => {
+    if (!linkToDelete) return;
+    
+    try {
+      const response = await deleteUploadLink(linkToDelete.id);
+      
+      if (response.status === 'success') {
+        // Update project data to reflect the deleted link
+        if (project && project.uploadLinks) {
+          setProject({
+            ...project,
+            uploadLinks: project.uploadLinks.filter(link => link.id !== linkToDelete.id)
+          });
+        }
+        
+        setSuccessMessage('Upload link deleted successfully');
+        setTimeout(() => setSuccessMessage(null), 3000);
+        setDeleteDialogOpen(false);
+        setLinkToDelete(null);
+      } else {
+        setError(response.message || 'Failed to delete upload link');
+      }
+    } catch (err) {
+      setError('Failed to delete upload link');
+    }
   };
 
   if (loading) {
@@ -393,6 +431,113 @@ const ProjectDetails: React.FC = () => {
           </Box>
         )}
       </Box>
+
+      <Box mt={4}>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+          <Typography variant="h6">Upload Links</Typography>
+          <Button
+            variant="contained"
+            onClick={() => setShowCreateLink(true)}
+            size="small"
+          >
+            Create Upload Link
+          </Button>
+        </Box>
+        
+        {project?.uploadLinks && project.uploadLinks.length > 0 ? (
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Token</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Usage</TableCell>
+                  <TableCell>Expires</TableCell>
+                  <TableCell>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {project.uploadLinks.map((link) => (
+                  <TableRow key={link.id}>
+                    <TableCell>
+                      <Box display="flex" alignItems="center">
+                        {link.token}
+                        <Tooltip title={copySuccess === link.token ? "Copied!" : "Copy link"}>
+                          <IconButton size="small" onClick={() => handleCopyLink(`${UPLOAD_ENDPOINT_URL}${link.token}`)}>
+                            <ContentCopyIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      {link.isActive === false ? (
+                        <Chip label="Inactive" color="error" size="small" />
+                      ) : new Date(link.expiresAt) < new Date() ? (
+                        <Chip label="Expired" color="warning" size="small" />
+                      ) : (
+                        <Chip label="Active" color="success" size="small" />
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {link.usedCount} / {link.maxUses === 0 ? '∞' : link.maxUses}
+                    </TableCell>
+                    <TableCell>
+                      {new Date(link.expiresAt).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      <Box display="flex">
+                        <Tooltip title="View Upload Interface">
+                          <IconButton 
+                            size="small" 
+                            onClick={() => handleUploadLinkSelect(link)}
+                          >
+                            <OpenInNew fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete Link">
+                          <IconButton 
+                            size="small"
+                            color="error"
+                            onClick={() => {
+                              setLinkToDelete(link);
+                              setDeleteDialogOpen(true);
+                            }}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        ) : (
+          <Typography color="textSecondary">No upload links created yet</Typography>
+        )}
+      </Box>
+
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+        <DialogTitle>Delete Upload Link</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to delete this upload link?
+            {linkToDelete && (
+              <>
+                <br /><br />
+                <strong>Token:</strong> {linkToDelete.token}<br />
+                <strong>Status:</strong> {linkToDelete.isActive === false ? 'Inactive' : 'Active'}<br />
+                <strong>Usage:</strong> {linkToDelete.usedCount} / {linkToDelete.maxUses === 0 ? '∞' : linkToDelete.maxUses}
+              </>
+            )}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleDeleteUploadLink} color="error">Delete</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

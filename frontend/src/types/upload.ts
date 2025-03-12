@@ -25,6 +25,7 @@ export interface UploadLink {
   expiresAt: string;
   maxUses?: number;
   usedCount: number;
+  isActive?: boolean;
   createdAt: string;
   updatedAt: string;
 }

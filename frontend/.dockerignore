@@ -1,6 +1,8 @@
 # Git
 .git
 .gitignore
+.github
+.gitlab-ci.yml
 
 # Node.js
 node_modules
@@ -11,13 +13,27 @@ yarn-error.log
 # Build artifacts
 build
 dist
+coverage
+.nyc_output
 
 # Environment files
 .env
+.env.*
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Testing
+**/__tests__
+**/*.test.*
+**/*.spec.*
+__mocks__
+
+# Documentation
+docs
+*.md
+LICENSE
 
 # Editor directories and files
 .idea
@@ -27,4 +43,34 @@ dist
 
 # OS files
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+# Unnecessary configuration files
+.eslintrc*
+.prettierrc*
+.stylelintrc*
+.babelrc*
+jest.config.*
+
+# Large media files (if applicable)
+*.mp4
+*.mov
+*.wav
+*.mp3
+*.webm
+*.zip
+*.tar
+*.gz
+
+# Logs
+logs
+*.log
+
+# Other unnecessary files for production
+*.tsbuildinfo
+.dockerignore
+Dockerfile
+docker-compose*
+
+# backend uploads
+backend/uploads

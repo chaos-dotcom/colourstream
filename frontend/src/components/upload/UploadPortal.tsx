@@ -22,6 +22,7 @@ import ClientList from './ClientList';
 import CreateClientForm from './CreateClientForm';
 import ClientDetails from './ClientDetails';
 import ProjectDetails from './ProjectDetails';
+import { UPLOAD_ENDPOINT_URL } from '../../config';
 
 // Define proper Uppy instance type - we can just use any for now to avoid complex typing issues
 type UppyInstance = any;
@@ -55,17 +56,17 @@ const FileUploader: React.FC = () => {
       allowMultipleUploadBatches: true,
       debug: false,
       restrictions: {
-        maxFileSize: 64000000000, // 64GB (ProRes files can be very large)
-        maxNumberOfFiles: 10,
+        maxFileSize: 640000000000, // 64GB (ProRes files can be very large)
+        maxNumberOfFiles: 1000,
         // Allow all file types - this service is for all files
       },
     }).use(Tus, {
-      endpoint: 'https://live.colourstream.johnrogerscolour.co.uk/files/',
+      endpoint: UPLOAD_ENDPOINT_URL,
       retryDelays: [0, 3000, 5000, 10000, 20000],
-      chunkSize: 5 * 1024 * 1024, // 5MB chunks for better reliability
+      chunkSize: 50 * 1024 * 1024, // 50MB chunks for better reliability
       removeFingerprintOnSuccess: true,
       // Retry parameters are managed via retryDelays
-      limit: 5, // Max number of simultaneous uploads
+      limit: 10, // Max number of simultaneous uploads
     });
   });
 

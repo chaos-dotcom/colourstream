@@ -10,18 +10,18 @@ import {
   Stack,
 } from '@mui/material';
 import { createProject } from '../../services/uploadService';
-import { CreateProjectRequest } from '../../types/upload';
+import { CreateProjectRequest, Project } from '../../types/upload';
 
 interface CreateProjectFormProps {
   clientId: string;
-  onSuccess?: () => void;
-  onCancel?: () => void;
+  onSuccess?: (project: Project) => void;
+  onClose?: () => void;
 }
 
 const CreateProjectForm: React.FC<CreateProjectFormProps> = ({
   clientId,
   onSuccess,
-  onCancel,
+  onClose,
 }) => {
   const [formData, setFormData] = useState<CreateProjectRequest>({
     name: '',
@@ -55,85 +55,78 @@ const CreateProjectForm: React.FC<CreateProjectFormProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
+    if (!validateForm()) return;
 
-    if (!validateForm()) {
-      return;
-    }
+    const projectData = {
+      ...formData,
+      description: description || undefined,
+    };
 
     setLoading(true);
     try {
-      const projectData: CreateProjectRequest = {
-        ...formData,
-        description: description.trim() || undefined
-      };
-
       const response = await createProject(clientId, projectData);
-      
       if (response.status === 'success') {
-        onSuccess?.();
+        if (onSuccess) onSuccess(response.data);
       } else {
         setError(response.message || 'Failed to create project');
       }
-    } catch (err: any) {
-      console.error('Project creation error:', err);
-      setError(err?.response?.data?.error || err?.message || 'Failed to create project');
+    } catch (err) {
+      setError('An error occurred while creating the project');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Paper elevation={2}>
-      <Box p={3} component="form" onSubmit={handleSubmit}>
-        <Typography variant="h6" gutterBottom>
-          Create New Project
-        </Typography>
-
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
-
-        <TextField
-          fullWidth
-          label="Project Name"
-          name="name"
-          value={formData.name}
-          onChange={handleChange}
-          margin="normal"
-          required
-          error={!!error && !formData.name}
-          helperText={!!error && !formData.name ? 'Project name is required' : ''}
-        />
-
-        <TextField
-          fullWidth
-          label="Description (Optional)"
-          name="description"
-          value={description}
-          onChange={handleChange}
-          margin="normal"
-          multiline
-          rows={3}
-        />
-
-        <Stack direction="row" spacing={2} mt={2}>
-          <Button
-            type="submit"
-            variant="contained"
-            color="primary"
-            disabled={loading}
-            sx={{ minWidth: 120 }}
-          >
-            {loading ? <CircularProgress size={24} /> : 'Create Project'}
-          </Button>
-          <Button variant="outlined" onClick={onCancel} disabled={loading}>
-            Cancel
-          </Button>
+    <Paper sx={{ p: 3 }}>
+      <Typography variant="h6" gutterBottom>
+        Create New Project
+      </Typography>
+      
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+      
+      <form onSubmit={handleSubmit}>
+        <Stack spacing={2}>
+          <TextField
+            fullWidth
+            label="Project Name"
+            name="name"
+            value={formData.name}
+            onChange={handleChange}
+            required
+          />
+          
+          <TextField
+            fullWidth
+            label="Description (Optional)"
+            name="description"
+            value={description}
+            onChange={handleChange}
+            multiline
+            rows={3}
+          />
+          
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 2 }}>
+            {onClose && (
+              <Button onClick={onClose} disabled={loading}>
+                Cancel
+              </Button>
+            )}
+            <Button
+              type="submit"
+              variant="contained"
+              color="primary"
+              disabled={loading}
+            >
+              {loading ? <CircularProgress size={24} /> : 'Create Project'}
+            </Button>
+          </Box>
         </Stack>
-      </Box>
+      </form>
     </Paper>
   );
 };

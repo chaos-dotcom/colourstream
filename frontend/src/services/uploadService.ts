@@ -21,6 +21,11 @@ export const createClient = async (data: CreateClientRequest): Promise<ApiRespon
   return response.data;
 };
 
+export const deleteClient = async (clientId: string): Promise<ApiResponse<void>> => {
+  const response = await api.delete(`/upload/clients/${clientId}`);
+  return response.data;
+};
+
 // Project Management
 export const getClientProjects = async (clientId: string): Promise<ApiResponse<Project[]>> => {
   const response = await api.get(`/upload/clients/${clientId}/projects`);
@@ -56,6 +61,16 @@ export const createUploadLink = async (
 
 export const getUploadLink = async (token: string): Promise<ApiResponse<UploadLink>> => {
   const response = await api.get(`/upload/upload-links/${token}`);
+  return response.data;
+};
+
+export const deleteUploadLink = async (linkId: string): Promise<ApiResponse<void>> => {
+  const response = await api.delete(`/upload/upload-links/${linkId}`);
+  return response.data;
+};
+
+export const getAllUploadLinks = async (): Promise<ApiResponse<UploadLink[]>> => {
+  const response = await api.get('/upload/upload-links/all');
   return response.data;
 };
 

@@ -20,6 +20,7 @@ import {
   Snackbar,
   Typography,
   Paper,
+  Button,
 } from '@mui/material';
 // Only import icons that are actually used
 import { ContentCopy, OpenInNew } from '@mui/icons-material';
@@ -27,7 +28,6 @@ import { OBSSettings } from './settings/OBSSettings';
 import OIDCSettings from './settings/OIDCSettings';
 import OBSControls from './settings/OBSControls';
 import {
-  Button as GovUkButton,
   InsetText,
 } from './GovUkComponents';
 import { 
@@ -36,7 +36,7 @@ import {
   TokenGenerationRequest,
   stopOBSStream
 } from '../utils/api';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import RoomManagement from './rooms/RoomManagement';
 import IPSecurity from './security/IPSecurity';
 import PasskeyManagement from './security/PasskeyManagement';
@@ -44,6 +44,7 @@ import { OvenMediaConfig } from './OvenMediaConfig';
 import ClientList from './upload/ClientList';
 import CreateClientForm from './upload/CreateClientForm';
 import ProjectDetails from './upload/ProjectDetails';
+import AllUploadLinks from '../pages/AllUploadLinks';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -174,28 +175,29 @@ const AdminDashboard: React.FC = () => {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column' }}>
-        <Box sx={{ borderBottom: 1, borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Tabs value={value} onChange={handleChange} aria-label="admin tabs">
-            <Tab label="ROOMS" {...a11yProps(0)} />
-            <Tab label="SECURITY" {...a11yProps(1)} />
-            <Tab label="OBS SETTINGS" {...a11yProps(2)} />
-            <Tab label="OVEN MEDIA" {...a11yProps(3)} />
-            <Tab label="UPLOAD PORTAL" {...a11yProps(4)} />
+    <Container maxWidth="xl">
+      <Box sx={{ width: '100%' }}>
+        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+          <Tabs value={value} onChange={handleChange} aria-label="admin tabs" variant="scrollable" scrollButtons="auto">
+            <Tab label="Rooms" {...a11yProps(0)} />
+            <Tab label="OBS" {...a11yProps(1)} />
+            <Tab label="Security" {...a11yProps(2)} />
+            <Tab label="Settings" {...a11yProps(3)} />
+            <Tab label="Upload Clients" {...a11yProps(4)} />
+            <Tab label="All Upload Links" {...a11yProps(5)} />
           </Tabs>
-          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-            <OBSControls showLabel={false} />
-            <GovUkButton 
-              variant="red" 
-              onClick={handleLogout}
-              disabled={loading}
-            >
-              {loading ? <CircularProgress size={24} /> : 'Logout'}
-            </GovUkButton>
-          </Box>
         </Box>
-        
+        <Box sx={{ padding: 2, display: 'flex', justifyContent: 'flex-end' }}>
+          <Button 
+            variant="contained" 
+            color="error" 
+            onClick={handleLogout}
+            disabled={loading}
+          >
+            {loading ? <CircularProgress size={24} /> : 'Logout'}
+          </Button>
+        </Box>
+
         {error && (
           <Alert severity="error" sx={{ mt: 2 }}>
             {error}
@@ -210,6 +212,13 @@ const AdminDashboard: React.FC = () => {
         </TabPanel>
         
         <TabPanel value={value} index={1}>
+          <Typography variant="h6" gutterBottom component="div">
+            OBS Settings
+          </Typography>
+          <OBSSettings />
+        </TabPanel>
+
+        <TabPanel value={value} index={2}>
           <Typography variant="h6" gutterBottom component="div">
             Security Settings
           </Typography>
@@ -236,13 +245,6 @@ const AdminDashboard: React.FC = () => {
           </Box>
         </TabPanel>
         
-        <TabPanel value={value} index={2}>
-          <Typography variant="h6" gutterBottom component="div">
-            OBS Settings
-          </Typography>
-          <OBSSettings />
-        </TabPanel>
-
         <TabPanel value={value} index={3}>
           <Typography variant="h6" gutterBottom component="div">
             Oven Media Configuration
@@ -251,29 +253,33 @@ const AdminDashboard: React.FC = () => {
         </TabPanel>
 
         <TabPanel value={value} index={4}>
-          <Typography variant="h6" gutterBottom component="div">
-            Upload Portal Management
-          </Typography>
-          
-          <Box sx={{ mb: 4 }}>
-            <Typography variant="subtitle1" gutterBottom>
-              Manage Clients
-            </Typography>
-            <Paper sx={{ p: 2, mb: 2 }}>
-              <ClientList />
-            </Paper>
-          </Box>
-          
-          <Box sx={{ mb: 4 }}>
-            <Typography variant="subtitle1" gutterBottom>
-              Add New Client
-            </Typography>
-            <CreateClientForm onSuccess={() => {
-              setSuccess('Client created successfully');
-            }} />
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography variant="h6">Upload Clients</Typography>
+              <Button 
+                component={RouterLink} 
+                to="/upload-links" 
+                variant="contained" 
+                color="primary"
+                startIcon={<OpenInNew />}
+              >
+                View All Upload Links
+              </Button>
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <CreateClientForm onSuccess={() => {
+                // Handle client creation success
+                console.log('Client created successfully');
+              }} />
+            </Box>
+            <ClientList />
           </Box>
         </TabPanel>
-      </Paper>
+
+        <TabPanel value={value} index={5}>
+          <AllUploadLinks />
+        </TabPanel>
+      </Box>
 
       <Dialog open={tokenDialogOpen} onClose={handleCloseTokenDialog} maxWidth="md" fullWidth>
         <DialogTitle>Generate Token Links for {selectedRoom?.name}</DialogTitle>
@@ -304,21 +310,23 @@ const AdminDashboard: React.FC = () => {
             </FormControl>
             
             <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
-              <GovUkButton
-                variant="purple"
+              <Button
+                variant="contained"
+                color="primary"
                 onClick={() => handleGenerateToken(true)}
                 disabled={isGeneratingToken}
               >
                 Generate Presenter Link
-              </GovUkButton>
+              </Button>
               
-              <GovUkButton
-                variant="blue"
+              <Button
+                variant="contained"
+                color="secondary"
                 onClick={() => handleGenerateToken(false)}
                 disabled={isGeneratingToken}
               >
                 Generate Guest Link
-              </GovUkButton>
+              </Button>
             </Box>
             
             {isGeneratingToken && (
@@ -354,9 +362,9 @@ const AdminDashboard: React.FC = () => {
           </Box>
         </DialogContent>
         <DialogActions>
-          <GovUkButton variant="secondary" onClick={handleCloseTokenDialog}>
+          <Button variant="outlined" onClick={handleCloseTokenDialog}>
             Close
-          </GovUkButton>
+          </Button>
         </DialogActions>
       </Dialog>
       

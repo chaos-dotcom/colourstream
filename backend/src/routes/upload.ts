@@ -200,7 +200,7 @@ router.post('/projects/:projectId/upload-links', authenticateToken, async (req: 
     });
 
     // Generate the full upload URL
-    const uploadUrl = `https://live.colourstream.johnrogerscolour.co.uk/files/${uploadLink.token}`;
+    const uploadUrl = `https://upload.colourstream.johnrogerscolour.co.uk/${uploadLink.token}`;
     
     res.json({
       status: 'success',
@@ -462,6 +462,106 @@ router.get('/projects/:projectId', authenticateToken, async (req: Request, res: 
     res.status(500).json({ 
       status: 'error',
       message: 'Failed to fetch project'
+    });
+  }
+});
+
+// Delete a client
+router.delete('/clients/:clientId', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { clientId } = req.params;
+    
+    // Check if client exists
+    const client = await prisma.client.findUnique({
+      where: { id: clientId },
+      include: { projects: true }
+    });
+    
+    if (!client) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Client not found'
+      });
+    }
+    
+    // Delete the client (cascading delete will handle projects and upload links)
+    await prisma.client.delete({
+      where: { id: clientId }
+    });
+    
+    res.json({
+      status: 'success',
+      message: 'Client deleted successfully'
+    });
+  } catch (error) {
+    console.error('Failed to delete client:', error);
+    res.status(500).json({ 
+      status: 'error',
+      message: 'Failed to delete client. Make sure there are no active uploads for this client.'
+    });
+  }
+});
+
+// Delete an upload link
+router.delete('/upload-links/:linkId', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { linkId } = req.params;
+    
+    // Check if upload link exists
+    const uploadLink = await prisma.uploadLink.findUnique({
+      where: { id: linkId }
+    });
+    
+    if (!uploadLink) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Upload link not found'
+      });
+    }
+    
+    // Delete the upload link
+    await prisma.uploadLink.delete({
+      where: { id: linkId }
+    });
+    
+    res.json({
+      status: 'success',
+      message: 'Upload link deleted successfully'
+    });
+  } catch (error) {
+    console.error('Failed to delete upload link:', error);
+    res.status(500).json({ 
+      status: 'error',
+      message: 'Failed to delete upload link'
+    });
+  }
+});
+
+// Get all upload links with client and project information
+router.get('/upload-links/all', authenticateToken, async (_req: Request, res: Response) => {
+  try {
+    const uploadLinks = await prisma.uploadLink.findMany({
+      include: {
+        project: {
+          include: {
+            client: true
+          }
+        }
+      },
+      orderBy: [
+        { createdAt: 'desc' }
+      ]
+    });
+    
+    res.json({
+      status: 'success',
+      data: uploadLinks
+    });
+  } catch (error) {
+    console.error('Failed to fetch upload links:', error);
+    res.status(500).json({ 
+      status: 'error',
+      message: 'Failed to fetch upload links'
     });
   }
 });

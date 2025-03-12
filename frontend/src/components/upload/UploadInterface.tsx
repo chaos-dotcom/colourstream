@@ -19,6 +19,7 @@ import {
   Cancel as CancelIcon,
   CheckCircle as SuccessIcon,
 } from '@mui/icons-material';
+import { UPLOAD_ENDPOINT_URL } from '../../config';
 
 type UploadStatusType = 'preparing' | 'uploading' | 'paused' | 'completed' | 'error';
 
@@ -78,7 +79,7 @@ const UploadInterface: React.FC<UploadInterfaceProps> = ({
     }
 
     const upload = new tus.Upload(file, {
-      endpoint: 'https://live.colourstream.johnrogerscolour.co.uk/files/',
+      endpoint: UPLOAD_ENDPOINT_URL,
       retryDelays: [0, 3000, 5000, 10000, 20000],
       metadata: {
         filename: file.name,
@@ -92,7 +93,7 @@ const UploadInterface: React.FC<UploadInterfaceProps> = ({
         'X-Requested-With': 'XMLHttpRequest',
       },
       chunkSize: 50 * 1024 * 1024, // 50MB chunks
-      parallelUploads: 3,
+      parallelUploads: 4,
       onError: (error) => {
         console.error(`[Upload Error] ${file.name}:`, error);
         setUploads(prev => ({
