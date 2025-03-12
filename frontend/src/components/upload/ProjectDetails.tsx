@@ -320,12 +320,38 @@ const ProjectDetails: React.FC = () => {
               </TableHead>
               <TableBody>
                 {project.uploadLinks.map((link) => (
-                  <TableRow key={link.id}>
+                  <TableRow 
+                    key={link.id}
+                    hover
+                    onClick={(event) => {
+                      // Prevent selection if clicking on a button with action-button class or its container
+                      if (event.currentTarget.querySelector('.action-button')?.contains(event.target as Node)) {
+                        return;
+                      }
+                      // Select this upload link
+                      handleUploadLinkSelect(link);
+                    }}
+                    sx={{ 
+                      cursor: 'pointer',
+                      '&:hover': {
+                        backgroundColor: 'rgba(0, 0, 0, 0.04)',
+                      },
+                      // Highlight the selected link
+                      backgroundColor: selectedUploadLink?.id === link.id ? 'rgba(25, 118, 210, 0.08)' : 'inherit',
+                    }}
+                  >
                     <TableCell>
                       <Box display="flex" alignItems="center">
                         {link.token.substring(0, 12)}...
                         <Tooltip title={copySuccess === link.token ? "Copied!" : "Copy link"}>
-                          <IconButton size="small" onClick={() => handleCopyLink(link.token)}>
+                          <IconButton 
+                            size="small" 
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevent row click
+                              handleCopyLink(link.token);
+                            }}
+                            className="action-button"
+                          >
                             <ContentCopyIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
@@ -351,7 +377,11 @@ const ProjectDetails: React.FC = () => {
                         <Tooltip title="View Upload Interface">
                           <IconButton 
                             size="small" 
-                            onClick={() => handleUploadLinkSelect(link)}
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevent row click
+                              handleUploadLinkSelect(link);
+                            }}
+                            className="action-button"
                           >
                             <OpenInNew fontSize="small" />
                           </IconButton>
@@ -360,10 +390,12 @@ const ProjectDetails: React.FC = () => {
                           <IconButton 
                             size="small"
                             color="error"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevent row click
                               setLinkToDelete(link);
                               setDeleteDialogOpen(true);
                             }}
+                            className="action-button"
                           >
                             <DeleteIcon fontSize="small" />
                           </IconButton>
