@@ -18,6 +18,7 @@ import PasskeySetupPage from './components/PasskeySetupPage';
 import UploadPortal from './components/upload/UploadPortal';
 import ClientUploadPortal from './pages/UploadPortal';
 import AllUploadLinks from './pages/AllUploadLinks';
+import About from './pages/About';
 
 // Debug component to verify rendering
 const DebugAdminLoginPage = () => {
@@ -156,8 +157,11 @@ function App() {
             
             {/* Routes without GovUkLayout (no footer) */}
             <Route path="/room/:roomId" element={<RoomView isPasswordProtected={true} />} />
+            <Route path="/room" element={<RoomView />} />
             <Route path="/room/:roomId/presenter" element={<PresenterView isPasswordProtected={true} />} />
-            <Route path="/" element={<RoomView />} />
+            
+            {/* About page as the landing page */}
+            <Route path="/" element={<About />} />
           </Routes>
         </Router>
       </SnackbarProvider>
