@@ -1,11 +1,17 @@
-# 🏳️‍🌈 ColourStream: A Self Hosted Livestream Colour Grading Review Platform for Colourists
+# 🏳️‍🌈 ColourStream: A Self Hosted Suite of Open Source Tools for Colorists
 
 
 ## 🚀 Overview
 
-ColourStream is a self-hosted livestreaming review platform designed for colourists by a colourist. Powered by OvenMediaEngine and Mirotalk (AGPL), it provides potential end-to-end latency of less than 5 frames, making it perfect for real-time collaboration and client reviews.
+ColourStream has evolved into a comprehensive suite of open source tools designed to assist the everyday colorist with their workflows. By being self-hosted, ColourStream won't succumb to "enshittification" - the common degradation of platforms as they prioritize profit whislt actively making the user experience worse.
 
-💡 **Built by A Colourist, for colourists** - with features specifically designed for the unique needs of color grading professionals. Unlike Grading over Zoom,Teams or another Video Meeting App, Colourstream is a purpose built application designed from the ground up with colourgrading in mind leveraging OvenMediaEngine to ensure a fully accurate Colour Pipeline Workflow
+Powered by OvenMediaEngine and Mirotalk (AGPL), ColourStream provides potential end-to-end latency of less than 5 frames, making it perfect for real-time collaboration and client reviews.
+
+ColourStream Uploader streamlines file transfers by eliminating the need for multiple transfer applications. The workflow is simple: create a client profile, set up a project, and generate a secure, time-limited upload link. This unique hashed link allows clients to easily and safely transfer files directly to your system. 
+
+We reccomend our sister application "TurboSort - LINK TO TURBOSORT" which works in tandem to link Colourstream Uploaders File Structure with your existing Project File Structure
+
+💡 **Built by A Colourist, for Colorists** - with features specifically designed for the unique needs of colour grading professionals. Unlike grading over Zoom, Teams or another video meeting app, ColourStream is a purpose-built application designed from the ground up with colour grading in mind, leveraging OvenMediaEngine to ensure a fully accurate Colour Pipeline Workflow
 
 ## ✨ Key Features
 
@@ -17,6 +23,8 @@ ColourStream is a self-hosted livestreaming review platform designed for colouri
 - **🛡️ Secure by Design**: End-to-end security for your sensitive content, Colourstream folllows Industry Best practices and uses a full SSL pipeline to ensure your review remains safe, 
 - **🎛️ Admin Dashboard**: Manage users, rooms, and streaming settings
 - **📱 Device Compatibility**: Works across desktop and mobile devices
+- **📤 Upload Portal**: Secure file sharing with clients through a dedicated upload portal
+- **📜 File Management**: Organize and manage client files with project-based structure
 
 ## 🏗️ System Architecture
 
@@ -26,17 +34,20 @@ graph TD
     %% Client connections
     Client([User/Client Browser]) --> |HTTPS| Traefik
     OBS([OBS/Encoder]) --> |RTMP/SRT| OME_Origin
+    ClientUpload([Client Upload]) --> |HTTPS| Traefik
     
     %% Traefik routing
     Traefik[(Traefik Proxy)] <--> |Route: live.colourstream...| Frontend
     Traefik --> |Route: /api| Backend
     Traefik --> |Route: video.colourstream...| Mirotalk
     Traefik --> |Route: /app, /ws| OME_Origin
+    Traefik --> |Route: upload.colourstream...| UploadPortal
     
     %% Backend connections
     Backend <--> PostgreSQL[(PostgreSQL DB)]
     Backend <--> |WebSockets| Frontend
     Backend --> |API Calls| OME_Origin
+    Backend <--> |Upload Management| UploadPortal
     
     %% Media connections
     OME_Origin[OvenMediaEngine Origin] --> OME_Edge[OvenMediaEngine Edge]
@@ -59,6 +70,7 @@ graph TD
         Frontend
         Backend
         Mirotalk
+        UploadPortal[Upload Portal]
     end
     
     %% Styling
@@ -69,10 +81,10 @@ graph TD
     classDef client fill:,stroke:#999,stroke-width:1px;
 
     class Traefik proxy;
-    class Frontend,Backend,Mirotalk app;
+    class Frontend,Backend,Mirotalk,UploadPortal app;
     class PostgreSQL db;
     class OME_Origin,OME_Edge,Coturn media;
-    class Client,OBS client;
+    class Client,OBS,ClientUpload client;
 ```
 
 ### 🧩 Components
@@ -81,8 +93,24 @@ graph TD
 - **Backend**: Node.js API with Prisma ORM for business logic
 - **OvenMediaEngine**: Handles video streaming (SRT, RTMP, WebRTC)
 - **Mirotalk**: Provides WebRTC-based video conferencing
+- **Upload Portal**: Secure file sharing portal for client uploads and downloads
 - **Traefik**: Manages routing, SSL termination, and load balancing
 - **PostgreSQL**: Stores user data, room configurations, and system settings
+
+## 📤 Upload Portal
+
+ColourStream includes a dedicated upload portal that allows clients to securely share large media files with colorists:
+
+- **🔗 Shareable Links**: Generate time-limited upload links to share with clients
+- **📂 Project Organization**: Organize uploads by client and project for easy management
+- **↪️ Resumable Uploads**: TUS protocol support for reliable, resumable uploads of large files
+- **🔒 Secure Access**: Token-based authentication for client uploads without full system access
+- **⬇️ Easy Downloads**: Download completed files directly through the interface
+- **📐 User-Friendly UI**: Modern interface with drag-and-drop support and progress monitoring
+
+The upload portal is ideal for receiving high-resolution media files from clients while maintaining organization and security. It eliminates the need for external file sharing services, keeping your workflow self-contained within the ColourStream ecosystem.
+
+For detailed information about the upload portal setup, see [Upload Portal Documentation](docs/upload-portal.md).
 
 ## 🔒 Authentication
 
@@ -178,6 +206,21 @@ For more information about using the GitHub Container Registry images, see [GHCR
 - [Token Flow](docs/token-flow.md)
 - [OBS Integration](docs/obs-integration.md)
 - [WebAuthn Implementation](docs/WEBAUTHN.md)
+- [Upload Portal](docs/upload-portal.md)
+- [Client File Management](docs/client-files.md)
+
+## 🛡️ Self-Hosted Advantage
+
+ColourStream is designed to be fully self-hosted, providing several key advantages:
+
+- **🚫 No Enshittification**: Avoid the common problem of platforms degrading quality or introducing unwanted changes to maximize profit
+- **👑 Complete Control**: You own and control your entire workflow and data
+- **🔏 Data Privacy**: Client media stays on your systems, not on third-party servers
+- **🔄 Customizability**: Modify and adapt the platform to your specific workflow needs
+- **💰 No Subscription Fees**: Pay only for your hosting costs, not per-user or feature fees
+- **🔒 Independence**: Your tools won't disappear due to company shutdowns, acquisitions, or policy changes
+
+By self-hosting ColourStream, colorists maintain control over their professional tools and workflows, ensuring they remain stable, private, and tailored to actual needs rather than corporate profit motives.
 
 ## 🔧 Advanced Configuration
 
@@ -199,7 +242,9 @@ To set up the TURN server:
 
 ColourStream is licensed under a custom license that includes a "Pride Flag Covenant" and the GNU Affero General Public License (AGPL). The license requires that the 🏳️‍🌈 Pride Flag symbol be maintained in all project branding and documentation as a core part of its identity.
 
-**Important**: The license includes a strong anti-DEI removal protection clause with a £1,000,000 financial penalty for any entity that removes or alters the Pride Flag symbol. By using this software, you explicitly agree to these terms.
+**Important**: The Colourstream Pride Convenant license includes a strong anti-DEI removal protection clause with a £1,000,000 financial penalty for any entity that removes or alters the Pride Flag symbol. By using this software, you explicitly agree to these terms.
+
+This does not apply to the OvenMediaEngine or Mirotalk components, which remain under their original AGPL-3.0 licenses. The Pride Flag Covenant and associated penalties only cover Colourstream-specific code,including but not exclusive to branding and userinterfaces. 
 
 See the [LICENSE](LICENSE) file for complete details.
 
