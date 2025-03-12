@@ -341,7 +341,7 @@ const UploadPortal: React.FC = () => {
             <strong>© {new Date().getFullYear()} ColourStream</strong>
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Powered by <Link href="https://github.com/transloadit/uppy" target="_blank" rel="noopener noreferrer">Uppy</Link> and <Link href="https://github.com/tus/tusd" target="_blank" rel="noopener noreferrer">Tusd</Link>
+            Powered by <Link href="https://github.com/transloadit/uppy" target="_blank" rel="noopener noreferrer" underline="none" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>Uppy</Link> and <Link href="https://github.com/tus/tusd" target="_blank" rel="noopener noreferrer" underline="none" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>Tusd</Link>
           </Typography>
         </Container>
       </Box>
