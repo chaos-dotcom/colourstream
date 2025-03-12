@@ -15,6 +15,8 @@ export class TelegramBot {
     this.botToken = config.botToken;
     this.chatId = config.chatId;
     this.baseUrl = `https://api.telegram.org/bot${this.botToken}`;
+    console.log('[TELEGRAM-DEBUG] Telegram API Base URL:', `https://api.telegram.org/bot${this.botToken.substring(0, 10)}...`);
+    logger.info('Telegram API Base URL:', `https://api.telegram.org/bot${this.botToken.substring(0, 10)}...`);
   }
 
   /**
@@ -25,15 +27,24 @@ export class TelegramBot {
       // Convert the chat_id to a number if it's a numeric string
       const chatId = !isNaN(Number(this.chatId)) ? Number(this.chatId) : this.chatId;
       
+      console.log('[TELEGRAM-DEBUG] Sending Telegram message to chat ID:', chatId);
+      console.log('[TELEGRAM-DEBUG] Message content:', message.substring(0, 100) + (message.length > 100 ? '...' : ''));
+      
       const response = await axios.post(`${this.baseUrl}/sendMessage`, {
         chat_id: chatId,
         text: message,
         parse_mode: 'HTML',
       });
       
+      console.log('[TELEGRAM-DEBUG] Telegram API response:', JSON.stringify(response.data));
+      
       return response.data.ok;
-    } catch (error) {
+    } catch (error: any) {
+      console.error('[TELEGRAM-DEBUG] Failed to send Telegram message:', error);
       logger.error('Failed to send Telegram message:', error);
+      if (error.response) {
+        console.error('[TELEGRAM-DEBUG] Error response data:', JSON.stringify(error.response.data));
+      }
       return false;
     }
   }
@@ -51,6 +62,8 @@ export class TelegramBot {
     storage?: string;
   }): Promise<boolean> {
     const { id, size, offset, metadata, isComplete } = uploadInfo;
+    
+    console.log('[TELEGRAM-DEBUG] Creating upload notification message for upload:', id);
     
     // Calculate progress percentage
     const progress = size > 0 ? Math.round((offset / size) * 100) : 0;
@@ -86,6 +99,14 @@ export class TelegramBot {
       message += `\n<b>Estimated time remaining:</b> ${remainingTime}`;
     }
 
+    return this.sendMessage(message);
+  }
+
+  /**
+   * Send a test message to verify the bot is working
+   */
+  async sendTestMessage(): Promise<boolean> {
+    const message = `<b>🧪 Test Message</b>\n\nThis is a test message from the ColourStream Upload Monitor. If you can see this message, the bot is properly configured to send notifications.`;
     return this.sendMessage(message);
   }
 }

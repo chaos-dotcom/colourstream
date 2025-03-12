@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { authenticateToken } from '../middleware/auth';
 import fs from 'fs';
 import path from 'path';
+import { uploadTracker } from '../services/uploads/uploadTracker';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -19,6 +20,7 @@ interface TusHookEvent {
   Upload: {
     ID: string;
     Size: number;
+    Offset?: number;
     MetaData: {
       filename: string;
       filetype: string;
@@ -34,7 +36,7 @@ interface TusHookEvent {
       Key?: string;
     };
   };
-  Type: 'pre-create' | 'post-create' | 'post-finish' | 'post-terminate';
+  Type: 'pre-create' | 'post-create' | 'post-receive' | 'post-finish' | 'post-terminate';
 }
 
 // Define the uploads directory path
@@ -48,24 +50,34 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 // TUS webhook handler
 router.post('/hooks', async (req: Request, res: Response) => {
   try {
-    console.log('TUS webhook received:', JSON.stringify(req.body));
+    console.log('[TELEGRAM-DEBUG] TUS webhook received:', JSON.stringify(req.body || {}));
+    
+    // Check if the request body is empty
+    if (!req.body || typeof req.body !== 'object') {
+      console.error('[TELEGRAM-DEBUG] Error: Invalid request body format');
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid request body format'
+      });
+    }
+    
+    // Extract event data - don't validate strictly as tusd may send different formats
     const event = req.body as TusHookEvent;
     const { Upload, Type } = event;
     
-    // Handle case where MetaData might be missing or incomplete
-    const filename = Upload.MetaData?.filename || 'unnamed-file';
-    const token = Upload.MetaData?.token || null;
-    const clientName = Upload.MetaData?.clientName || null;
-    const projectName = Upload.MetaData?.projectName || null;
-    let projectId = Upload.MetaData?.projectId || 'default';
-
+    // Safe access to nested properties with fallbacks
+    const filename = Upload?.MetaData?.filename || 'unnamed-file';
+    const token = Upload?.MetaData?.token || null;
+    const clientName = Upload?.MetaData?.clientName || null;
+    const projectName = Upload?.MetaData?.projectName || null;
+    let projectId = Upload?.MetaData?.projectId || 'default';
+    
     // Log the metadata we received
-    console.log('Upload metadata:', {
+    console.log('[TELEGRAM-DEBUG] Upload metadata:', {
+      id: Upload?.ID,
       filename,
-      token,
-      clientName,
-      projectName,
-      projectId
+      size: Upload?.Size,
+      type: Type
     });
 
     // If token is provided, try to find the associated project
@@ -95,6 +107,12 @@ router.post('/hooks', async (req: Request, res: Response) => {
       } catch (err) {
         console.error('Error finding upload link by token:', err);
       }
+    }
+
+    // Process the hook based on type
+    if (!Type) {
+      // If Type is missing, just return success to not block uploads
+      return res.status(200).json({ status: 'success' });
     }
 
     switch (Type) {
@@ -143,6 +161,39 @@ router.post('/hooks', async (req: Request, res: Response) => {
             s3Bucket: Upload.Storage.Bucket,
           }
         });
+        
+        // Track the upload in the uploadTracker (enables Telegram notifications)
+        console.log('[TELEGRAM-DEBUG] Tracking new upload in uploadTracker:', Upload.ID);
+        try {
+          uploadTracker.trackUpload({
+            id: Upload.ID,
+            size: Upload.Size,
+            offset: 0,
+            metadata: Upload.MetaData,
+            createdAt: new Date()
+          });
+          console.log('[TELEGRAM-DEBUG] Successfully tracked upload:', Upload.ID);
+        } catch (err) {
+          console.error('[TELEGRAM-DEBUG] Error tracking upload:', err);
+        }
+        
+        break;
+
+      case 'post-receive':
+        // Update the upload tracker with progress (sends Telegram progress notifications)
+        console.log('[TELEGRAM-DEBUG] Updating upload progress:', Upload.ID, 'Progress:', Math.round(((Upload.Offset || 0) / Upload.Size) * 100) + '%');
+        try {
+          uploadTracker.trackUpload({
+            id: Upload.ID,
+            size: Upload.Size,
+            offset: Upload.Offset || 0,
+            metadata: Upload.MetaData,
+            createdAt: new Date()
+          });
+          console.log('[TELEGRAM-DEBUG] Successfully updated upload progress');
+        } catch (err) {
+          console.error('[TELEGRAM-DEBUG] Error updating upload progress:', err);
+        }
         break;
 
       case 'post-finish':
@@ -175,6 +226,16 @@ router.post('/hooks', async (req: Request, res: Response) => {
             path: destPath, // Update the path to the symlink
           }
         });
+        
+        // Mark upload as complete in the uploadTracker (sends Telegram completion notification)
+        console.log('[TELEGRAM-DEBUG] Marking upload as complete in uploadTracker:', Upload.ID);
+        try {
+          uploadTracker.completeUpload(Upload.ID);
+          console.log('[TELEGRAM-DEBUG] Successfully marked upload as complete');
+        } catch (err) {
+          console.error('[TELEGRAM-DEBUG] Error marking upload as complete:', err);
+        }
+        
         break;
 
       case 'post-terminate':
@@ -192,10 +253,15 @@ router.post('/hooks', async (req: Request, res: Response) => {
 
     res.status(200).json({ status: 'success' });
   } catch (error) {
-    console.error('TUS webhook error:', error);
+    console.error('[TELEGRAM-DEBUG] TUS webhook error:', error);
+    console.error('[TELEGRAM-DEBUG] Error stack:', error instanceof Error ? error.stack : 'No stack available');
+    console.error('[TELEGRAM-DEBUG] Request body was:', typeof req.body, JSON.stringify(req.body || {}));
+    console.error('[TELEGRAM-DEBUG] Request headers were:', JSON.stringify(req.headers));
+    
     res.status(500).json({
       status: 'error',
-      message: 'Failed to process TUS webhook'
+      message: 'Failed to process TUS webhook',
+      error: error instanceof Error ? error.message : String(error)
     });
   }
 });

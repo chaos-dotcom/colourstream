@@ -22,6 +22,8 @@ class UploadTracker {
     const now = new Date();
     const existingUpload = this.uploads.get(uploadInfo.id);
     
+    console.log('[TELEGRAM-DEBUG] trackUpload called for ID:', uploadInfo.id);
+    
     const updatedUpload: UploadInfo = {
       ...uploadInfo,
       lastUpdated: now,
@@ -33,9 +35,16 @@ class UploadTracker {
     
     // Send notification via Telegram if configured
     const telegramBot = getTelegramBot();
+    console.log('[TELEGRAM-DEBUG] getTelegramBot() returned:', telegramBot ? 'Bot instance available' : 'No bot instance');
+    
     if (telegramBot) {
+      console.log('[TELEGRAM-DEBUG] Calling sendUploadNotification for upload:', uploadInfo.id);
       telegramBot.sendUploadNotification(updatedUpload)
-        .catch(err => logger.error('Failed to send upload notification to Telegram:', err));
+        .then(success => console.log('[TELEGRAM-DEBUG] sendUploadNotification result:', success ? 'Success' : 'Failed'))
+        .catch(err => {
+          console.error('[TELEGRAM-DEBUG] Failed to send upload notification to Telegram:', err);
+          logger.error('Failed to send upload notification to Telegram:', err);
+        });
     }
     
     logger.info(`Upload tracked: ${uploadInfo.id} - ${Math.round((uploadInfo.offset / uploadInfo.size) * 100)}% complete`);
@@ -46,6 +55,8 @@ class UploadTracker {
    */
   completeUpload(id: string): void {
     const upload = this.uploads.get(id);
+    console.log('[TELEGRAM-DEBUG] completeUpload called for ID:', id, 'upload exists:', !!upload);
+    
     if (upload) {
       const completedUpload: UploadInfo = {
         ...upload,
@@ -58,9 +69,16 @@ class UploadTracker {
       
       // Send completion notification via Telegram
       const telegramBot = getTelegramBot();
+      console.log('[TELEGRAM-DEBUG] getTelegramBot() returned:', telegramBot ? 'Bot instance available' : 'No bot instance');
+      
       if (telegramBot) {
+        console.log('[TELEGRAM-DEBUG] Calling sendUploadNotification for completed upload:', id);
         telegramBot.sendUploadNotification(completedUpload)
-          .catch(err => logger.error('Failed to send completion notification to Telegram:', err));
+          .then(success => console.log('[TELEGRAM-DEBUG] sendUploadNotification result:', success ? 'Success' : 'Failed'))
+          .catch(err => {
+            console.error('[TELEGRAM-DEBUG] Failed to send completion notification to Telegram:', err);
+            logger.error('Failed to send completion notification to Telegram:', err);
+          });
       }
       
       logger.info(`Upload completed: ${id}`);
