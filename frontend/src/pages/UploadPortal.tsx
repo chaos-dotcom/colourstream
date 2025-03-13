@@ -131,7 +131,7 @@ const UploadPortal: React.FC = () => {
             locale: {
               strings: {
                 // Customize the "Complete" text to the requested message
-                complete: `Your upload was successful and ${NAMEFORUPLOADCOMPLETION} has received it successfully 😌`
+                complete: `Your upload was completed and ${NAMEFORUPLOADCOMPLETION} has received it successfully 😌`
               },
               pluralize: (n) => {
                 if (n === 1) {
