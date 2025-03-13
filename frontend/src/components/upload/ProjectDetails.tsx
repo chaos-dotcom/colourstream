@@ -4,9 +4,6 @@ import {
   Box,
   Typography,
   Paper,
-  Grid,
-  Card,
-  CardContent,
   Button,
   CircularProgress,
   IconButton,
@@ -32,15 +29,11 @@ import { Project, UploadLink, UploadedFile } from '../../types/upload';
 import { getProject, getProjectFiles, downloadFile, deleteUploadLink } from '../../services/uploadService';
 import CreateUploadLinkForm from './CreateUploadLinkForm';
 import { Link as RouterLink } from 'react-router-dom';
-import Uppy from '@uppy/core';
-import { Dashboard } from '@uppy/react';
-import Tus from '@uppy/tus';
-import '@uppy/core/dist/style.min.css';
-import '@uppy/dashboard/dist/style.min.css';
-import { UPLOAD_ENDPOINT_URL } from '../../config';
 
-// Define Uppy instance type as any to avoid complex typing issues
-type UppyInstance = any;
+// Define proper types
+interface UploadLinkWithSelection extends UploadLink {
+  selected?: boolean;
+}
 
 const formatBytes = (bytes: number): string => {
   if (bytes === 0) return '0 Bytes';
@@ -62,32 +55,6 @@ const ProjectDetails: React.FC = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [linkToDelete, setLinkToDelete] = useState<UploadLink | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [uppy] = useState<UppyInstance>(() => new Uppy({
-    restrictions: {
-      maxFileSize: 10 * 1024 * 1024 * 1024, // 10GB
-      maxNumberOfFiles: 100,
-    },
-    autoProceed: false,
-    meta: {
-      // Ensure these values are always included in metadata
-      projectId: projectId,
-      projectid: projectId, // Duplicate for backward compatibility
-      clientId: project?.clientId || 'default_client',
-      clientid: project?.clientId || 'default_client'
-    },
-  }).use(Tus, {
-    endpoint: UPLOAD_ENDPOINT_URL,
-    retryDelays: [0, 3000, 5000, 10000, 20000],
-    chunkSize: 50 * 1024 * 1024, // Use 50MB chunks for better reliability
-    removeFingerprintOnSuccess: true,
-    headers: {
-      'X-Requested-With': 'XMLHttpRequest', // Add custom header to help identify TUS requests
-    },
-    // Add performance optimizations
-    limit: 12, // Increase number of simultaneous uploads
-    parallelUploads: 6, // Enable parallel uploads
-    uploadDataDuringCreation: true, // Enable creation-with-upload extension
-  }));
 
   const fetchProjectData = async () => {
     if (!projectId) return;
@@ -139,34 +106,6 @@ const ProjectDetails: React.FC = () => {
     fetchInitialData();
   }, [projectId]);
 
-  useEffect(() => {
-    const completeHandler = (result: any) => {
-      // Safe check for result.successful
-      if (result && result.successful && result.successful.length > 0) {
-        fetchProjectData();
-      }
-    };
-
-    uppy.on('complete', completeHandler);
-
-    return () => {
-      uppy.off('complete', completeHandler);
-      // Use cancelAll instead of close
-      uppy.cancelAll();
-    };
-  }, [uppy]);
-
-  useEffect(() => {
-    if (project && uppy) {
-      uppy.setMeta({
-        projectId: projectId,
-        projectid: projectId,
-        clientId: project.clientId,
-        clientid: project.clientId
-      });
-    }
-  }, [project, projectId, uppy]);
-
   const handleCopyLink = async (link: string) => {
     try {
       await navigator.clipboard.writeText(
@@ -201,18 +140,9 @@ const ProjectDetails: React.FC = () => {
     fetchProjectData();
   };
 
-  const handleUploadLinkSelect = (link: UploadLink) => {
-    setSelectedUploadLink(link);
-    uppy.setMeta({
-      token: link.token,
-      projectId: projectId,
-      projectid: projectId, // Duplicate for backward compatibility
-      clientId: project?.clientId || 'default_client',
-      clientid: project?.clientId || 'default_client'
-    });
-    uppy.getPlugin('Tus').setOptions({
-      endpoint: `${UPLOAD_ENDPOINT_URL}${link.token}`,
-    });
+  const openClientUploadPage = (link: UploadLink) => {
+    const uploadUrl = `https://upload.colourstream.johnrogerscolour.co.uk/portal/${link.token}`;
+    window.open(uploadUrl, '_blank');
   };
 
   const handleDeleteUploadLink = async () => {
@@ -331,22 +261,6 @@ const ProjectDetails: React.FC = () => {
                   <TableRow 
                     key={link.id}
                     hover
-                    onClick={(event) => {
-                      // Prevent selection if clicking on a button with action-button class or its container
-                      if (event.currentTarget.querySelector('.action-button')?.contains(event.target as Node)) {
-                        return;
-                      }
-                      // Select this upload link
-                      handleUploadLinkSelect(link);
-                    }}
-                    sx={{ 
-                      cursor: 'pointer',
-                      '&:hover': {
-                        backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                      },
-                      // Highlight the selected link
-                      backgroundColor: selectedUploadLink?.id === link.id ? 'rgba(25, 118, 210, 0.08)' : 'inherit',
-                    }}
                   >
                     <TableCell>
                       <Box display="flex" alignItems="center">
@@ -383,12 +297,12 @@ const ProjectDetails: React.FC = () => {
                     </TableCell>
                     <TableCell>
                       <Box display="flex">
-                        <Tooltip title="View Upload Interface">
+                        <Tooltip title="Open Client Upload Interface">
                           <IconButton 
                             size="small" 
                             onClick={(e) => {
                               e.stopPropagation(); // Prevent row click
-                              handleUploadLinkSelect(link);
+                              openClientUploadPage(link);
                             }}
                             className="action-button"
                           >
@@ -420,26 +334,6 @@ const ProjectDetails: React.FC = () => {
           <Typography color="textSecondary">No upload links created yet</Typography>
         )}
       </Box>
-
-      {selectedUploadLink && (
-        <Box mt={4}>
-          <Typography variant="h6" gutterBottom>
-            Upload Files
-          </Typography>
-          <Paper elevation={2}>
-            <Box p={3}>
-              <Dashboard
-                uppy={uppy}
-                plugins={['Webcam']}
-                width="100%"
-                height={450}
-                showProgressDetails
-                proudlyDisplayPoweredByUppy={false}
-              />
-            </Box>
-          </Paper>
-        </Box>
-      )}
 
       <Box mt={4}>
         <Typography variant="h6" gutterBottom>

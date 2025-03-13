@@ -141,9 +141,10 @@ const UploadPortal: React.FC = () => {
               }
             }
           }).use(Tus, {
-            endpoint: UPLOAD_ENDPOINT_URL, // Base TUS endpoint
+            // Ensure we don't duplicate 'files/' in the URL
+            endpoint: `${UPLOAD_ENDPOINT_URL.endsWith('/') ? UPLOAD_ENDPOINT_URL : UPLOAD_ENDPOINT_URL + '/'}files/${token}`,
             retryDelays: [0, 3000, 5000, 10000, 20000],
-            chunkSize: 2000 * 1024 * 1024, // 2GB chunks for better reliability
+            chunkSize: 5000 * 1024 * 1024, // 50MB chunks for better reliability
             removeFingerprintOnSuccess: true,
             headers: {
               'X-Requested-With': 'XMLHttpRequest', // Add this header to match the tusd-xhr router
