@@ -50,19 +50,27 @@ const GovUkLayout: React.FC<GovUkLayoutProps> = ({ children, serviceName = 'Colo
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       <StyledAppBar position="static">
+        <Box sx={{ height: '6px', width: '100%', bgcolor: '#ff00ff', display: 'flex' }}>
+          {/* Rainbow stripe colors */}
+          <Box sx={{ flex: 1, bgcolor: '#E40303' }}></Box>
+          <Box sx={{ flex: 1, bgcolor: '#FF8C00' }}></Box>
+          <Box sx={{ flex: 1, bgcolor: '#FFED00' }}></Box>
+          <Box sx={{ flex: 1, bgcolor: '#008026' }}></Box>
+          <Box sx={{ flex: 1, bgcolor: '#004DFF' }}></Box>
+          <Box sx={{ flex: 1, bgcolor: '#750787' }}></Box>
+          {/* Transgender flag colors */}
+          <Box sx={{ flex: 1, bgcolor: '#5BCEFA' }}></Box>
+          <Box sx={{ flex: 1, bgcolor: '#FFFFFF' }}></Box>
+          <Box sx={{ flex: 1, bgcolor: '#F5A9B8' }}></Box>
+        </Box>
         <Toolbar>
-          <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <Link href="/" color="inherit" underline="none" sx={{ display: 'flex', alignItems: 'center' }}>
               <RainbowFlag />
-              <Typography variant="h6" component="span" sx={{ ml: 1, fontWeight: 700, fontSize: '1.125rem' }}>
-                SHED.GAY
+              <Typography variant="h6" component="span" sx={{ fontWeight: 700, fontSize: '1.125rem' }}>
+                {serviceName}
               </Typography>
             </Link>
-          </Box>
-          <Box sx={{ borderLeft: '1px solid #ffffff', pl: 2, ml: 2 }}>
-            <Typography variant="h6" component="h1" sx={{ fontWeight: 700, fontSize: '1.125rem' }}>
-              {serviceName}
-            </Typography>
           </Box>
           <Box sx={{ flexGrow: 1 }} />
           <Box sx={{ height: '8px', width: '100%', position: 'absolute', bottom: 0, left: 0, backgroundColor: accentColor }} />
@@ -101,7 +109,7 @@ const GovUkLayout: React.FC<GovUkLayoutProps> = ({ children, serviceName = 'Colo
             </Box>
             <Box>
               <Link href="/" color="inherit" sx={{ display: 'block', mb: 1 }}>
-                SHED.GAY
+                ColourStream
               </Link>
             </Box>
           </Box>

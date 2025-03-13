@@ -71,18 +71,22 @@ const ProjectDetails: React.FC = () => {
     meta: {
       // Ensure these values are always included in metadata
       projectId: projectId,
-      projectid: projectId,
+      projectid: projectId, // Duplicate for backward compatibility
       clientId: project?.clientId || 'default_client',
       clientid: project?.clientId || 'default_client'
     },
   }).use(Tus, {
     endpoint: UPLOAD_ENDPOINT_URL,
     retryDelays: [0, 3000, 5000, 10000, 20000],
-    chunkSize: 50 * 1024 * 1024, // 50MB chunks for better reliability
+    chunkSize: 50 * 1024 * 1024, // Use 50MB chunks for better reliability
     removeFingerprintOnSuccess: true,
     headers: {
       'X-Requested-With': 'XMLHttpRequest', // Add custom header to help identify TUS requests
     },
+    // Add performance optimizations
+    limit: 12, // Increase number of simultaneous uploads
+    parallelUploads: 6, // Enable parallel uploads
+    uploadDataDuringCreation: true, // Enable creation-with-upload extension
   }));
 
   const fetchProjectData = async () => {
@@ -199,8 +203,12 @@ const ProjectDetails: React.FC = () => {
 
   const handleUploadLinkSelect = (link: UploadLink) => {
     setSelectedUploadLink(link);
-    uppy.setOptions({
-      meta: { token: link.token },
+    uppy.setMeta({
+      token: link.token,
+      projectId: projectId,
+      projectid: projectId, // Duplicate for backward compatibility
+      clientId: project?.clientId || 'default_client',
+      clientid: project?.clientId || 'default_client'
     });
     uppy.getPlugin('Tus').setOptions({
       endpoint: `${UPLOAD_ENDPOINT_URL}${link.token}`,

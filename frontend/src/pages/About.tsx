@@ -16,17 +16,16 @@ const About: React.FC = () => {
           
           <div className="govuk-grid-row">
             <div className="govuk-grid-column-two-thirds">
-              <SectionHeading>About ColourStream</SectionHeading>
               <p className="govuk-body">
-                ColourStream is a powerful, secure video streaming platform designed and developed by a colourist,
-                for colourists. Built with a deep understanding of colour workflows, ColourStream offers a seamless 
-                experience for both professionals and clients.
+                ColourStream is an open-source video streaming platform built by colourists for colourists. 
+                Designed with deep expertise in colour workflows, it provides professional tools for 
+                secure collaboration between colour professionals and their clients.
               </p>
               <p className="govuk-body">
-                Our platform prioritizes security,by utilising zero-trust architecture, and siloed design principles, 
-                performance with extremly low latency live streams and in browser resumable uploads, 
-                and ease of use and accessibility utilising the UK Government Design System, making it the ideal choice
-                for professional streaming needs in the colour grading industry.
+                Our platform combines three core pillars: enterprise-grade security through zero-trust architecture 
+                and siloed design principles; sub-5 frame latency streaming for real-time colour decisions; and 
+                accessible, open source award winning UX through our implementation of the UK Government Design System. 
+                This unique combination makes ColourStream the professional's choice for colour-critical streaming and file sharing.
               </p>
               <p className="govuk-body">
                 ColourStream was built on the fundamental belief that colourist tools should be open source.
@@ -37,47 +36,51 @@ const About: React.FC = () => {
                 colourists.
               </p>
               <p className="govuk-body">
+                We are proud signatories of the <a href="https://live.colourstream.johnrogerscolour.co.uk/license" target="_blank" rel="noopener noreferrer" className="govuk-link">Pride Flag Covenant</a>, affirming our commitment to creating inclusive
+                technology that respects and supports all members of our community. We believe that diversity
+                strengthens our tools and ensures they serve everyone in the colour grading industry, regardless
+                of background or identity. You can read our full <a href="/license" className="govuk-link">license</a> for more details.
+              </p>
+              <p className="govuk-body">
                 ColourStream was written by <a href="https://johnrogerscolour.co.uk" target="_blank" rel="noopener noreferrer" className="govuk-link">John Rogers</a>, 
                 a professional colourist with extensive experience in the industry.
               </p>
             </div>
           </div>
           
-          <div className="govuk-grid-row" style={{ marginTop: '30px' }}>
+          <div className="govuk-grid-row" style={{ marginTop: '30px', marginBottom: '30px' }}>
             <div className="govuk-grid-column-full">
-              <SectionHeading>Self-Hosted Advantage</SectionHeading>
+              <SectionHeading>Key Features & Benefits</SectionHeading>
               <p className="govuk-body">
-                ColourStream is designed to be fully self-hosted, providing several key advantages:
+                ColourStream is a self-hosted platform designed specifically for professional colourists, offering:
               </p>
-              <ul className="govuk-list govuk-list--bullet">
-                <li>🚫 <strong>No Enshittification:</strong> Avoid the common problem of platforms degrading quality or introducing unwanted changes to maximize profit</li>
-                <li>👑 <strong>Complete Control:</strong> You own and control your entire workflow and data</li>
-                <li>🔏 <strong>Data Privacy:</strong> Client media stays on your systems, not on third-party servers</li>
-                <li>🔄 <strong>Customizability:</strong> Modify and adapt the platform to your specific workflow needs</li>
-                <li>💰 <strong>No Subscription Fees:</strong> Pay only for your hosting costs, not per-user or feature fees</li>
-                <li>🔒 <strong>Independence:</strong> Your tools won't disappear due to company shutdowns, acquisitions, or policy changes</li>
-              </ul>
-              <p className="govuk-body">
-                By self-hosting ColourStream, colourists maintain control over their professional tools and workflows, 
-                ensuring they remain stable, private, and tailored to actual needs rather than corporate profit motives.
+              <div className="govuk-grid-row">
+                <div className="govuk-grid-column-one-half">
+                  <ul className="govuk-list govuk-list--bullet">
+                    <li>🎥 <strong>Professional Streaming:</strong> Secure, high-quality video with less than 5 frames latency</li>
+                    <li>🔒 <strong>Data Privacy:</strong> Client media stays on your systems, not third-party servers</li>
+                    <li>👑 <strong>Complete Control:</strong> Own and manage your entire workflow and data</li>
+                    <li>💻 <strong>Modern Interface:</strong> Intuitive admin dashboard and responsive design</li>
+                  </ul>
+                </div>
+                <div className="govuk-grid-column-one-half">
+                  <ul className="govuk-list govuk-list--bullet">
+                    <li>🔄 <strong>Customizable:</strong> Open source codebase you can modify for your needs</li>
+                    <li>💰 <strong>Cost Effective:</strong> Pay only hosting costs, no per-user or feature fees</li>
+                    <li>🌈 <strong>Inclusive Technology:</strong> Proud <a href="/license" className="govuk-link">Pride Flag Covenant</a> signatory</li>
+                    <li>🙂‍↕️ <strong>Colour Spelt Properly:</strong> British spelling throughout (colour with a 'u', as it should be)</li>
+                  </ul>
+                </div>
+              </div>
+              
+              <p className="govuk-body" style={{ marginTop: '20px' }}>
+                Being self-hosted means you avoid platform degradation <a href="https://en.wikipedia.org/wiki/Enshittification" className="govuk-link">"enshittification"</a>, maintain independence from third-party policies,
+                and keep complete control over your professional tools and client data.
               </p>
             </div>
           </div>
           
-          <div className="govuk-grid-row" style={{ marginTop: '30px', marginBottom: '30px' }}>
-            <div className="govuk-grid-column-one-half">
-              <SectionHeading>Features</SectionHeading>
-              <ul className="govuk-list govuk-list--bullet">
-                <li>Secure, high-quality video streaming</li>
-                <li>Administrative dashboard for stream management</li>
-                <li>Realtime Live Streaming for Remote Review Sessions, with less than 5 frames of latency Powered By Oven Media Engine and Mirotalk</li>
-                <li>Secure file upload functionality</li>
-                <li>Modern, responsive user interface</li>
-                <li>British spelling throughout (colour with a 'u', as it should be)</li>
-                <li>100% open source codebase with transparency and community contribution</li>
-              </ul>
-            </div>
-            
+          <div className="govuk-grid-row" style={{ marginTop: '30px' }}>
             <div className="govuk-grid-column-one-half">
               <SectionHeading>Getting Started</SectionHeading>
               <p className="govuk-body">

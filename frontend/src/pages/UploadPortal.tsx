@@ -143,7 +143,7 @@ const UploadPortal: React.FC = () => {
           }).use(Tus, {
             endpoint: UPLOAD_ENDPOINT_URL, // Base TUS endpoint
             retryDelays: [0, 3000, 5000, 10000, 20000],
-            chunkSize: 50 * 1024 * 1024, // 50MB chunks for better reliability
+            chunkSize: 2000 * 1024 * 1024, // 2GB chunks for better reliability
             removeFingerprintOnSuccess: true,
             headers: {
               'X-Requested-With': 'XMLHttpRequest', // Add this header to match the tusd-xhr router
@@ -165,7 +165,7 @@ const UploadPortal: React.FC = () => {
             },
             // The following metadata is handled automatically by Uppy from the global meta option
             // No need to specify it here again as Uppy will handle it
-            limit: 5, // Max number of simultaneous uploads
+            limit: 10, // Max number of simultaneous uploads
           });
           
           // Set up error handling

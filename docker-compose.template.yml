@@ -394,7 +394,11 @@ services:
       "-hooks-http-forward-headers=*",
       "-hooks-http-retry=5",
       "-max-size=640000000000",
+      "-max-chunk-size=0",
+      "-loggable-request-headers=Upload-Length,Upload-Offset,Tus-Resumable,Upload-Metadata",
       "-base-path=/files",
+      "-enable-creation-with-upload",
+      "-enable-concatenation",
       "-verbose"
     ]
     restart: unless-stopped

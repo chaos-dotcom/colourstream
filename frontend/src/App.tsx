@@ -19,6 +19,7 @@ import UploadPortal from './components/upload/UploadPortal';
 import ClientUploadPortal from './pages/UploadPortal';
 import AllUploadLinks from './pages/AllUploadLinks';
 import About from './pages/About';
+import License from './pages/License';
 
 // Debug component to verify rendering
 const DebugAdminLoginPage = () => {
@@ -154,6 +155,9 @@ function App() {
             
             {/* OIDC Callback Route - frontend-specific route */}
             <Route path="/auth/callback" element={<OIDCCallback />} />
+            
+            {/* License Page */}
+            <Route path="/license" element={<License />} />
             
             {/* Routes without GovUkLayout (no footer) */}
             <Route path="/room/:roomId" element={<RoomView isPasswordProtected={true} />} />
