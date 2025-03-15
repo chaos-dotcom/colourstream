@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "Starting TurboMount S3 mounting service..."
+echo "Starting TurboMount S3 mounting service with s3fs-fuse..."
 
 # Check for required environment variables
 if [ -z "$S3_BUCKET" ]; then
@@ -32,21 +32,23 @@ S3_REGION=${S3_REGION:-us-east-1}
 # Set mount point with default if not specified
 S3_MOUNT_POINT=${S3_MOUNT_POINT:-/mnt/s3fs}
 
+# Create cache directory for s3fs
+CACHE_DIR="/tmp/s3fs-cache"
+mkdir -p $CACHE_DIR
+
 # Debug: Print environment variables for troubleshooting
 echo "Environment variables:"
 echo "S3_BUCKET: $S3_BUCKET"
 echo "S3_REGION: $S3_REGION"
 echo "S3_PUBLIC_ENDPOINT: $S3_PUBLIC_ENDPOINT"
-echo "MOUNT_OPTIONS: $MOUNT_OPTIONS"
 echo "S3_MOUNT_POINT: $S3_MOUNT_POINT"
 echo "AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:0:5}... (masked)"
 echo "AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:0:5}... (masked)"
 
 # Create mount directories if they don't exist
 mkdir -p "$S3_MOUNT_POINT"
-mkdir -p /mnt/shared
 
-# Test AWS/S3 credentials with aws CLI
+# Test AWS/S3 credentials with aws CLI before mounting
 echo "Testing S3 connection with aws CLI..."
 if [ -n "$S3_PUBLIC_ENDPOINT" ]; then
   # Explicitly configure AWS CLI to use path-style URL for MinIO compatibility
@@ -58,35 +60,79 @@ fi
 
 echo "Running: $AWS_CMD"
 echo "This may take a moment..."
-eval $AWS_CMD
-if [ $? -eq 0 ]; then
+if eval $AWS_CMD; then
   echo "Successfully connected to S3 bucket: $S3_BUCKET using AWS CLI"
   
-  # Now get contents directly and use them to populate the shared directory
-  echo "Listing bucket contents and copying to shared directory..."
-  rm -rf /mnt/shared/* # Clear any existing files
+  # Create password file for s3fs (more secure than passing credentials on command line)
+  echo "${AWS_ACCESS_KEY_ID}:${AWS_SECRET_ACCESS_KEY}" > /tmp/.s3fs-credentials
+  chmod 600 /tmp/.s3fs-credentials
   
-  # Get all files from S3 bucket
+  # Set up s3fs mount options
+  S3FS_OPTS="use_cache=${CACHE_DIR},allow_other,use_path_request_style,umask=0022"
+  
+  # Add endpoint option if specified
   if [ -n "$S3_PUBLIC_ENDPOINT" ]; then
-    aws s3 cp --endpoint-url $S3_PUBLIC_ENDPOINT --recursive s3://$S3_BUCKET/ /mnt/shared/
-  else
-    aws s3 cp --recursive s3://$S3_BUCKET/ /mnt/shared/
+    # Remove http:// or https:// if present
+    S3_ENDPOINT=$(echo $S3_PUBLIC_ENDPOINT | sed 's#^https\?://##')
+    S3FS_OPTS="${S3FS_OPTS},url=https://${S3_ENDPOINT},endpoint=${S3_REGION}"
   fi
   
-  # Set permissions
-  chmod -R 755 /mnt/shared
+  # Add performance options
+  S3FS_OPTS="${S3FS_OPTS},parallel_count=20,multipart_size=52,list_object_max_keys=1000,max_stat_cache_size=100000"
   
-  echo "Files successfully copied to /mnt/shared"
-  echo "Listing copied files:"
-  ls -la /mnt/shared
+  # Mount the S3 bucket
+  echo "Mounting S3 bucket with s3fs-fuse..."
+  echo "Mount options: ${S3FS_OPTS}"
+  
+  # Unmount first if already mounted (in case of container restart)
+  if mountpoint -q "$S3_MOUNT_POINT"; then
+    echo "Unmounting existing mount point..."
+    umount -f "$S3_MOUNT_POINT" || true
+  fi
+  
+  # Mount the bucket
+  s3fs "$S3_BUCKET" "$S3_MOUNT_POINT" -o passwd_file=/tmp/.s3fs-credentials -o "$S3FS_OPTS"
+  
+  # Verify mount was successful
+  if mountpoint -q "$S3_MOUNT_POINT"; then
+    echo "S3 bucket successfully mounted at $S3_MOUNT_POINT"
+    echo "List top-level directories:"
+    ls -la "$S3_MOUNT_POINT"
+    
+    # Show CLIENT/PROJECT structure
+    echo "CLIENT/PROJECT Directory Structure:"
+    find "$S3_MOUNT_POINT" -type d -maxdepth 2 2>/dev/null | sort
+    
+    # Keep container running and detect if mount fails
+    echo "Mount is active. Container will continue running. Use docker logs to monitor activity."
+    
+    # Monitor the mount point and exit if it becomes unavailable
+    while true; do
+      if ! mountpoint -q "$S3_MOUNT_POINT"; then
+        echo "ERROR: Mount point is no longer available. Attempting to remount..."
+        s3fs "$S3_BUCKET" "$S3_MOUNT_POINT" -o passwd_file=/tmp/.s3fs-credentials -o "$S3FS_OPTS"
+        
+        if ! mountpoint -q "$S3_MOUNT_POINT"; then
+          echo "ERROR: Failed to remount. Exiting."
+          exit 1
+        fi
+        
+        echo "Successfully remounted."
+      fi
+      
+      # Output a status message every 5 minutes to show the service is still running
+      date
+      echo "S3 mount is active at $S3_MOUNT_POINT"
+      
+      # Sleep for 5 minutes
+      sleep 300
+    done
+  else
+    echo "ERROR: Failed to mount S3 bucket at $S3_MOUNT_POINT"
+    exit 1
+  fi
 else
   echo "Failed to connect to S3 bucket: $S3_BUCKET using AWS CLI"
   echo "This could be due to credentials or network issues"
   exit 1
-fi
-
-echo "TurboMount service is running successfully!"
-echo "Container will continue running. Use docker logs to monitor activity."
-echo "S3 files are accessible on the host at /Volumes/Backup3/s3mount"
-
-exec tail -f /dev/null 
+fi 

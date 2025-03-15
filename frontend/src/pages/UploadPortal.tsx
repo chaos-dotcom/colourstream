@@ -280,8 +280,25 @@ const UploadPortal: React.FC = () => {
               shouldUseMultipart: false, // Explicitly disable multipart uploads
               limit: 1, // Process one file at a time to avoid issues
               getUploadParameters: async (file) => {
+                // Log original filename for debugging
+                console.log('Original filename before S3 upload:', file.name);
+                
+                // Ensure we have valid strings for file names
+                const fileName = typeof file.name === 'string' ? file.name : 'unnamed-file';
+                const clientName = file.meta?.client ? String(file.meta.client).replace(/\s+/g, '_') : 'default';
+                const projectName = file.meta?.project ? String(file.meta.project).replace(/\s+/g, '_') : 'default';
+                
+                // Set the file meta to include the original name without any modification
+                // This prevents Uppy from adding a UUID prefix
+                file.meta = {
+                  ...file.meta,
+                  key: `${clientName}/${projectName}/${fileName}`,
+                  // This prevents the AWS S3 plugin from adding random identifiers to the filename
+                  name: fileName
+                };
+                
                 // Generate a simple URL for debugging
-                const requestUrl = `${API_URL}/upload/s3-params/${token}?filename=${encodeURIComponent(file.name || 'unnamed-file')}`;
+                const requestUrl = `${API_URL}/upload/s3-params/${token}?filename=${encodeURIComponent(fileName)}`;
                 console.log('Requesting S3 URL from:', requestUrl);
                 
                 // Simple fetch to get presigned URL
@@ -323,8 +340,10 @@ const UploadPortal: React.FC = () => {
                 return;
               }
               
-              console.log('Upload successful to S3:', file.name, response);
-              console.log('Response details:', {
+              // Enhanced logging for debugging 
+              console.log('Upload successful to S3 - Original file name:', file.name);
+              console.log('File metadata:', file.meta);
+              console.log('Upload response details:', {
                 status: response.status,
                 body: response.body,
                 uploadURL: response.uploadURL
@@ -336,13 +355,19 @@ const UploadPortal: React.FC = () => {
               if (response.uploadURL) {
                 // When we get a URL back, extract just the key path from it (after the bucket)
                 const urlPath = response.uploadURL.split('?')[0].split('/').slice(3).join('/');
-                // If the key has a UUID prefix, strip it out to get clean filenames
+                console.log('Extracted URL path from S3 response:', urlPath);
+                // Use the path from the response
                 key = urlPath;
               } else {
                 // Construct the key using the client/project structure with the clean filename
+                // Strip any UUID patterns from the filename (standard UUID format)
+                const cleanFileName = file.name.replace(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-)/gi, '');
+                console.log('Clean filename (after UUID removal):', cleanFileName);
+                
                 key = `${file.meta.client ? file.meta.client.replace(/\s+/g, '_') : 'default'}/${
                       file.meta.project ? file.meta.project.replace(/\s+/g, '_') : 'default'
-                    }/${file.name}`;
+                    }/${cleanFileName}`;
+                console.log('Generated key from filename:', key);
               }
               
               // Notify the backend about the successful S3 upload

@@ -1,18 +1,29 @@
-# TurboMount - S3 Bucket Mounting Container
+# TurboMount - S3 Bucket Mounting Container with s3fs-fuse
 
-TurboMount is a Docker-based solution for mounting S3 buckets as filesystems on macOS. It uses AWS Mountpoint for S3 to provide a seamless way to access S3 objects as files.
+TurboMount is a Docker-based solution for mounting S3 buckets as filesystems on macOS and Linux. It uses s3fs-fuse to provide a seamless way to access S3 objects as files **without downloading the entire bucket content**.
 
 ## Features
 
+- True filesystem mounting without downloading all files
+- Files are only downloaded when accessed (lazy loading)
 - Works on both Intel (x86_64) and Apple Silicon (ARM) Macs
 - Supports AWS S3 and S3-compatible storage solutions (like MinIO)
+- Maintains CLIENT/PROJECT directory structure
+- Automatically recovers from mount failures
 - Configurable through environment variables
 - Exposes mounted S3 bucket through a Docker volume
-- Integration with existing Docker Compose setups
+
+## Key Advantages Over Previous Method
+
+- Instant startup (no waiting for downloads)
+- Minimal disk space usage (only caches accessed files)
+- Real-time access to all bucket content, including new files
+- Much lower network bandwidth usage
+- No duplication of data
 
 ## Prerequisites
 
-- Docker Desktop for Mac
+- Docker Desktop for Mac or Linux
 - Docker Compose
 - AWS account with S3 bucket (or S3-compatible storage)
 - AWS credentials with appropriate permissions
@@ -32,11 +43,13 @@ TurboMount is a Docker-based solution for mounting S3 buckets as filesystems on 
 
 3. **Verify the mount:**
    ```bash
-   docker exec -it turbomount ls -la /mnt/s3
+   docker exec -it turbomount ls -la /mnt/s3fs
    ```
 
-4. **Access your S3 files:**
-   Files mounted in the container are also accessible through the `turbomount_data` volume.
+4. **Check the CLIENT/PROJECT structure:**
+   ```bash
+   docker exec -it turbomount find /mnt/s3fs -type d -maxdepth 2
+   ```
 
 ## Integration with Existing Projects
 
@@ -52,10 +65,20 @@ To integrate TurboMount with your existing Docker Compose project:
 
 When using TurboMount with MinIO or other S3-compatible storage:
 
-1. Make sure to use the **public endpoint URL** for your MinIO server in the `S3_ENDPOINT` variable
-2. Example: `S3_ENDPOINT=https://s3.yourdomain.com` instead of `http://minio:9000`
-3. This is because mount-s3 needs to resolve the domain name from inside the container
-4. You might need to ensure your MinIO server has proper TLS certificates installed
+1. Set the `S3_PUBLIC_ENDPOINT` environment variable to your MinIO server's endpoint URL:
+   ```
+   S3_PUBLIC_ENDPOINT=https://s3.yourdomain.com
+   ```
+2. Make sure your MinIO server has proper TLS certificates installed if using HTTPS
+
+## Performance Tuning
+
+The default configuration should work well for most scenarios, but you can tune performance by modifying these parameters in `start.sh`:
+
+- `parallel_count`: Number of parallel connections (default: 20)
+- `multipart_size`: Size of multipart uploads in MB (default: 52)
+- `max_stat_cache_size`: Number of entries in the stat cache (default: 100000)
+- `use_cache`: Path to the cache directory (default: /tmp/s3fs-cache)
 
 ## Troubleshooting
 
@@ -71,22 +94,23 @@ If you encounter issues:
    docker exec -it turbomount aws s3 ls
    ```
 
-3. **Check FUSE permissions:**
-   Make sure `/dev/fuse` is accessible and `--cap-add SYS_ADMIN` is properly set.
+3. **Check FUSE mount status:**
+   ```bash
+   docker exec -it turbomount mountpoint -q /mnt/s3fs && echo "Mounted" || echo "Not mounted"
+   ```
 
-4. **Architecture issues:**
-   Ensure you've set the correct `ARCH` in your .env file (arm64 for Apple Silicon, amd64 for Intel Macs).
+4. **Check mount options:**
+   ```bash
+   docker exec -it turbomount mount | grep s3fs
+   ```
 
-5. **DNS resolution errors:**
-   If you see "Host name was invalid for dns resolution" errors, try using a public endpoint URL that can be resolved from within the container.
-
-## Known Limitations on macOS
-
-- Performance may vary compared to native S3 access
-- File locking operations may not work as expected
-- Some macOS-specific file attributes may not be preserved
+5. **Force remount if needed:**
+   ```bash
+   docker exec -it turbomount umount -f /mnt/s3fs
+   docker exec -it turbomount /mnt/start.sh
+   ```
 
 ## Credits
 
-- [AWS Mountpoint for S3](https://github.com/awslabs/mountpoint-s3)
+- [s3fs-fuse](https://github.com/s3fs-fuse/s3fs-fuse)
 - Ubuntu base image 

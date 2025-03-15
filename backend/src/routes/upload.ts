@@ -439,6 +439,11 @@ router.post('/upload/:token', upload.array('files'), async (req: Request, res: R
             file.originalname
           );
 
+          // Enhanced logging for debugging filename issues
+          console.log(`File upload request - Original filename: "${file.originalname}"`);
+          console.log(`Generated S3 key: "${s3Key}" for file: "${file.originalname}"`);
+          console.log(`Client code: "${uploadLink.project.client.code || 'default'}", Project name: "${uploadLink.project.name}"`);
+
           // Log the generated S3 key for debugging
           console.log(`Generated S3 key for upload: ${s3Key} for file: ${file.originalname}`);
 
@@ -727,8 +732,10 @@ router.get('/s3-params/:token', async (req: Request, res: Response) => {
       filename
     );
     
-    // Log the generated S3 key for debugging
-    console.log(`Generated S3 key: ${s3Key} for file: ${filename}`);
+    // Enhanced logging for debugging filename issues
+    console.log(`File upload request - Original filename: "${filename}"`);
+    console.log(`Generated S3 key: "${s3Key}" for file: "${filename}"`);
+    console.log(`Client code: "${uploadLink.project.client.code || 'default'}", Project name: "${uploadLink.project.name}"`);
 
     // Handle multipart upload initialization or regular presigned URL
     if (multipart) {
@@ -960,10 +967,13 @@ router.post('/s3-callback/:token', async (req: Request, res: Response) => {
     // The key should be in format: CLIENT/PROJECT/FILENAME
     const extractedFilename = key.split('/').pop() || filename;
     
+    // Strip any UUID patterns from the filename if they still exist
+    const cleanFilename = extractedFilename.replace(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-)/gi, '');
+    
     // Record the upload in the database
     const uploadedFile = await prisma.uploadedFile.create({
       data: {
-        name: extractedFilename,
+        name: cleanFilename,
         path: key,
         size: size ? parseFloat(size.toString()) : 0,
         mimeType: mimeType || 'application/octet-stream',
