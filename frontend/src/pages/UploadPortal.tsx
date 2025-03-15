@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation, useSearchParams } from 'react-router-dom';
 import { 
   Box, 
   Typography, 
@@ -18,11 +18,26 @@ import { styled } from '@mui/material/styles';
 import { Dashboard } from '@uppy/react';
 import Uppy from '@uppy/core';
 import Tus from '@uppy/tus';
+import XHRUpload from '@uppy/xhr-upload';
+import AwsS3 from '@uppy/aws-s3';
+import AwsS3Multipart from '@uppy/aws-s3-multipart';
+import type { UppyFile } from '@uppy/core';
+import type { AwsS3UploadParameters } from '@uppy/aws-s3';
 import '@uppy/core/dist/style.min.css';
 import '@uppy/dashboard/dist/style.min.css';
 import { getUploadLink } from '../services/uploadService';
 import { ApiResponse } from '../types';
-import { UPLOAD_ENDPOINT_URL, NAMEFORUPLOADCOMPLETION } from '../config';
+import { 
+  UPLOAD_ENDPOINT_URL, 
+  API_URL, 
+  NAMEFORUPLOADCOMPLETION,
+  S3_ENDPOINT,
+  S3_REGION,
+  S3_BUCKET,
+  COMPANION_URL,
+  COMPANION_AWS_ENDPOINT,
+  USE_COMPANION
+} from '../config';
 
 const StyledDashboard = styled(Box)(({ theme }) => ({
   '& .uppy-Dashboard-inner': {
@@ -79,11 +94,14 @@ interface UploadLinkResponse {
 // Main upload portal for clients (standalone page not requiring authentication)
 const UploadPortal: React.FC = () => {
   const { token } = useParams<{ token: string }>();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [projectInfo, setProjectInfo] = useState<UploadLinkResponse | null>(null);
   const [uppy, setUppy] = useState<any>(null);
   const [accentColor, setAccentColor] = useState('#1d70b8');
+  const useS3 = searchParams.get('S3') === 'true';
   
   useEffect(() => {
     // Select a random accent color on component mount
@@ -140,34 +158,280 @@ const UploadPortal: React.FC = () => {
                 return 1;
               }
             }
-          }).use(Tus, {
-            // Set endpoint to match tusd base path without duplicating paths
-            endpoint: UPLOAD_ENDPOINT_URL,
-            retryDelays: [0, 3000, 5000, 10000, 20000],
-            chunkSize: 5000 * 1024 * 1024, // 5000MB chunks for better reliability
-            removeFingerprintOnSuccess: true,
-            headers: {
-              'X-Requested-With': 'XMLHttpRequest', // Add this header to match the tusd-xhr router
-            },
-            onBeforeRequest: (req) => {
-              // Log the request for debugging
-              console.log('Uppy request:', req.getURL(), req.getMethod());
-              
-              // Log the metadata explicitly for POST requests (initial creation)
-              if (req.getMethod() === 'POST') {
-                console.log('Uppy metadata being sent:', uppyInstance.getState().meta);
-                console.log('Upload-Metadata header:', req.getHeader('Upload-Metadata'));
-              }
-            },
-            onShouldRetry: (err, retryAttempt, options, next) => {
-              // Log retry attempts
-              console.log('Uppy retry attempt:', retryAttempt, err);
-              return next(err);
-            },
-            // The following metadata is handled automatically by Uppy from the global meta option
-            // No need to specify it here again as Uppy will handle it
-            limit: 10, // Max number of simultaneous uploads
           });
+
+          // Choose upload method based on configuration
+          if (USE_COMPANION) {
+            console.log('Using AwsS3Multipart with Companion for large file uploads');
+            
+            // Use the AWS S3 Multipart plugin with Companion for chunked uploads
+            // @ts-expect-error - Uppy plugins have complex typings that are difficult to match exactly
+            uppyInstance.use(AwsS3Multipart, {
+              endpoint: COMPANION_URL,
+              headers: {
+                'x-upload-token': token
+              },
+              // Ensure all S3 requests go through Companion instead of directly to MinIO
+              companionAllowedHosts: /.*/,  // Force all uploads through Companion
+              // Configure chunking for large file support
+              limit: 6, // Number of concurrent uploads
+              retryDelays: [0, 1000, 3000, 5000, 10000], // Retry delays for failed chunks
+              // For very large files, use large chunks to speed up upload
+              // This is larger than the default 5MB chunks
+              chunkSize: 50 * 1024 * 1024, // 50MB chunks
+              // Log progress for debugging
+              getChunkSize(file: any) {
+                // For smaller files, use smaller chunks
+                if (file.size && file.size < 100 * 1024 * 1024) {
+                  return 10 * 1024 * 1024; // 10MB chunks for files smaller than 100MB
+                }
+                // For medium files
+                if (file.size && file.size < 1024 * 1024 * 1024) {
+                  return 25 * 1024 * 1024; // 25MB chunks for files smaller than 1GB
+                }
+                // For very large files (like your 600GB files)
+                return 50 * 1024 * 1024; // 50MB chunks for very large files
+              }
+            });
+            
+            // Log all events for multipart uploads to help debug
+            uppyInstance.on('upload-success', (file, response) => {
+              if (!file) {
+                console.error('No file information available in upload-success event');
+                return;
+              }
+              
+              console.log('Multipart upload succeeded:', file.name);
+              console.log('Response details:', response);
+              
+              // Extract key information for callback
+              let key;
+              if (file.name) {
+                // Construct the key using the client/project structure with the clean filename 
+                key = `${file.meta?.client ? String(file.meta.client).replace(/\s+/g, '_') : 'default'}/${
+                  file.meta?.project ? String(file.meta.project).replace(/\s+/g, '_') : 'default'
+                }/${file.name}`;
+              } else if (response.uploadURL) {
+                // If we have a URL but no filename, extract the key from the URL
+                key = response.uploadURL.split('?')[0].split('/').slice(3).join('/');
+              } else {
+                // Fallback for when we can't determine the key
+                key = `unknown/${Date.now()}.bin`;
+              }
+                
+              // Notify backend about the successful S3 multipart upload
+              fetch(`${API_URL}/upload/s3-callback/${token}`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  key: key,
+                  size: file.size || 0,
+                  filename: file.name || 'unknown',
+                  mimeType: file.type || 'application/octet-stream',
+                  hash: 's3-multipart-' + file.id
+                })
+              })
+              .then(response => response.json())
+              .then(data => {
+                console.log('Backend notified of S3 multipart upload:', data);
+              })
+              .catch(error => {
+                console.error('Error notifying backend about S3 multipart upload:', error);
+              });
+            });
+            
+            // Enhanced error handling for multipart uploads
+            uppyInstance.on('upload-error', (file, error, response) => {
+              console.error('MULTIPART UPLOAD ERROR:');
+              console.error('File:', file?.name, file?.size, file?.type);
+              console.error('Error message:', error?.message);
+              
+              if (response) {
+                console.error('Response status:', response.status);
+                try {
+                  console.error('Response details:', JSON.stringify(response, null, 2));
+                } catch (e) {
+                  console.error('Could not stringify response');
+                }
+              }
+              
+              setError(`Error uploading ${file?.name || 'unknown file'}: ${error?.message || 'Unknown error'}`);
+            });
+            
+            // Add specific logging for chunk uploads to debug performance
+            uppyInstance.on('upload-progress', (file, progress) => {
+              if (!file || !file.name) return;
+              if (progress.bytesTotal === null || progress.bytesUploaded === null) {
+                console.log(`Progress for ${file.name}: bytes information unavailable`);
+                return;
+              }
+              const percent = progress.bytesUploaded / progress.bytesTotal * 100;
+              console.log(`Progress for ${file.name}: ${percent.toFixed(2)}% (${progress.bytesUploaded}/${progress.bytesTotal})`);
+            });
+          } 
+          // Fall back to regular S3 if Companion is not enabled
+          else if (useS3) {
+            console.log('Using regular (non-multipart) AWS S3 plugin for direct PUT uploads');
+            
+            // Use the regular AWS S3 plugin, explicitly disabling multipart uploads
+            uppyInstance.use(AwsS3, {
+              shouldUseMultipart: false, // Explicitly disable multipart uploads
+              limit: 1, // Process one file at a time to avoid issues
+              getUploadParameters: async (file) => {
+                // Generate a simple URL for debugging
+                const requestUrl = `${API_URL}/upload/s3-params/${token}?filename=${encodeURIComponent(file.name || 'unnamed-file')}`;
+                console.log('Requesting S3 URL from:', requestUrl);
+                
+                // Simple fetch to get presigned URL
+                const response = await fetch(requestUrl);
+                
+                if (!response.ok) {
+                  console.error('S3 params request failed:', response.status, response.statusText);
+                  throw new Error(`S3 params request failed: ${response.status} ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.status !== 'success' || !data.url) {
+                  console.error('Invalid S3 response:', data);
+                  throw new Error('Invalid S3 response from server');
+                }
+                
+                console.log('S3 presigned URL:', data.url);
+                
+                // Return the complete upload parameters including Content-Type
+                return {
+                  method: 'PUT',
+                  url: data.url,
+                  fields: {}, // Empty for PUT operations
+                  headers: {
+                    'Content-Type': file.type || 'application/octet-stream',
+                    // Add cache control to prevent caching issues
+                    'Cache-Control': 'no-cache'
+                  }
+                };
+              }
+            });
+            
+            // Add event handler for successful uploads to record in the database
+            uppyInstance.on('upload-success', (file, response) => {
+              // Check that file exists before proceeding
+              if (!file || !file.name) {
+                console.error('Missing file data in upload-success event');
+                return;
+              }
+              
+              console.log('Upload successful to S3:', file.name, response);
+              console.log('Response details:', {
+                status: response.status,
+                body: response.body,
+                uploadURL: response.uploadURL
+              });
+              
+              // Extract the key from the upload response or construct it
+              // Important: We need to extract just the original filename without any UUID prefix
+              let key;
+              if (response.uploadURL) {
+                // When we get a URL back, extract just the key path from it (after the bucket)
+                const urlPath = response.uploadURL.split('?')[0].split('/').slice(3).join('/');
+                // If the key has a UUID prefix, strip it out to get clean filenames
+                key = urlPath;
+              } else {
+                // Construct the key using the client/project structure with the clean filename
+                key = `${file.meta.client ? file.meta.client.replace(/\s+/g, '_') : 'default'}/${
+                      file.meta.project ? file.meta.project.replace(/\s+/g, '_') : 'default'
+                    }/${file.name}`;
+              }
+              
+              // Notify the backend about the successful S3 upload
+              fetch(`${API_URL}/upload/s3-callback/${token}`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  key: key,
+                  size: file.size || 0,
+                  filename: file.name, // Use the original filename
+                  mimeType: file.type || 'application/octet-stream',
+                  hash: 's3-' + file.id
+                })
+              })
+              .then(response => response.json())
+              .then(data => {
+                console.log('Backend notified of S3 upload:', data);
+              })
+              .catch(error => {
+                console.error('Error notifying backend about S3 upload:', error);
+              });
+            });
+            
+            // Add specific listener for S3 multipart errors to get more detailed information
+            uppyInstance.on('upload-error', (file, error, response) => {
+              console.error('UPLOAD ERROR DETAILS:');
+              console.error('File:', file?.name, file?.size, file?.type);
+              console.error('Error message:', error?.message);
+              
+              // Try to extract the request details
+              if (response) {
+                console.error('Response status:', response.status);
+                
+                // Log all response properties safely using a try/catch to avoid TypeScript errors
+                try {
+                  console.error('Response details:', JSON.stringify(response, null, 2));
+                } catch (e) {
+                  console.error('Could not stringify response');
+                }
+                
+                // Log response body if available
+                if (response.body) {
+                  console.error('Response body:', 
+                    typeof response.body === 'string' 
+                      ? response.body 
+                      : JSON.stringify(response.body, null, 2)
+                  );
+                }
+              }
+              
+              // Log MinIO specific diagnostic info
+              if (error.message === 'Non 2xx' && response) {
+                console.error('MinIO S3 error details:', {
+                  status: response.status
+                });
+
+                // MinIO specific suggestion
+                if (response.status === 403) {
+                  setError(`Error uploading ${file?.name}: ${error.message} - This may be a MinIO permissions issue. Check the bucket policy and ACL settings.`);
+                } else if (response.status === 404) {
+                  setError(`Error uploading ${file?.name}: ${error.message} - The specified bucket or object key may not exist in MinIO.`);
+                } else if (response.status === 400) {
+                  setError(`Error uploading ${file?.name}: ${error.message} - Request format may be incorrect for MinIO.`);
+                } else {
+                  setError(`Error uploading ${file?.name}: ${error.message}`);
+                }
+              } else {
+                setError(`Error uploading ${file?.name}: ${error.message}`);
+              }
+            });
+          } else {
+            // Standard XHR uploader for local storage
+            console.log('Using XHRUpload for local storage');
+            
+            uppyInstance.use(XHRUpload, {
+              endpoint: `${API_URL}/upload/upload/${token}`,
+              fieldName: 'files', // Must match the field name expected by multer in backend
+              formData: true,
+              bundle: true,
+              limit: 10,
+              headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+              }
+            });
+            
+            console.log('Local storage upload configured');
+          }
           
           // Set up error handling
           uppyInstance.on('error', (error: Error) => {
@@ -175,10 +439,47 @@ const UploadPortal: React.FC = () => {
             setError(`Upload error: ${error.message}`);
           });
           
-          uppyInstance.on('upload-error', (file: any, error: Error) => {
+          uppyInstance.on('upload-error', (file: any, error: Error, response: any) => {
             if (file) {
               console.error('File error:', file, error);
-              setError(`Error uploading ${file.name}: ${error.message}`);
+              console.error('Upload error response:', response);
+              // Try to extract more meaningful error details
+              let errorMessage = error.message;
+              if (response && response.status) {
+                errorMessage = `HTTP ${response.status}: ${errorMessage}`;
+                if (response.body) {
+                  try {
+                    const errorBody = typeof response.body === 'string' 
+                      ? JSON.parse(response.body) 
+                      : response.body;
+                    errorMessage += ` - ${errorBody.message || JSON.stringify(errorBody)}`;
+                  } catch (e) {
+                    console.error('Failed to parse error body', e);
+                    // Add the raw body for debugging
+                    errorMessage += ` - Raw body: ${typeof response.body === 'string' ? response.body : '[Object]'}`;
+                  }
+                }
+              }
+              // Additional S3-specific error details
+              if (error.message === 'Non 2xx' && response) {
+                console.error('MinIO S3 error details:', {
+                  status: response.status,
+                  statusText: response.statusText,
+                  url: response.request?.url || 'Unknown URL',
+                  headers: response.headers,
+                  method: response.method || 'Unknown Method'
+                });
+
+                // MinIO specific suggestion
+                if (response.status === 403) {
+                  errorMessage += ' - This may be a MinIO permissions issue. Check the bucket policy and ACL settings.';
+                } else if (response.status === 404) {
+                  errorMessage += ' - The specified bucket or object key may not exist in MinIO.';
+                } else if (response.status === 400) {
+                  errorMessage += ' - Request format may be incorrect for MinIO.';
+                }
+              }
+              setError(`Error uploading ${file.name}: ${errorMessage}`);
             }
           });
           
@@ -209,7 +510,7 @@ const UploadPortal: React.FC = () => {
         uppy.close();
       }
     };
-  }, [token]);
+  }, [token, useS3]);
 
   const renderHeader = () => (
     <StyledAppBar position="static">
@@ -317,7 +618,7 @@ const UploadPortal: React.FC = () => {
             fontSize: '19px',
             color: '#0b0c0c'
           }}>
-            Upload large video files with automatic resumability.
+            Upload large video files with high-speed direct upload. {useS3 && '(Using S3 storage for native filenames)'}
           </Typography>
           
           <StyledDashboard>
@@ -342,7 +643,7 @@ const UploadPortal: React.FC = () => {
             <strong>© {new Date().getFullYear()} ColourStream</strong>
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Powered by <Link href="https://github.com/transloadit/uppy" target="_blank" rel="noopener noreferrer" underline="none" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>Uppy</Link> and <Link href="https://github.com/tus/tusd" target="_blank" rel="noopener noreferrer" underline="none" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>Tusd</Link>
+            Powered by <Link href="https://github.com/transloadit/uppy" target="_blank" rel="noopener noreferrer" underline="none" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>Uppy</Link> and <Link href="https://min.io/" target="_blank" rel="noopener noreferrer" underline="none" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>MinIO</Link>
           </Typography>
         </Container>
       </Box>

@@ -65,6 +65,10 @@ RUN if [ ! -f package-lock.json ]; then \
 COPY --from=builder --chown=appuser:appgroup /app/dist ./dist
 COPY --from=builder --chown=appuser:appgroup /app/node_modules/.prisma ./node_modules/.prisma
 
+# Copy tus hooks with proper permissions
+COPY --chown=appuser:appgroup hooks ./hooks/
+RUN chmod +x ./hooks/*
+
 # Copy and set permissions for startup script
 COPY --chown=appuser:appgroup docker-entrypoint.sh /app/
 RUN chmod +x /app/docker-entrypoint.sh

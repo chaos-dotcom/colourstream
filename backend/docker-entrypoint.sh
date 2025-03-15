@@ -74,7 +74,7 @@ echo "PostgreSQL extensions installed successfully"
 
 # Use db push instead of migrations - skip generating client
 echo "Pushing schema to database..."
-npx prisma db push --skip-generate
+npx prisma db push --skip-generate --accept-data-loss
 if [ $? -ne 0 ]; then
   echo "Failed to push schema to database"
   exit 1

@@ -7,7 +7,6 @@ import omenRoutes from './omen';
 import mirotalkRoutes from './mirotalk';
 import omeWebhookRoutes from './omeWebhook';
 import uploadRoutes from './upload';
-import tusUploadRoutes from './tusUpload';
 import tusdHooksRoutes from './tusdHooksRoutes';
 
 const router = express.Router();
@@ -20,7 +19,6 @@ router.use('/omen', omenRoutes);
 router.use('/mirotalk', mirotalkRoutes);
 router.use('/ome-webhook', omeWebhookRoutes);
 router.use('/upload', uploadRoutes);
-router.use('/upload-hooks', tusUploadRoutes);
 router.use('/tusd-hooks', tusdHooksRoutes);
 
 export default router; 

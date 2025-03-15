@@ -4,7 +4,11 @@ import { getClients } from '../../services/uploadService';
 import { Box, TextField, Typography, Card, CardContent, Grid, CircularProgress } from '@mui/material';
 import { Link } from 'react-router-dom';
 
-const ClientList: React.FC = () => {
+interface ClientListProps {
+  refreshTrigger?: number;
+}
+
+const ClientList: React.FC<ClientListProps> = ({ refreshTrigger = 0 }) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [filteredClients, setFilteredClients] = useState<Client[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -14,6 +18,7 @@ const ClientList: React.FC = () => {
   useEffect(() => {
     const fetchClients = async () => {
       try {
+        setLoading(true);
         const response = await getClients();
         if (response.status === 'success') {
           setClients(response.data);
@@ -29,7 +34,7 @@ const ClientList: React.FC = () => {
     };
 
     fetchClients();
-  }, []);
+  }, [refreshTrigger]);
 
   useEffect(() => {
     const filtered = clients.filter(

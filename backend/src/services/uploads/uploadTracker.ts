@@ -93,6 +93,7 @@ class UploadTracker {
       
       if (telegramBot) {
         console.log('[TELEGRAM-DEBUG] Calling sendUploadNotification for completed upload:', id);
+        // We'll use the same upload ID to ensure message editing occurs
         telegramBot.sendUploadNotification(completedUpload)
           .then(success => console.log('[TELEGRAM-DEBUG] sendUploadNotification result:', success ? 'Success' : 'Failed'))
           .catch(err => {

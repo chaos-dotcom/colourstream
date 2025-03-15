@@ -91,6 +91,7 @@ const AdminDashboard: React.FC = () => {
   const [isGeneratingToken, setIsGeneratingToken] = useState(false);
   const [value, setValue] = useState(0);
   const [stoppingStream, setStoppingStream] = useState(false);
+  const [forceClientListRefresh, setForceClientListRefresh] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -268,11 +269,12 @@ const AdminDashboard: React.FC = () => {
             </Box>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
               <CreateClientForm onSuccess={() => {
-                // Handle client creation success
+                // Trigger a refresh of the client list using refreshTrigger
+                setForceClientListRefresh(prev => prev + 1);
                 console.log('Client created successfully');
               }} />
             </Box>
-            <ClientList />
+            <ClientList refreshTrigger={forceClientListRefresh} />
           </Box>
         </TabPanel>
 

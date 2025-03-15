@@ -41,6 +41,8 @@ export interface UploadedFile {
   project?: Project;
   createdAt: string;
   updatedAt: string;
+  status?: string;
+  completedAt?: string;
 }
 
 export interface CreateClientRequest {

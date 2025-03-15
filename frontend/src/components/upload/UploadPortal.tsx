@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Routes, Route, Link as RouterLink } from 'react-router-dom';
 import {
   Box,
@@ -19,6 +19,13 @@ import ProjectDetails from './ProjectDetails';
 
 // Main container for the upload portal admin interface
 const UploadPortal: React.FC = () => {
+  const [clientRefreshTrigger, setClientRefreshTrigger] = useState(0);
+
+  const handleClientCreated = () => {
+    // Increment the refresh trigger to cause ClientList to re-fetch data
+    setClientRefreshTrigger(prev => prev + 1);
+  };
+
   return (
     <Box>
       <AppBar position="static">
@@ -44,9 +51,9 @@ const UploadPortal: React.FC = () => {
                   </Breadcrumbs>
                 </Box>
                 <Box mb={3}>
-                  <CreateClientForm />
+                  <CreateClientForm onSuccess={handleClientCreated} />
                 </Box>
-                <ClientList />
+                <ClientList refreshTrigger={clientRefreshTrigger} />
               </>
             }
           />

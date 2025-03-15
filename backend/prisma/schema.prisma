@@ -120,7 +120,7 @@ model UploadLink {
   projectId   String
   project     Project   @relation(fields: [projectId], references: [id])
   expiresAt   DateTime
-  maxUses     Int       @default(1)
+  maxUses     Int?
   usedCount   Int       @default(0)
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
@@ -138,20 +138,26 @@ model UploadedFile {
   id          String       @id @default(uuid())
   name        String
   path        String?
-  size        Float        // Changed from BigInt to Float to handle large file sizes
-  status      UploadStatus @default(uploading)
-  tusId       String?      @unique
-  s3Key       String?
-  s3Bucket    String?
+  size        Float
   mimeType    String?
-  hash        String?      // Adding hash field to store file hash
-  projectId   String
+  hash        String
+  status      String       @default("completed")
+  storage     String       @default("local") // "local" or "s3" to track where the file is stored
+  url         String?      // Optional URL for S3 storage
   project     Project      @relation(fields: [projectId], references: [id])
-  uploadedBy  String?      // Could be an email or name of uploader
-  completedAt DateTime?
+  projectId   String
   createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  completedAt DateTime?
+}
 
-  @@index([projectId])
-  @@index([tusId])
+// Model for storing Telegram message IDs associated with uploads
+model TelegramMessage {
+  id           String   @id @default(uuid())
+  uploadId     String   @unique  // The ID of the upload this message corresponds to
+  messageId    Int      // The Telegram message ID
+  chatId       String   // The Telegram chat ID
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([uploadId])
 } 

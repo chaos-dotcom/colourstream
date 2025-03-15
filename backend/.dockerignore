@@ -1,0 +1,49 @@
+# Node.js dependencies and build artifacts
+node_modules
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
+# Environment files (except templates)
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+# Keep the template
+!.env.template
+
+# Logs
+logs
+*.log
+
+# Build output
+dist
+
+# Development-only directories
+.git
+.github
+.vscode
+.idea
+coverage
+tests
+
+# Temporary files
+.DS_Store
+*.swp
+*.swo
+tmp
+temp
+
+# Local uploads (they should be volume mounted)
+uploads/*
+!uploads/.gitkeep
+
+# Documentation
+*.md
+!README.md
+
+# DevOps and CI/CD related
+.circleci
+.travis.yml
+.gitlab-ci.yml 
