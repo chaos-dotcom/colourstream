@@ -1,6 +1,6 @@
 import { S3Client, GetObjectCommand, DeleteObjectCommand, PutObjectCommand, 
   CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, 
-  AbortMultipartUploadCommand, CompletedPart } from '@aws-sdk/client-s3';
+  AbortMultipartUploadCommand, CompletedPart, CopyObjectCommand } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Readable } from 'stream';
@@ -313,6 +313,44 @@ export const s3Service = {
   },
 
   /**
+   * Get the content of a file from S3
+   * @param {string} key - The key (path) of the file in S3
+   * @returns {Promise<Buffer|null>} - The file content as a Buffer, or null if not found
+   */
+  async getFileContent(key: string): Promise<Buffer | null> {
+    try {
+      const command = new GetObjectCommand({
+        Bucket: bucket,
+        Key: key,
+      });
+
+      const response = await s3Client.send(command);
+      
+      if (!response.Body) {
+        return null;
+      }
+
+      // Convert the response body to a buffer
+      const chunks: Uint8Array[] = [];
+      const stream = response.Body as Readable;
+      
+      return new Promise((resolve, reject) => {
+        stream.on('data', (chunk) => chunks.push(chunk));
+        stream.on('end', () => resolve(Buffer.concat(chunks)));
+        stream.on('error', reject);
+      });
+    } catch (error) {
+      // Check if the error is a NoSuchKey error, which means the file doesn't exist
+      if ((error as any)?.name === 'NoSuchKey') {
+        return null;
+      }
+      
+      logger.error(`Error getting file content from S3 for key ${key}:`, error);
+      throw new Error(`Failed to get file content from S3: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  },
+
+  /**
    * Delete a file from S3
    * @param {string} key - The key (path) of the file in S3
    * @returns {Promise<void>}
@@ -327,7 +365,7 @@ export const s3Service = {
       await s3Client.send(command);
       logger.info(`File deleted from S3: ${key}`);
     } catch (error) {
-      logger.error(`Error deleting file from S3 (${key}):`, error);
+      logger.error(`Error deleting file from S3 for key ${key}:`, error);
       throw new Error(`Failed to delete file from S3: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   },
@@ -354,6 +392,46 @@ export const s3Service = {
     
     // Create the key using the client/project/filename structure without any additional prefixes or suffixes
     return `${normalizedClientCode}/${normalizedProjectName}/${safeName}`;
+  },
+
+  /**
+   * Renames an object in S3 by copying to a new key and deleting the old one
+   * @param {string} sourceKey - The original key of the object
+   * @param {string} destinationKey - The new key for the object
+   * @returns {Promise<string>} - The new URL of the renamed object
+   */
+  async renameObject(sourceKey: string, destinationKey: string): Promise<string> {
+    try {
+      // Skip if source and destination are the same
+      if (sourceKey === destinationKey) {
+        logger.info(`Key already cleaned: ${sourceKey}`);
+        return `${process.env.S3_ENDPOINT}/${bucket}/${sourceKey}`;
+      }
+
+      logger.info(`Renaming S3 object: ${sourceKey} -> ${destinationKey}`);
+      
+      // Copy the object to the new key
+      await s3Client.send(new CopyObjectCommand({
+        Bucket: bucket,
+        CopySource: `${bucket}/${sourceKey}`,
+        Key: destinationKey
+      }));
+      
+      // Delete the original object
+      await s3Client.send(new DeleteObjectCommand({
+        Bucket: bucket,
+        Key: sourceKey
+      }));
+      
+      // Generate the URL for the renamed file
+      const fileUrl = `${process.env.S3_ENDPOINT}/${bucket}/${destinationKey}`;
+      logger.info(`Successfully renamed S3 object to: ${fileUrl}`);
+      
+      return fileUrl;
+    } catch (error) {
+      logger.error(`Error renaming object in S3 from ${sourceKey} to ${destinationKey}:`, error);
+      throw new Error(`Failed to rename object in S3: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 };
 

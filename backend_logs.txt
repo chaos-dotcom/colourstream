@@ -1,0 +1,150 @@
+backend-1  | Starting backend initialization...
+backend-1  | Database configuration:
+backend-1  | - Host: colourstream-postgres
+backend-1  | - Port: 5432
+backend-1  | - User: colourstream
+backend-1  | - Database: colourstream
+backend-1  | Waiting for PostgreSQL to be ready...
+backend-1  | Attempting to connect to PostgreSQL at colourstream-postgres:5432 (attempt 1/30)...
+backend-1  | PostgreSQL is ready!
+backend-1  | Database colourstream already exists, using it
+backend-1  | Setting up database...
+backend-1  | Installing PostgreSQL extensions...
+backend-1  | NOTICE:  extension "pgcrypto" already exists, skipping
+backend-1  | CREATE EXTENSION
+backend-1  | NOTICE:  extension "uuid-ossp" already exists, skipping
+backend-1  | CREATE EXTENSION
+backend-1  | PostgreSQL extensions installed successfully
+backend-1  | Pushing schema to database...
+backend-1  | Prisma schema loaded from prisma/schema.prisma
+backend-1  | Datasource "db": PostgreSQL database "colourstream", schema "public" at "colourstream-postgres:5432"
+backend-1  | 
+backend-1  | The database is already in sync with the Prisma schema.
+backend-1  | 
+backend-1  | Schema pushed to database successfully
+backend-1  | Starting the application...
+backend-1  | [32minfo[39m: Connecting to database... {"timestamp":"2025-03-15T16:37:43.525Z"}
+backend-1  | [32minfo[39m: WebSocket server initialized without path restriction to handle all WebSocket connections {"timestamp":"2025-03-15T16:37:44.189Z"}
+backend-1  | [32minfo[39m: OBS WebSocket service initialized {"timestamp":"2025-03-15T16:37:44.190Z"}
+backend-1  | [32minfo[39m: Initialized service with OME RTMP endpoint: rtmp://live.colourstream.johnrogerscolour.co.uk:1935/app {"timestamp":"2025-03-15T16:37:44.190Z"}
+backend-1  | [32minfo[39m: Initialized service with OME SRT endpoint: srt://live.colourstream.johnrogerscolour.co.uk:9999 {"timestamp":"2025-03-15T16:37:44.190Z"}
+backend-1  | [32minfo[39m: Using SRT latency: 2000000 microseconds {"timestamp":"2025-03-15T16:37:44.191Z"}
+backend-1  | [32minfo[39m: Initialized OvenMediaEngine Service with URL: http://origin:8081 {"timestamp":"2025-03-15T16:37:44.227Z"}
+backend-1  | [32minfo[39m: Using API access token: ******** {"timestamp":"2025-03-15T16:37:44.227Z"}
+backend-1  | [32minfo[39m: WebSocket server initialized without path restriction to handle all WebSocket connections {"timestamp":"2025-03-15T16:37:44.454Z"}
+backend-1  | [32minfo[39m: OBS WebSocket service initialized {"timestamp":"2025-03-15T16:37:44.454Z"}
+backend-1  | [32minfo[39m: Initialized service with OME RTMP endpoint: rtmp://live.colourstream.johnrogerscolour.co.uk:1935/app {"timestamp":"2025-03-15T16:37:44.454Z"}
+backend-1  | [32minfo[39m: Initialized service with OME SRT endpoint: srt://live.colourstream.johnrogerscolour.co.uk:9999 {"timestamp":"2025-03-15T16:37:44.454Z"}
+backend-1  | [32minfo[39m: Using SRT latency: 2000000 microseconds {"timestamp":"2025-03-15T16:37:44.455Z"}
+backend-1  | [32minfo[39m: Initializing authentication system {"timestamp":"2025-03-15T16:37:44.456Z"}
+backend-1  | [32minfo[39m: Authentication system initialized successfully {"envVars":{"NODE_ENV":"production","hasJwtSecret":true,"hasWebAuthnConfig":true},"timestamp":"2025-03-15T16:37:44.456Z"}
+backend-1  | prisma:info Starting a postgresql pool with 17 connections.
+backend-1  | prisma:info Started query engine http server on http://127.0.0.1:45963
+backend-1  | [32minfo[39m: Successfully connected to the database {"timestamp":"2025-03-15T16:37:44.555Z"}
+backend-1  | [32minfo[39m: OIDC is not enabled or configured in database {"timestamp":"2025-03-15T16:37:44.564Z"}
+backend-1  | [33mwarn[39m: OIDC initialization failed, authentication will be limited to passkeys {"timestamp":"2025-03-15T16:37:44.564Z"}
+backend-1  | [32minfo[39m: Initializing Telegram bot with token: 7734850258... and chat ID: 5509832781 {"timestamp":"2025-03-15T16:37:44.564Z"}
+backend-1  | [TELEGRAM-DEBUG] Telegram API Base URL: https://api.telegram.org/bot7734850258...
+backend-1  | [32minfo[39m: Telegram API Base URL: {"timestamp":"2025-03-15T16:37:44.565Z"}
+backend-1  | [TELEGRAM-DEBUG] Sending Telegram message to chat ID: 5509832781
+backend-1  | [TELEGRAM-DEBUG] Message content: <b>🚀 ColourStream Upload Monitor Started</b>
+backend-1  | 
+backend-1  | The upload monitoring system is now active. You will ...
+backend-1  | [TELEGRAM-DEBUG] No existing message found for unknown, sending new message
+backend-1  | [32minfo[39m: Server is running on port 5001 {"timestamp":"2025-03-15T16:37:44.602Z"}
+backend-1  | [32minfo[39m: Health check available at /api/health {"timestamp":"2025-03-15T16:37:44.602Z"}
+backend-1  | [TELEGRAM-DEBUG] Telegram API response: {"ok":true,"result":{"message_id":368,"from":{"id":7734850258,"is_bot":true,"first_name":"ColourStream Upload Notifications","username":"ColourStream_bot"},"chat":{"id":5509832781,"first_name":"John","last_name":"Rogers","username":"colourbyrogers","type":"private"},"date":1742056664,"text":"🚀 ColourStream Upload Monitor Started\n\nThe upload monitoring system is now active. You will receive notifications about upload progress and completions.","entities":[{"offset":0,"length":38,"type":"bold"}]}}
+backend-1  | [32minfo[39m: Telegram bot initialized and startup message sent {"timestamp":"2025-03-15T16:37:44.699Z"}
+backend-1  | [TELEGRAM-DEBUG] trackUpload called for ID: s3-7ffdc025-0c9a-4a49-a828-34243a42ff74
+backend-1  | [TELEGRAM-DEBUG] getTelegramBot() returned: Bot instance available
+backend-1  | [TELEGRAM-DEBUG] Calling sendUploadNotification for upload: s3-7ffdc025-0c9a-4a49-a828-34243a42ff74
+backend-1  | [TELEGRAM-DEBUG] Creating upload notification message for upload: s3-7ffdc025-0c9a-4a49-a828-34243a42ff74
+backend-1  | [32minfo[39m: Upload tracked: s3-7ffdc025-0c9a-4a49-a828-34243a42ff74 - 100% complete {"timestamp":"2025-03-15T16:43:06.181Z"}
+backend-1  | [TELEGRAM-DEBUG] No message ID found for upload s3-7ffdc025-0c9a-4a49-a828-34243a42ff74
+backend-1  | [TELEGRAM-DEBUG] Looking for existing message ID for upload s3-7ffdc025-0c9a-4a49-a828-34243a42ff74: Not found
+backend-1  | [TELEGRAM-DEBUG] Sending new message for upload s3-7ffdc025-0c9a-4a49-a828-34243a42ff74
+backend-1  | [TELEGRAM-DEBUG] Sending Telegram message to chat ID: 5509832781
+backend-1  | [TELEGRAM-DEBUG] Message content: <b>✅ Upload Completed!</b>
+backend-1  | <b>File:</b> Screenshot 2025-03-04 at 10.07.42.png
+backend-1  | <b>Size:</b> 1008.39 K...
+backend-1  | [TELEGRAM-DEBUG] No message ID found for upload s3-7ffdc025-0c9a-4a49-a828-34243a42ff74
+backend-1  | [TELEGRAM-DEBUG] No existing message found for s3-7ffdc025-0c9a-4a49-a828-34243a42ff74, sending new message
+backend-1  | [TELEGRAM-DEBUG] Stored message ID 369 for upload s3-7ffdc025-0c9a-4a49-a828-34243a42ff74 in database
+backend-1  | [TELEGRAM-DEBUG] Telegram API response: {"ok":true,"result":{"message_id":369,"from":{"id":7734850258,"is_bot":true,"first_name":"ColourStream Upload Notifications","username":"ColourStream_bot"},"chat":{"id":5509832781,"first_name":"John","last_name":"Rogers","username":"colourbyrogers","type":"private"},"date":1742056986,"text":"✅ Upload Completed!\nFile: Screenshot 2025-03-04 at 10.07.42.png\nSize: 1008.39 KB\nID: s3-7ffdc025-0c9a-4a49-a828-34243a42ff74\nProgress: 100% Complete!\nClient: Test\nProject: AlphaFuck\nMethod: TUS Upload\nCompleted at: 3/15/2025, 4:43:06 PM","entities":[{"offset":0,"length":19,"type":"bold"},{"offset":20,"length":5,"type":"bold"},{"offset":64,"length":5,"type":"bold"},{"offset":81,"length":3,"type":"bold"},{"offset":125,"length":9,"type":"bold"},{"offset":150,"length":7,"type":"bold"},{"offset":163,"length":8,"type":"bold"},{"offset":182,"length":7,"type":"bold"},{"offset":201,"length":13,"type":"bold"}]}}
+backend-1  | [TELEGRAM-DEBUG] sendUploadNotification result: Success
+backend-1  | [TELEGRAM-DEBUG] Cleaning up message ID after completion for s3-7ffdc025-0c9a-4a49-a828-34243a42ff74
+backend-1  | [TELEGRAM-DEBUG] Deleted message ID for upload s3-7ffdc025-0c9a-4a49-a828-34243a42ff74 from database
+backend-1  | [TELEGRAM-DEBUG] trackUpload called for ID: s3-e1c855eb-d0e0-4c27-ac85-8a952289ccf4
+backend-1  | [TELEGRAM-DEBUG] getTelegramBot() returned: Bot instance available
+backend-1  | [TELEGRAM-DEBUG] Calling sendUploadNotification for upload: s3-e1c855eb-d0e0-4c27-ac85-8a952289ccf4
+backend-1  | [TELEGRAM-DEBUG] Creating upload notification message for upload: s3-e1c855eb-d0e0-4c27-ac85-8a952289ccf4
+backend-1  | [32minfo[39m: Upload tracked: s3-e1c855eb-d0e0-4c27-ac85-8a952289ccf4 - 100% complete {"timestamp":"2025-03-15T16:44:44.124Z"}
+backend-1  | [TELEGRAM-DEBUG] No message ID found for upload s3-e1c855eb-d0e0-4c27-ac85-8a952289ccf4
+backend-1  | [TELEGRAM-DEBUG] Looking for existing message ID for upload s3-e1c855eb-d0e0-4c27-ac85-8a952289ccf4: Not found
+backend-1  | [TELEGRAM-DEBUG] Sending new message for upload s3-e1c855eb-d0e0-4c27-ac85-8a952289ccf4
+backend-1  | [TELEGRAM-DEBUG] Sending Telegram message to chat ID: 5509832781
+backend-1  | [TELEGRAM-DEBUG] Message content: <b>✅ Upload Completed!</b>
+backend-1  | <b>File:</b> Screenshot 2025-03-04 at 09.46.06.png
+backend-1  | <b>Size:</b> 547.51 KB...
+backend-1  | [TELEGRAM-DEBUG] No message ID found for upload s3-e1c855eb-d0e0-4c27-ac85-8a952289ccf4
+backend-1  | [TELEGRAM-DEBUG] No existing message found for s3-e1c855eb-d0e0-4c27-ac85-8a952289ccf4, sending new message
+backend-1  | [TELEGRAM-DEBUG] Stored message ID 370 for upload s3-e1c855eb-d0e0-4c27-ac85-8a952289ccf4 in database
+backend-1  | [TELEGRAM-DEBUG] Telegram API response: {"ok":true,"result":{"message_id":370,"from":{"id":7734850258,"is_bot":true,"first_name":"ColourStream Upload Notifications","username":"ColourStream_bot"},"chat":{"id":5509832781,"first_name":"John","last_name":"Rogers","username":"colourbyrogers","type":"private"},"date":1742057084,"text":"✅ Upload Completed!\nFile: Screenshot 2025-03-04 at 09.46.06.png\nSize: 547.51 KB\nID: s3-e1c855eb-d0e0-4c27-ac85-8a952289ccf4\nProgress: 100% Complete!\nClient: Test\nProject: AlphaFuck\nMethod: TUS Upload\nCompleted at: 3/15/2025, 4:44:44 PM","entities":[{"offset":0,"length":19,"type":"bold"},{"offset":20,"length":5,"type":"bold"},{"offset":64,"length":5,"type":"bold"},{"offset":80,"length":3,"type":"bold"},{"offset":124,"length":9,"type":"bold"},{"offset":149,"length":7,"type":"bold"},{"offset":162,"length":8,"type":"bold"},{"offset":181,"length":7,"type":"bold"},{"offset":200,"length":13,"type":"bold"}]}}
+backend-1  | [TELEGRAM-DEBUG] sendUploadNotification result: Success
+backend-1  | [TELEGRAM-DEBUG] Cleaning up message ID after completion for s3-e1c855eb-d0e0-4c27-ac85-8a952289ccf4
+backend-1  | [TELEGRAM-DEBUG] Deleted message ID for upload s3-e1c855eb-d0e0-4c27-ac85-8a952289ccf4 from database
+backend-1  | [TELEGRAM-DEBUG] trackUpload called for ID: s3-2b698bf9-316d-4fb3-b4bc-ae3cdeadc3dd
+backend-1  | [TELEGRAM-DEBUG] getTelegramBot() returned: Bot instance available
+backend-1  | [TELEGRAM-DEBUG] Calling sendUploadNotification for upload: s3-2b698bf9-316d-4fb3-b4bc-ae3cdeadc3dd
+backend-1  | [TELEGRAM-DEBUG] Creating upload notification message for upload: s3-2b698bf9-316d-4fb3-b4bc-ae3cdeadc3dd
+backend-1  | [32minfo[39m: Upload tracked: s3-2b698bf9-316d-4fb3-b4bc-ae3cdeadc3dd - 100% complete {"timestamp":"2025-03-15T16:45:19.942Z"}
+backend-1  | [TELEGRAM-DEBUG] No message ID found for upload s3-2b698bf9-316d-4fb3-b4bc-ae3cdeadc3dd
+backend-1  | [TELEGRAM-DEBUG] Looking for existing message ID for upload s3-2b698bf9-316d-4fb3-b4bc-ae3cdeadc3dd: Not found
+backend-1  | [TELEGRAM-DEBUG] Sending new message for upload s3-2b698bf9-316d-4fb3-b4bc-ae3cdeadc3dd
+backend-1  | [TELEGRAM-DEBUG] Sending Telegram message to chat ID: 5509832781
+backend-1  | [TELEGRAM-DEBUG] Message content: <b>✅ Upload Completed!</b>
+backend-1  | <b>File:</b> Screenshot 2025-03-03 at 21.42.21.png
+backend-1  | <b>Size:</b> 541.40 KB...
+backend-1  | [TELEGRAM-DEBUG] No message ID found for upload s3-2b698bf9-316d-4fb3-b4bc-ae3cdeadc3dd
+backend-1  | [TELEGRAM-DEBUG] No existing message found for s3-2b698bf9-316d-4fb3-b4bc-ae3cdeadc3dd, sending new message
+backend-1  | [TELEGRAM-DEBUG] Stored message ID 371 for upload s3-2b698bf9-316d-4fb3-b4bc-ae3cdeadc3dd in database
+backend-1  | [TELEGRAM-DEBUG] Telegram API response: {"ok":true,"result":{"message_id":371,"from":{"id":7734850258,"is_bot":true,"first_name":"ColourStream Upload Notifications","username":"ColourStream_bot"},"chat":{"id":5509832781,"first_name":"John","last_name":"Rogers","username":"colourbyrogers","type":"private"},"date":1742057120,"text":"✅ Upload Completed!\nFile: Screenshot 2025-03-03 at 21.42.21.png\nSize: 541.40 KB\nID: s3-2b698bf9-316d-4fb3-b4bc-ae3cdeadc3dd\nProgress: 100% Complete!\nClient: Test\nProject: AlphaFuck\nMethod: TUS Upload\nCompleted at: 3/15/2025, 4:45:19 PM","entities":[{"offset":0,"length":19,"type":"bold"},{"offset":20,"length":5,"type":"bold"},{"offset":64,"length":5,"type":"bold"},{"offset":80,"length":3,"type":"bold"},{"offset":124,"length":9,"type":"bold"},{"offset":149,"length":7,"type":"bold"},{"offset":162,"length":8,"type":"bold"},{"offset":181,"length":7,"type":"bold"},{"offset":200,"length":13,"type":"bold"}]}}
+backend-1  | [TELEGRAM-DEBUG] sendUploadNotification result: Success
+backend-1  | [TELEGRAM-DEBUG] Cleaning up message ID after completion for s3-2b698bf9-316d-4fb3-b4bc-ae3cdeadc3dd
+backend-1  | [TELEGRAM-DEBUG] Deleted message ID for upload s3-2b698bf9-316d-4fb3-b4bc-ae3cdeadc3dd from database
+backend-1  | [TELEGRAM-DEBUG] trackUpload called for ID: s3-67e3cd09-9d99-4ad5-b8ad-c88c6697e9ce
+backend-1  | [TELEGRAM-DEBUG] getTelegramBot() returned: Bot instance available
+backend-1  | [TELEGRAM-DEBUG] Calling sendUploadNotification for upload: s3-67e3cd09-9d99-4ad5-b8ad-c88c6697e9ce
+backend-1  | [TELEGRAM-DEBUG] Creating upload notification message for upload: s3-67e3cd09-9d99-4ad5-b8ad-c88c6697e9ce
+backend-1  | [32minfo[39m: Upload tracked: s3-67e3cd09-9d99-4ad5-b8ad-c88c6697e9ce - 100% complete {"timestamp":"2025-03-15T16:52:55.913Z"}
+backend-1  | [TELEGRAM-DEBUG] No message ID found for upload s3-67e3cd09-9d99-4ad5-b8ad-c88c6697e9ce
+backend-1  | [TELEGRAM-DEBUG] Looking for existing message ID for upload s3-67e3cd09-9d99-4ad5-b8ad-c88c6697e9ce: Not found
+backend-1  | [TELEGRAM-DEBUG] Sending new message for upload s3-67e3cd09-9d99-4ad5-b8ad-c88c6697e9ce
+backend-1  | [TELEGRAM-DEBUG] Sending Telegram message to chat ID: 5509832781
+backend-1  | [TELEGRAM-DEBUG] Message content: <b>✅ Upload Completed!</b>
+backend-1  | <b>File:</b> Screenshot 2025-03-04 at 09.46.06.png
+backend-1  | <b>Size:</b> 547.51 KB...
+backend-1  | [TELEGRAM-DEBUG] No message ID found for upload s3-67e3cd09-9d99-4ad5-b8ad-c88c6697e9ce
+backend-1  | [TELEGRAM-DEBUG] No existing message found for s3-67e3cd09-9d99-4ad5-b8ad-c88c6697e9ce, sending new message
+backend-1  | [TELEGRAM-DEBUG] Stored message ID 372 for upload s3-67e3cd09-9d99-4ad5-b8ad-c88c6697e9ce in database
+backend-1  | [TELEGRAM-DEBUG] Telegram API response: {"ok":true,"result":{"message_id":372,"from":{"id":7734850258,"is_bot":true,"first_name":"ColourStream Upload Notifications","username":"ColourStream_bot"},"chat":{"id":5509832781,"first_name":"John","last_name":"Rogers","username":"colourbyrogers","type":"private"},"date":1742057576,"text":"✅ Upload Completed!\nFile: Screenshot 2025-03-04 at 09.46.06.png\nSize: 547.51 KB\nID: s3-67e3cd09-9d99-4ad5-b8ad-c88c6697e9ce\nProgress: 100% Complete!\nClient: Test\nProject: AlphaFuck\nMethod: TUS Upload\nCompleted at: 3/15/2025, 4:52:55 PM","entities":[{"offset":0,"length":19,"type":"bold"},{"offset":20,"length":5,"type":"bold"},{"offset":64,"length":5,"type":"bold"},{"offset":80,"length":3,"type":"bold"},{"offset":124,"length":9,"type":"bold"},{"offset":149,"length":7,"type":"bold"},{"offset":162,"length":8,"type":"bold"},{"offset":181,"length":7,"type":"bold"},{"offset":200,"length":13,"type":"bold"}]}}
+backend-1  | [TELEGRAM-DEBUG] sendUploadNotification result: Success
+backend-1  | [TELEGRAM-DEBUG] Cleaning up message ID after completion for s3-67e3cd09-9d99-4ad5-b8ad-c88c6697e9ce
+backend-1  | [TELEGRAM-DEBUG] Deleted message ID for upload s3-67e3cd09-9d99-4ad5-b8ad-c88c6697e9ce from database
+backend-1  | [TELEGRAM-DEBUG] trackUpload called for ID: s3-366a12d3-cf04-46d2-bdb6-067452fda0d5
+backend-1  | [TELEGRAM-DEBUG] getTelegramBot() returned: Bot instance available
+backend-1  | [TELEGRAM-DEBUG] Calling sendUploadNotification for upload: s3-366a12d3-cf04-46d2-bdb6-067452fda0d5
+backend-1  | [TELEGRAM-DEBUG] Creating upload notification message for upload: s3-366a12d3-cf04-46d2-bdb6-067452fda0d5
+backend-1  | [32minfo[39m: Upload tracked: s3-366a12d3-cf04-46d2-bdb6-067452fda0d5 - 100% complete {"timestamp":"2025-03-15T16:55:45.463Z"}
+backend-1  | [TELEGRAM-DEBUG] No message ID found for upload s3-366a12d3-cf04-46d2-bdb6-067452fda0d5
+backend-1  | [TELEGRAM-DEBUG] Looking for existing message ID for upload s3-366a12d3-cf04-46d2-bdb6-067452fda0d5: Not found
+backend-1  | [TELEGRAM-DEBUG] Sending new message for upload s3-366a12d3-cf04-46d2-bdb6-067452fda0d5
+backend-1  | [TELEGRAM-DEBUG] Sending Telegram message to chat ID: 5509832781
+backend-1  | [TELEGRAM-DEBUG] Message content: <b>✅ Upload Completed!</b>
+backend-1  | <b>File:</b> Screenshot 2025-03-15 at 16.55.35.png
+backend-1  | <b>Size:</b> 635.97 KB...
+backend-1  | [TELEGRAM-DEBUG] No message ID found for upload s3-366a12d3-cf04-46d2-bdb6-067452fda0d5
+backend-1  | [TELEGRAM-DEBUG] No existing message found for s3-366a12d3-cf04-46d2-bdb6-067452fda0d5, sending new message
+backend-1  | [TELEGRAM-DEBUG] Stored message ID 373 for upload s3-366a12d3-cf04-46d2-bdb6-067452fda0d5 in database
+backend-1  | [TELEGRAM-DEBUG] Telegram API response: {"ok":true,"result":{"message_id":373,"from":{"id":7734850258,"is_bot":true,"first_name":"ColourStream Upload Notifications","username":"ColourStream_bot"},"chat":{"id":5509832781,"first_name":"John","last_name":"Rogers","username":"colourbyrogers","type":"private"},"date":1742057745,"text":"✅ Upload Completed!\nFile: Screenshot 2025-03-15 at 16.55.35.png\nSize: 635.97 KB\nID: s3-366a12d3-cf04-46d2-bdb6-067452fda0d5\nProgress: 100% Complete!\nClient: Test\nProject: AlphaFuck\nMethod: TUS Upload\nCompleted at: 3/15/2025, 4:55:45 PM","entities":[{"offset":0,"length":19,"type":"bold"},{"offset":20,"length":5,"type":"bold"},{"offset":64,"length":5,"type":"bold"},{"offset":80,"length":3,"type":"bold"},{"offset":124,"length":9,"type":"bold"},{"offset":149,"length":7,"type":"bold"},{"offset":162,"length":8,"type":"bold"},{"offset":181,"length":7,"type":"bold"},{"offset":200,"length":13,"type":"bold"}]}}
+backend-1  | [TELEGRAM-DEBUG] sendUploadNotification result: Success

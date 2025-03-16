@@ -33,21 +33,18 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.omenService = void 0;
+exports.omenService = exports.OvenMediaEngineService = void 0;
 const axios_1 = __importStar(require("axios"));
 const logger_1 = require("../utils/logger");
 class OvenMediaEngineService {
     constructor() {
         this.baseURL = process.env.OME_API_URL || 'http://origin:8081';
         this.accessToken = process.env.OME_API_ACCESS_TOKEN || '0fc62ea62790ad7c';
-        
         logger_1.logger.info(`Initialized OvenMediaEngine Service with URL: ${this.baseURL}`);
         logger_1.logger.info(`Using API access token: ${this.accessToken ? '********' : 'default token'}`);
-        
         if (!this.baseURL) {
             logger_1.logger.error('OvenMediaEngine API URL is not configured! Set OME_API_URL environment variable.');
         }
-        
         if (!this.accessToken) {
             logger_1.logger.error('OvenMediaEngine API access token is not configured! Set OME_API_ACCESS_TOKEN environment variable.');
         }
@@ -126,4 +123,6 @@ class OvenMediaEngineService {
         return response.response;
     }
 }
+exports.OvenMediaEngineService = OvenMediaEngineService;
+// Create singleton instance for the service
 exports.omenService = new OvenMediaEngineService();

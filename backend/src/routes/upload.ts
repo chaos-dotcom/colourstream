@@ -8,6 +8,8 @@ import xxhash from 'xxhash-wasm';
 import { authenticateToken } from '../middleware/auth';
 import { uploadTracker } from '../services/uploads/uploadTracker';
 import { s3Service } from '../services/s3/s3Service';
+import { fixS3Filenames } from '../scripts/fix-s3-filenames';
+import { logger } from '../utils/logger';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -142,6 +144,43 @@ router.get('/clients', authenticateToken, async (_req: Request, res: Response) =
     res.status(500).json({
       status: 'error',
       message: 'Failed to fetch clients'
+    });
+  }
+});
+
+// Update a client
+router.put('/clients/:clientId', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { clientId } = req.params;
+    const { name } = req.body;
+    
+    // Check if client exists
+    const clientExists = await prisma.client.findUnique({
+      where: { id: clientId }
+    });
+    
+    if (!clientExists) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Client not found'
+      });
+    }
+    
+    // Update the client
+    const updatedClient = await prisma.client.update({
+      where: { id: clientId },
+      data: { name }
+    });
+    
+    res.json({
+      status: 'success',
+      data: updatedClient
+    });
+  } catch (error) {
+    console.error('Failed to update client:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to update client'
     });
   }
 });
@@ -552,6 +591,49 @@ router.delete('/projects/:projectId', authenticateToken, async (req: Request, re
   }
 });
 
+// Update a project
+router.put('/projects/:projectId', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { projectId } = req.params;
+    const { name, description } = req.body;
+    
+    // Check if project exists
+    const projectExists = await prisma.project.findUnique({
+      where: { id: projectId }
+    });
+    
+    if (!projectExists) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Project not found'
+      });
+    }
+    
+    // Update the project
+    const updatedProject = await prisma.project.update({
+      where: { id: projectId },
+      data: { 
+        name: name !== undefined ? name : undefined,
+        description: description !== undefined ? description : undefined
+      },
+      include: {
+        client: true
+      }
+    });
+    
+    res.json({
+      status: 'success',
+      data: updatedProject
+    });
+  } catch (error) {
+    console.error('Failed to update project:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to update project'
+    });
+  }
+});
+
 // Get a single project
 router.get('/projects/:projectId', authenticateToken, async (req: Request, res: Response) => {
   try {
@@ -572,9 +654,59 @@ router.get('/projects/:projectId', authenticateToken, async (req: Request, res: 
       });
     }
 
+    // Check if .turbosort file exists for this project
+    // Note: The turbosort directory is stored in a .turbosort file in the project directory,
+    // not in the database. This allows for easier integration with external file-based tools.
+    let turbosortContent = null;
+    try {
+      // Construct the path to the project directory
+      const projectPath = path.join(process.env.UPLOAD_DIR || 'uploads', projectId);
+      const turbosortPath = path.join(projectPath, '.turbosort');
+      
+      // Check if the file exists locally
+      if (fs.existsSync(turbosortPath)) {
+        // Read the content of the .turbosort file
+        turbosortContent = fs.readFileSync(turbosortPath, 'utf8').trim();
+      } 
+      // If not found locally and we have client info, try to get from S3
+      else if (project.client && project.client.code) {
+        try {
+          // Generate S3 key based on client and project name
+          const s3Key = s3Service.generateKey(
+            project.client.code,
+            project.name,
+            '.turbosort'
+          );
+
+          // Try to get the file from S3
+          const s3Object = await s3Service.getFileContent(s3Key);
+          if (s3Object) {
+            turbosortContent = s3Object.toString('utf8').trim();
+            
+            // Cache the S3 content locally for future use
+            if (!fs.existsSync(projectPath)) {
+              fs.mkdirSync(projectPath, { recursive: true });
+            }
+            fs.writeFileSync(turbosortPath, turbosortContent);
+            console.log(`Cached turbosort file from S3 to local path: ${turbosortPath}`);
+          }
+        } catch (s3Error) {
+          console.error('Failed to get turbosort file from S3:', s3Error);
+          // Don't fail the request if we can't get the file from S3
+        }
+      }
+    } catch (err) {
+      console.error('Error reading .turbosort file:', err);
+      // Don't fail the request if we can't read the file
+    }
+
+    // Add the turbosort content to the response
     res.json({
       status: 'success',
-      data: project
+      data: {
+        ...project,
+        turbosortDirectory: turbosortContent
+      }
     });
   } catch (error) {
     console.error('Failed to fetch project:', error);
@@ -652,6 +784,66 @@ router.delete('/upload-links/:linkId', authenticateToken, async (req: Request, r
     res.status(500).json({ 
       status: 'error',
       message: 'Failed to delete upload link'
+    });
+  }
+});
+
+// Update upload link
+router.put('/upload-links/:linkId', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { linkId } = req.params;
+    const { expiresAt, maxUses } = req.body;
+    
+    // Check if upload link exists
+    const uploadLink = await prisma.uploadLink.findUnique({
+      where: { id: linkId },
+      include: {
+        project: {
+          include: {
+            client: true
+          }
+        }
+      }
+    });
+    
+    if (!uploadLink) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Upload link not found'
+      });
+    }
+    
+    // Update the upload link
+    const updatedLink = await prisma.uploadLink.update({
+      where: { id: linkId },
+      data: {
+        expiresAt: expiresAt ? new Date(expiresAt) : undefined,
+        maxUses: maxUses !== undefined ? maxUses : undefined
+      },
+      include: {
+        project: {
+          include: {
+            client: true
+          }
+        }
+      }
+    });
+    
+    // Generate the full upload URL
+    const uploadUrl = `https://upload.colourstream.johnrogerscolour.co.uk/${updatedLink.token}`;
+    
+    res.json({
+      status: 'success',
+      data: {
+        ...updatedLink,
+        uploadUrl
+      }
+    });
+  } catch (error) {
+    console.error('Failed to update upload link:', error);
+    res.status(500).json({ 
+      status: 'error',
+      message: 'Failed to update upload link'
     });
   }
 });
@@ -751,7 +943,8 @@ router.get('/s3-params/:token', async (req: Request, res: Response) => {
       
       res.json({
         status: 'success',
-        url
+        url,
+        key: s3Key
       });
     }
   } catch (error) {
@@ -958,23 +1151,49 @@ router.post('/s3-callback/:token', async (req: Request, res: Response) => {
       });
     }
 
+    // Check if filename contains a UUID pattern
+    const uuidRegex = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-)/gi;
+    const hasUuid = uuidRegex.test(key);
+    
+    // Generate a clean key without UUIDs if needed
+    let cleanKey = key;
+    let cleanFilename = filename;
+    
+    if (hasUuid) {
+      // Extract client and project information
+      const clientCode = uploadLink.project.client.code || 'default';
+      const projectName = uploadLink.project.name || 'default';
+      
+      // Clean the filename by removing UUIDs
+      cleanFilename = filename.replace(uuidRegex, '');
+      
+      // Generate clean key with the standard structure
+      cleanKey = `${clientCode}/${projectName}/${cleanFilename}`;
+      
+      // Rename the file in S3
+      try {
+        // If key already has UUID prefix, rename it in S3
+        if (key !== cleanKey) {
+          await s3Service.renameObject(key, cleanKey);
+          logger.info(`Renamed file in S3: ${key} -> ${cleanKey}`);
+        }
+      } catch (renameError) {
+        logger.error('Failed to rename file in S3:', renameError);
+        // Continue with original key if rename fails
+        cleanKey = key;
+      }
+    }
+
     // Generate the URL for the uploaded file
     const s3Endpoint = process.env.S3_ENDPOINT || 'http://minio:9000';
     const s3Bucket = process.env.S3_BUCKET || 'uploads';
-    const fileUrl = `${s3Endpoint}/${s3Bucket}/${key}`;
-    
-    // Extract original filename from key if not provided explicitly
-    // The key should be in format: CLIENT/PROJECT/FILENAME
-    const extractedFilename = key.split('/').pop() || filename;
-    
-    // Strip any UUID patterns from the filename if they still exist
-    const cleanFilename = extractedFilename.replace(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-)/gi, '');
+    const fileUrl = `${s3Endpoint}/${s3Bucket}/${cleanKey}`;
     
     // Record the upload in the database
     const uploadedFile = await prisma.uploadedFile.create({
       data: {
         name: cleanFilename,
-        path: key,
+        path: cleanKey, // Use the clean key
         size: size ? parseFloat(size.toString()) : 0,
         mimeType: mimeType || 'application/octet-stream',
         hash: hash || 'unknown',
@@ -997,6 +1216,8 @@ router.post('/s3-callback/:token', async (req: Request, res: Response) => {
     // Track the upload using our tracking system
     const uploadId = `s3-${uploadedFile.id}`;
     
+    console.log('[DEBUG] Registering S3 upload with tracker:', uploadId);
+    
     uploadTracker.trackUpload({
       id: uploadId,
       size: uploadedFile.size,
@@ -1007,11 +1228,14 @@ router.post('/s3-callback/:token', async (req: Request, res: Response) => {
         token: token,
         clientName: uploadLink.project.client.name,
         projectName: uploadLink.project.name,
-        storage: 's3'
+        storage: 's3' // This is crucial for triggering the cleanup
       },
       createdAt: new Date(),
       isComplete: true
     });
+
+    // Also explicitly call completeUpload to ensure the cleanup is triggered
+    uploadTracker.completeUpload(uploadId);
 
     res.json({
       status: 'success',
@@ -1022,6 +1246,171 @@ router.post('/s3-callback/:token', async (req: Request, res: Response) => {
     res.status(500).json({
       status: 'error',
       message: 'Failed to record S3 upload'
+    });
+  }
+});
+
+// Add an endpoint to trigger S3 filename cleanup
+router.post('/cleanup-filenames', authenticateToken, async (_req: Request, res: Response) => {
+  try {
+    // Start the cleanup process
+    await fixS3Filenames();
+    
+    res.json({
+      status: 'success',
+      message: 'S3 filename cleanup process completed successfully'
+    });
+  } catch (error) {
+    console.error('Failed to run filename cleanup:', error);
+    res.status(500).json({ 
+      status: 'error',
+      message: 'Failed to run filename cleanup process'
+    });
+  }
+});
+
+// Set turbosort directory for a project
+// Note: The turbosort directory is stored in a .turbosort file in the project directory,
+// not in the database. This allows for easier integration with external file-based tools.
+router.post('/projects/:projectId/turbosort', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { projectId } = req.params;
+    const { directory } = req.body;
+
+    if (!directory || typeof directory !== 'string') {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Directory name is required'
+      });
+    }
+
+    // Validate that the project exists
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      include: {
+        client: true
+      }
+    });
+
+    if (!project) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Project not found'
+      });
+    }
+
+    // Construct the path to the project directory
+    const projectPath = path.join(process.env.UPLOAD_DIR || 'uploads', projectId);
+    
+    // Create the project directory if it doesn't exist
+    if (!fs.existsSync(projectPath)) {
+      fs.mkdirSync(projectPath, { recursive: true });
+    }
+
+    // Write the directory name to the .turbosort file
+    const turbosortPath = path.join(projectPath, '.turbosort');
+    fs.writeFileSync(turbosortPath, directory);
+
+    // Also save the .turbosort file to S3 if project has a client
+    if (project.client && project.client.code) {
+      try {
+        // Generate S3 key based on client and project name
+        const s3Key = s3Service.generateKey(
+          project.client.code,
+          project.name,
+          '.turbosort'
+        );
+
+        // Upload the .turbosort file to S3
+        await s3Service.uploadFile(
+          Buffer.from(directory),
+          s3Key,
+          'text/plain',
+          {
+            clientName: project.client.name,
+            projectName: project.name,
+            turbosortDirectory: 'true'
+          }
+        );
+
+        console.log(`Turbosort file uploaded to S3 at key: ${s3Key}`);
+      } catch (s3Error) {
+        console.error('Failed to upload turbosort file to S3:', s3Error);
+        // Don't fail the request if S3 upload fails, we still have the local file
+      }
+    }
+
+    res.json({
+      status: 'success',
+      message: 'Turbosort directory set successfully',
+      data: { directory }
+    });
+  } catch (error) {
+    console.error('Failed to set turbosort directory:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to set turbosort directory'
+    });
+  }
+});
+
+// Delete turbosort file for a project
+router.delete('/projects/:projectId/turbosort', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { projectId } = req.params;
+
+    // Validate that the project exists
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      include: {
+        client: true
+      }
+    });
+
+    if (!project) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Project not found'
+      });
+    }
+
+    // Construct the path to the .turbosort file
+    const projectPath = path.join(process.env.UPLOAD_DIR || 'uploads', projectId);
+    const turbosortPath = path.join(projectPath, '.turbosort');
+    
+    // Check if the file exists before attempting to delete
+    if (fs.existsSync(turbosortPath)) {
+      fs.unlinkSync(turbosortPath);
+    }
+
+    // Also delete from S3 if project has a client
+    if (project.client && project.client.code) {
+      try {
+        // Generate S3 key based on client and project name
+        const s3Key = s3Service.generateKey(
+          project.client.code,
+          project.name,
+          '.turbosort'
+        );
+
+        // Delete the .turbosort file from S3
+        await s3Service.deleteFile(s3Key);
+        console.log(`Turbosort file deleted from S3 at key: ${s3Key}`);
+      } catch (s3Error) {
+        console.error('Failed to delete turbosort file from S3:', s3Error);
+        // Don't fail the request if S3 deletion fails
+      }
+    }
+
+    res.json({
+      status: 'success',
+      message: 'Turbosort file deleted successfully'
+    });
+  } catch (error) {
+    console.error('Failed to delete turbosort file:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to delete turbosort file'
     });
   }
 });

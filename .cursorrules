@@ -145,3 +145,26 @@ This rule ensures consistent naming conventions across the ColourStream codebase
 - External libraries or frameworks may require different conventions
 - Legacy code may maintain its conventions until scheduled refactoring
 - Document any exceptions in comments for clarity
+
+
+
+{
+  "ruleName": "DockerComposeEnvVariableFormat",
+  "description": "Enforce DRY (Don't Repeat Yourself) principles in docker-compose environment variables",
+  "version": "1.0",
+  "rules": [
+    {
+      "id": "ENV-001",
+      "rule": "Use direct variable references without default values in docker-compose",
+      "description": "Always use direct variable references like 'VARIABLE: ${VARIABLE}' instead of 'VARIABLE: ${VARIABLE:-default}'. Default values should be defined in a central .env file to maintain DRY principles and simplify debugging. The ':-' syntax adds unnecessary complexity when diagnosing issues.",
+      "pattern": "\\${[A-Za-z0-9_]+:-[^}]+}",
+      "filePattern": "docker-compose.y*ml",
+      "severity": "warning",
+      "examples": {
+        "incorrect": "MINIO_DOMAIN: ${S3_DOMAIN:-s3.colourstream.johnrogerscolour.co.uk}",
+        "correct": "MINIO_DOMAIN: ${S3_DOMAIN}"
+      },
+      "fixInstructions": "1. Remove default values from docker-compose.yml\n2. Add these values to your .env file instead\n3. This maintains DRY principle and centralizes configuration"
+    }
+  ]
+}

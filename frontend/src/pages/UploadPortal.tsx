@@ -59,6 +59,49 @@ const StyledDashboard = styled(Box)(({ theme }) => ({
   },
 }));
 
+// Safe Dashboard wrapper to handle potential errors
+const SafeDashboard: React.FC<any> = (props) => {
+  // Save a reference to the uppy instance
+  const uppyRef = React.useRef(props.uppy);
+  
+  // Add safety monkey patches to prevent fileIDs undefined errors
+  React.useEffect(() => {
+    if (uppyRef.current) {
+      // Store the original upload method
+      const originalUpload = uppyRef.current.upload;
+      
+      // Replace with a safer version
+      uppyRef.current.upload = function() {
+        try {
+          return originalUpload.apply(this, arguments);
+        } catch (error) {
+          console.error('Error in Uppy upload method:', error);
+          return Promise.reject(error);
+        }
+      };
+
+      // Also patch the getFiles method for safety
+      const originalGetFiles = uppyRef.current.getFiles;
+      uppyRef.current.getFiles = function() {
+        try {
+          return originalGetFiles.apply(this, arguments);
+        } catch (error) {
+          console.error('Error in Uppy getFiles method:', error);
+          return [];
+        }
+      };
+    }
+  }, []);
+  
+  // Render the Dashboard component with the original props
+  try {
+    return <Dashboard {...props} />;
+  } catch (error) {
+    console.error('Error rendering Dashboard:', error);
+    return <Typography color="error">Error rendering upload interface. Please refresh the page.</Typography>;
+  }
+};
+
 // Array of accent colors
 const accentColors = [
   '#1d70b8', // Blue
@@ -163,6 +206,7 @@ const UploadPortal: React.FC = () => {
           // Choose upload method based on configuration
           if (USE_COMPANION) {
             console.log('Using AwsS3Multipart with Companion for large file uploads');
+            console.log('Companion URL configured as:', COMPANION_URL);
             
             // Use the AWS S3 Multipart plugin with Companion for chunked uploads
             // @ts-expect-error - Uppy plugins have complex typings that are difficult to match exactly
@@ -173,7 +217,9 @@ const UploadPortal: React.FC = () => {
               },
               // Ensure all S3 requests go through Companion instead of directly to MinIO
               companionAllowedHosts: /.*/,  // Force all uploads through Companion
-              // Configure chunking for large file support
+              // Note: Companion is configured with COMPANION_AWS_FORCE_PATH_STYLE=false
+              // The companionUrl value needs the exact URL format that the companion server expects
+              companionUrl: COMPANION_URL, // Explicitly set this to match the endpoint
               limit: 6, // Number of concurrent uploads
               retryDelays: [0, 1000, 3000, 5000, 10000], // Retry delays for failed chunks
               // For very large files, use large chunks to speed up upload
@@ -270,6 +316,41 @@ const UploadPortal: React.FC = () => {
               const percent = progress.bytesUploaded / progress.bytesTotal * 100;
               console.log(`Progress for ${file.name}: ${percent.toFixed(2)}% (${progress.bytesUploaded}/${progress.bytesTotal})`);
             });
+            
+            // Add error logging for debugging upload issues
+            uppyInstance.on('error', (error: any) => {
+              console.error('Uppy error:', error);
+              if (error.request) {
+                console.error('Error request URL:', error.request.url);
+                console.error('Error request method:', error.request.method);
+                console.error('Error status:', error.status);
+              }
+            });
+            
+            // Log upload starts without depending on fileIDs
+            uppyInstance.on('upload', (data: any) => {
+              console.log('Upload process started');
+              console.log('Upload data object:', JSON.stringify({
+                // Safely extract only the properties we're interested in
+                fileCount: data && typeof data === 'object' ? Object.keys(data).length : 'unknown',
+                dataType: typeof data
+              }));
+              
+              // Try to get file information without using fileIDs
+              try {
+                const files = uppyInstance.getFiles();
+                if (files && files.length > 0) {
+                  console.log(`Current files in Uppy: ${files.length} files`);
+                  files.forEach(file => {
+                    console.log(`- ${file.name} (${file.size} bytes)`);
+                  });
+                } else {
+                  console.log('No files currently in Uppy');
+                }
+              } catch (err) {
+                console.log('Could not get files from Uppy:', err);
+              }
+            });
           } 
           // Fall back to regular S3 if Companion is not enabled
           else if (useS3) {
@@ -279,6 +360,8 @@ const UploadPortal: React.FC = () => {
             uppyInstance.use(AwsS3, {
               shouldUseMultipart: false, // Explicitly disable multipart uploads
               limit: 1, // Process one file at a time to avoid issues
+              // TypeScript doesn't recognize forcePathStyle directly
+              // We'll handle URL style through the S3 configuration in the backend
               getUploadParameters: async (file) => {
                 // Log original filename for debugging
                 console.log('Original filename before S3 upload:', file.name);
@@ -317,6 +400,7 @@ const UploadPortal: React.FC = () => {
                 }
                 
                 console.log('S3 presigned URL:', data.url);
+                console.log('S3 key from backend:', data.key);
                 
                 // Return the complete upload parameters including Content-Type
                 return {
@@ -327,7 +411,9 @@ const UploadPortal: React.FC = () => {
                     'Content-Type': file.type || 'application/octet-stream',
                     // Add cache control to prevent caching issues
                     'Cache-Control': 'no-cache'
-                  }
+                  },
+                  // Add the key from the backend to override the default Uppy UUID generation
+                  key: data.key
                 };
               }
             });
@@ -647,7 +733,7 @@ const UploadPortal: React.FC = () => {
           </Typography>
           
           <StyledDashboard>
-            <Dashboard 
+            <SafeDashboard 
               uppy={uppy}
               showProgressDetails
               showRemoveButtonAfterComplete

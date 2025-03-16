@@ -21,6 +21,11 @@ export const createClient = async (data: CreateClientRequest): Promise<ApiRespon
   return response.data;
 };
 
+export const updateClient = async (clientId: string, name: string): Promise<ApiResponse<Client>> => {
+  const response = await api.put(`/upload/clients/${clientId}`, { name });
+  return response.data;
+};
+
 export const deleteClient = async (clientId: string): Promise<ApiResponse<void>> => {
   const response = await api.delete(`/upload/clients/${clientId}`);
   return response.data;
@@ -42,6 +47,14 @@ export const createProject = async (
 
 export const deleteProject = async (projectId: string): Promise<ApiResponse<void>> => {
   const response = await api.delete(`/upload/projects/${projectId}`);
+  return response.data;
+};
+
+export const updateProject = async (
+  projectId: string, 
+  data: { name?: string; description?: string }
+): Promise<ApiResponse<Project>> => {
+  const response = await api.put(`/upload/projects/${projectId}`, data);
   return response.data;
 };
 
@@ -69,6 +82,14 @@ export const deleteUploadLink = async (linkId: string): Promise<ApiResponse<void
   return response.data;
 };
 
+export const updateUploadLink = async (
+  linkId: string,
+  data: { expiresAt?: string; maxUses?: number }
+): Promise<ApiResponse<UploadLink>> => {
+  const response = await api.put(`/upload/upload-links/${linkId}`, data);
+  return response.data;
+};
+
 export const getAllUploadLinks = async (): Promise<ApiResponse<UploadLink[]>> => {
   const response = await api.get('/upload/upload-links/all');
   return response.data;
@@ -84,5 +105,21 @@ export const downloadFile = async (fileId: string): Promise<Blob> => {
   const response = await api.get(`/upload/files/${fileId}/download`, {
     responseType: 'blob'
   });
+  return response.data;
+};
+
+// Turbosort Management
+export const setTurbosortDirectory = async (
+  projectId: string,
+  directory: string
+): Promise<ApiResponse<{ directory: string }>> => {
+  const response = await api.post(`/upload/projects/${projectId}/turbosort`, { directory });
+  return response.data;
+};
+
+export const deleteTurbosortDirectory = async (
+  projectId: string
+): Promise<ApiResponse<{ message: string }>> => {
+  const response = await api.delete(`/upload/projects/${projectId}/turbosort`);
   return response.data;
 }; 

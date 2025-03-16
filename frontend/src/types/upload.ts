@@ -13,6 +13,7 @@ export interface Project {
   clientId: string;
   client?: Client;
   uploadLinks?: UploadLink[];
+  turbosortDirectory?: string | null;
   createdAt: string;
   updatedAt: string;
 }

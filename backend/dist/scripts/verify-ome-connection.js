@@ -49,9 +49,14 @@ async function testOmeApiConnection() {
     const accessToken = process.env.OME_API_ACCESS_TOKEN || '0fc62ea62790ad7c';
     try {
         logger_1.logger.info(`Testing connection to OvenMediaEngine API at ${apiUrl}`);
+        logger_1.logger.info(`Using API access token: ${accessToken ? '********' : 'default token'}`);
+        logger_1.logger.info(`Environment variables:
+      - OME_API_URL: ${process.env.OME_API_URL ? 'set' : 'not set'}
+      - OME_API_ACCESS_TOKEN: ${process.env.OME_API_ACCESS_TOKEN ? 'set' : 'not set'}
+    `);
         const response = await (0, node_fetch_1.default)(`${apiUrl}/v1/stats`, {
             headers: {
-                'Authorization': `Basic ${accessToken}`
+                'Authorization': `Basic ${Buffer.from(accessToken).toString('base64')}`
             }
         });
         if (!response.ok) {

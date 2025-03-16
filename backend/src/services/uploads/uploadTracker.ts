@@ -1,5 +1,6 @@
 import { logger } from '../../utils/logger';
 import { getTelegramBot } from '../telegram/telegramBot';
+import { fixS3Filenames } from '../../scripts/fix-s3-filenames';
 
 interface UploadInfo {
   id: string;
@@ -13,6 +14,7 @@ interface UploadInfo {
   uploadSpeed?: number; // Speed in bytes per second
   storage?: string;
   isComplete: boolean;
+  completedAt?: Date;
 }
 
 class UploadTracker {
@@ -82,7 +84,8 @@ class UploadTracker {
         ...upload,
         offset: upload.size,
         lastUpdated: new Date(),
-        isComplete: true
+        isComplete: true,
+        completedAt: new Date()
       };
       
       this.uploads.set(id, completedUpload);
@@ -103,9 +106,41 @@ class UploadTracker {
       }
       
       logger.info(`Upload completed: ${id}`);
+      
+      // If this is an S3 upload, trigger cleanup to fix UUIDs in filenames
+      console.log('[DEBUG] Upload metadata:', upload.metadata);
+      console.log('[DEBUG] Storage value:', upload.metadata?.storage);
+      
+      if (upload.metadata?.storage === 's3') {
+        console.log('[DEBUG] Will trigger S3 cleanup for upload:', id);
+        this.triggerS3Cleanup(id);
+      } else {
+        console.log('[DEBUG] Skipping S3 cleanup for upload:', id, 'as storage is not s3');
+      }
     } else {
       logger.warn(`Attempted to complete unknown upload: ${id}`);
     }
+  }
+  
+  /**
+   * Trigger S3 filename cleanup for UUID removal
+   * This runs asynchronously to avoid blocking the upload completion
+   */
+  private triggerS3Cleanup(id: string): void {
+    logger.info(`Triggering S3 filename cleanup after upload: ${id}`);
+    console.log('[DEBUG] Starting S3 cleanup trigger with timeout');
+    
+    // Run cleanup in the background without awaiting to avoid blocking
+    setTimeout(async () => {
+      try {
+        console.log('[DEBUG] Executing S3 filename cleanup after timeout');
+        await fixS3Filenames();
+        logger.info(`S3 filename cleanup completed for upload: ${id}`);
+      } catch (error) {
+        console.error('[DEBUG] Error in S3 cleanup:', error);
+        logger.error(`S3 filename cleanup failed for upload ${id}:`, error);
+      }
+    }, 5000); // Wait 5 seconds to ensure all operations are complete
   }
   
   /**

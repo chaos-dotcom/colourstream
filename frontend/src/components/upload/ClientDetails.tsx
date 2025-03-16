@@ -24,12 +24,94 @@ import {
   TableRow,
   Tooltip,
   IconButton,
+  TextField,
 } from '@mui/material';
 import { Client, Project } from '../../types/upload';
-import { getClients, getClientProjects, deleteProject, deleteClient } from '../../services/uploadService';
+import { getClients, getClientProjects, deleteProject, deleteClient, updateClient } from '../../services/uploadService';
 import CreateProjectForm from './CreateProjectForm';
 import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
 import OpenInNew from '@mui/icons-material/OpenInNew';
+
+// GDS-inspired styles
+const gdsStyles = {
+  // Card styles
+  card: {
+    border: '1px solid #b1b4b6',
+    borderRadius: '0px',
+    boxShadow: 'none',
+    backgroundColor: '#ffffff',
+  },
+  // Table styles
+  table: {
+    border: '1px solid #b1b4b6',
+    borderCollapse: 'collapse',
+    width: '100%',
+    '& th': {
+      backgroundColor: '#f3f2f1',
+      fontWeight: 'bold',
+      textAlign: 'left',
+      padding: '10px',
+      borderBottom: '1px solid #b1b4b6',
+    },
+    '& td': {
+      padding: '10px',
+      borderBottom: '1px solid #b1b4b6',
+      fontSize: '16px',
+    },
+  },
+  tableContainer: {
+    boxShadow: 'none',
+    border: 'none',
+  },
+  tableRow: {
+    '&:hover': {
+      backgroundColor: '#f8f8f8',
+    },
+  },
+  // Button styles
+  primaryButton: {
+    backgroundColor: '#00703c',
+    color: 'white',
+    borderRadius: '0',
+    fontWeight: 'bold',
+    textTransform: 'none',
+    '&:hover': {
+      backgroundColor: '#005a30',
+    },
+  },
+  secondaryButton: {
+    backgroundColor: '#f3f2f1',
+    color: '#0b0c0c',
+    borderRadius: '0',
+    border: '2px solid #0b0c0c',
+    fontWeight: 'bold',
+    textTransform: 'none',
+    '&:hover': {
+      backgroundColor: '#dbdad9',
+    },
+  },
+  dangerButton: {
+    backgroundColor: '#d4351c',
+    color: 'white',
+    borderRadius: '0',
+    fontWeight: 'bold',
+    textTransform: 'none',
+    '&:hover': {
+      backgroundColor: '#aa2a16',
+    },
+  },
+  // Typography
+  heading: {
+    color: '#0b0c0c',
+    fontWeight: 'bold',
+    marginBottom: '20px',
+  },
+  caption: {
+    color: '#505a5f',
+    fontSize: '16px',
+  },
+};
 
 const ClientDetails: React.FC = () => {
   const { clientId } = useParams<{ clientId: string }>();
@@ -41,6 +123,10 @@ const ClientDetails: React.FC = () => {
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  // New state variables for client name editing
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [nameError, setNameError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchClientData = async () => {
@@ -140,6 +226,27 @@ const ClientDetails: React.FC = () => {
     }
   };
 
+  // Add handleUpdateClient function
+  const handleUpdateClient = async () => {
+    if (!clientId || !editName.trim()) return;
+    
+    try {
+      setNameError(null);
+      const response = await updateClient(clientId, editName.trim());
+      
+      if (response.status === 'success') {
+        setClient(response.data);
+        setSuccessMessage('Client name updated successfully');
+        setTimeout(() => setSuccessMessage(null), 3000);
+        setIsEditingName(false);
+      } else {
+        setNameError(response.message || 'Failed to update client name');
+      }
+    } catch (err) {
+      setNameError('Failed to update client name');
+    }
+  };
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
@@ -157,36 +264,65 @@ const ClientDetails: React.FC = () => {
   }
 
   return (
-    <Box p={2}>
+    <Box p={2} sx={{ maxWidth: '1200px', margin: '0 auto' }}>
       {successMessage && (
-        <Alert severity="success" sx={{ mb: 2 }}>
+        <Alert severity="success" sx={{ mb: 3, borderRadius: 0 }} onClose={() => setSuccessMessage(null)}>
           {successMessage}
         </Alert>
       )}
       
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-          <Typography variant="h5">{client.name}</Typography>
-          <Button 
-            variant="contained" 
-            color="error"
-            onClick={() => setDeleteDialogOpen(true)}
-          >
-            Delete Client
-          </Button>
+      {/* Client Details Card */}
+      <Paper elevation={0} sx={gdsStyles.card}>
+        <Box p={4}>
+          <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={3}>
+            <Box>
+              <Box display="flex" alignItems="baseline" sx={{ mb: 2 }}>
+                <Typography variant="h4" component="h1" sx={{ ...gdsStyles.heading, mb: 0, mr: 1 }}>
+                  {client.name}
+                </Typography>
+                <Tooltip title="Edit Client Name">
+                  <IconButton 
+                    size="small" 
+                    onClick={() => {
+                      setEditName(client.name);
+                      setIsEditingName(true);
+                    }}
+                    sx={{ 
+                      color: '#1d70b8',
+                      p: '4px',
+                      position: 'relative',
+                      top: '-2px'
+                    }}
+                  >
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+              <Typography variant="body1" sx={{ fontSize: '18px', mb: 2 }}>
+                Client Code: <strong>{client.code || 'Auto-generated'}</strong>
+              </Typography>
+              <Typography variant="body2" sx={gdsStyles.caption}>
+                Created: {new Date(client.createdAt).toLocaleDateString()}
+              </Typography>
+            </Box>
+            <Button 
+              sx={gdsStyles.dangerButton}
+              onClick={() => setDeleteDialogOpen(true)}
+            >
+              Delete Client
+            </Button>
+          </Box>
         </Box>
-        <Typography color="textSecondary">Client Code: {client.code || 'Auto-generated'}</Typography>
-        <Typography color="textSecondary">
-          Created: {new Date(client.createdAt).toLocaleDateString()}
-        </Typography>
       </Paper>
 
-      <Box mb={3}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-          <Typography variant="h6">Projects</Typography>
+      {/* Projects Section */}
+      <Box mt={6}>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+          <Typography variant="h5" component="h2" sx={gdsStyles.heading}>
+            Projects
+          </Typography>
           <Button 
-            variant="contained" 
-            color="primary"
+            sx={gdsStyles.primaryButton}
             onClick={() => setShowCreateProject(true)}
           >
             Create Project
@@ -194,21 +330,24 @@ const ClientDetails: React.FC = () => {
         </Box>
 
         {projects.length > 0 ? (
-          <TableContainer component={Paper}>
-            <Table>
+          <TableContainer component={Paper} sx={gdsStyles.tableContainer}>
+            <Table sx={gdsStyles.table}>
               <TableHead>
                 <TableRow>
-                  <TableCell>Project Name</TableCell>
-                  <TableCell>Description</TableCell>
-                  <TableCell>Created</TableCell>
-                  <TableCell>Actions</TableCell>
+                  <TableCell component="th" scope="col" width="25%">Project Name</TableCell>
+                  <TableCell component="th" scope="col" width="40%">Description</TableCell>
+                  <TableCell component="th" scope="col" width="20%">Created</TableCell>
+                  <TableCell component="th" scope="col" width="15%">Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {projects.map((project) => (
                   <TableRow 
                     key={project.id}
-                    hover
+                    sx={{
+                      ...gdsStyles.tableRow,
+                      cursor: 'pointer',
+                    }}
                     onClick={(event) => {
                       // Prevent navigation if clicking on the delete button or its container
                       if (event.currentTarget.querySelector('.delete-button')?.contains(event.target as Node)) {
@@ -217,43 +356,57 @@ const ClientDetails: React.FC = () => {
                       // Navigate to the project details page
                       navigate(`/upload/projects/${project.id}`);
                     }}
-                    sx={{ 
-                      cursor: 'pointer',
-                      '&:hover': {
-                        backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                      } 
-                    }}
                   >
-                    <TableCell>{project.name}</TableCell>
+                    <TableCell sx={{ fontWeight: 'medium' }}>{project.name}</TableCell>
                     <TableCell>{project.description || 'No description provided'}</TableCell>
                     <TableCell>{new Date(project.createdAt).toLocaleDateString()}</TableCell>
                     <TableCell>
-                      <Box display="flex">
-                        <Tooltip title="View Project Details">
-                          <IconButton 
-                            size="small" 
-                            color="primary"
-                            onClick={(e) => {
-                              e.stopPropagation(); // Prevent row click from triggering
-                              navigate(`/upload/projects/${project.id}`);
-                            }}
-                          >
-                            <OpenInNew fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Delete Project">
-                          <IconButton 
-                            size="small"
-                            color="error"
-                            onClick={(e) => {
-                              e.stopPropagation(); // Prevent row click from triggering
-                              handleDeleteProject(project.id);
-                            }}
-                            className="delete-button"
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
+                      <Box display="flex" gap={2}>
+                        <Button
+                          variant="text"
+                          startIcon={<OpenInNew />}
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevent row click from triggering
+                            navigate(`/upload/projects/${project.id}`);
+                          }}
+                          sx={{ 
+                            color: '#1d70b8',
+                            textDecoration: 'underline',
+                            padding: '0',
+                            minWidth: 'auto',
+                            textTransform: 'none',
+                            fontWeight: 'normal',
+                            '&:hover': {
+                              backgroundColor: 'transparent',
+                              textDecoration: 'underline',
+                            }
+                          }}
+                        >
+                          View
+                        </Button>
+                        <Button
+                          variant="text"
+                          startIcon={<DeleteIcon />}
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevent row click from triggering
+                            handleDeleteProject(project.id);
+                          }}
+                          className="delete-button"
+                          sx={{ 
+                            color: '#d4351c',
+                            textDecoration: 'underline',
+                            padding: '0',
+                            minWidth: 'auto',
+                            textTransform: 'none',
+                            fontWeight: 'normal',
+                            '&:hover': {
+                              backgroundColor: 'transparent',
+                              textDecoration: 'underline',
+                            }
+                          }}
+                        >
+                          Delete
+                        </Button>
                       </Box>
                     </TableCell>
                   </TableRow>
@@ -262,34 +415,130 @@ const ClientDetails: React.FC = () => {
             </Table>
           </TableContainer>
         ) : (
-          <Typography color="textSecondary">No projects found for this client</Typography>
+          <Paper elevation={0} sx={{...gdsStyles.card, p: 4}}>
+            <Typography sx={gdsStyles.caption}>No projects found for this client</Typography>
+          </Paper>
         )}
       </Box>
 
+      {/* Create Project Form */}
       {showCreateProject && (
-        <CreateProjectForm
-          clientId={clientId!}
-          onClose={() => setShowCreateProject(false)}
-          onSuccess={(newProject: Project) => {
-            setProjects([...projects, newProject]);
-            setShowCreateProject(false);
-          }}
-        />
+        <Box mt={4}>
+          <Paper elevation={0} sx={gdsStyles.card}>
+            <Box p={4}>
+              <Typography variant="h5" component="h2" sx={{...gdsStyles.heading, mb: 3}}>
+                Create New Project
+              </Typography>
+              <CreateProjectForm
+                clientId={clientId!}
+                onClose={() => setShowCreateProject(false)}
+                onSuccess={(newProject: Project) => {
+                  setProjects([...projects, newProject]);
+                  setShowCreateProject(false);
+                }}
+              />
+            </Box>
+          </Paper>
+        </Box>
       )}
 
+      {/* Add Edit Client Name Dialog */}
+      <Dialog 
+        open={isEditingName} 
+        onClose={() => setIsEditingName(false)}
+        PaperProps={{
+          sx: {
+            borderRadius: 0,
+            maxWidth: '500px',
+          }
+        }}
+      >
+        <DialogTitle sx={{ backgroundColor: '#f3f2f1', fontWeight: 'bold' }}>
+          Edit Client Name
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3, pb: 2 }}>
+          {nameError && (
+            <Alert severity="error" sx={{ mb: 3, borderRadius: 0 }} onClose={() => setNameError(null)}>
+              {nameError}
+            </Alert>
+          )}
+          <TextField
+            label="Client Name"
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            fullWidth
+            margin="normal"
+            variant="outlined"
+            placeholder="Enter client name"
+            sx={{ 
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 0,
+                '& fieldset': {
+                  borderColor: '#0b0c0c',
+                },
+              },
+            }}
+          />
+        </DialogContent>
+        <Divider />
+        <DialogActions sx={{ p: 2 }}>
+          <Button 
+            onClick={() => setIsEditingName(false)}
+            sx={gdsStyles.secondaryButton}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleUpdateClient} 
+            disabled={!editName.trim() || editName === client?.name}
+            sx={gdsStyles.primaryButton}
+          >
+            Save Changes
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Delete Client Dialog */}
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
-        <DialogTitle>Delete Client</DialogTitle>
-        <DialogContent>
-          <Typography>
+      <Dialog 
+        open={deleteDialogOpen} 
+        onClose={() => setDeleteDialogOpen(false)}
+        PaperProps={{
+          sx: {
+            borderRadius: 0,
+            maxWidth: '500px',
+          }
+        }}
+      >
+        <DialogTitle sx={{ backgroundColor: '#f3f2f1', fontWeight: 'bold' }}>
+          Delete Client
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3, pb: 2 }}>
+          <Typography sx={{ mb: 3 }}>
             Are you sure you want to delete client "{client.name}"?
-            This will also delete all projects and upload links associated with this client.
+          </Typography>
+          <Box sx={{ backgroundColor: '#f8f8f8', p: 2, mb: 2 }}>
+            <Typography variant="body2" sx={{ mb: 1 }}>
+              This will also delete all projects and upload links associated with this client.
+            </Typography>
+          </Box>
+          <Typography variant="body2" color="error">
             This action cannot be undone.
           </Typography>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleDeleteClient} color="error">Delete</Button>
+        <Divider />
+        <DialogActions sx={{ p: 2 }}>
+          <Button 
+            onClick={() => setDeleteDialogOpen(false)}
+            sx={gdsStyles.secondaryButton}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleDeleteClient} 
+            sx={gdsStyles.dangerButton}
+          >
+            Delete
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

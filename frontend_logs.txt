@@ -1,0 +1,49 @@
+colourstream-frontend  | Generated runtime configuration:
+colourstream-frontend  | window.RUNTIME_CONFIG = {
+colourstream-frontend  |   API_URL: "https://live.colourstream.johnrogerscolour.co.uk/api",
+colourstream-frontend  |   OIDC_AUTH_ENDPOINT: "https://sso.johnrogerscolour.co.uk/authorize",
+colourstream-frontend  |   WEBRTC_WS_HOST: "live.colourstream.johnrogerscolour.co.uk",
+colourstream-frontend  |   WEBRTC_WS_PORT: "3334",
+colourstream-frontend  |   WEBRTC_WS_PROTOCOL: "wss",
+colourstream-frontend  |   WEBRTC_APP_PATH: "app",
+colourstream-frontend  |   VIDEO_URL: "https://video.colourstream.johnrogerscolour.co.uk/join",
+colourstream-frontend  |   OVENPLAYER_SCRIPT_URL: "https://cdn.jsdelivr.net/npm/ovenplayer/dist/ovenplayer.js",
+colourstream-frontend  |   UPLOAD_ENDPOINT_URL: "https://upload.colourstream.johnrogerscolour.co.uk/files/",
+colourstream-frontend  |   NAMEFORUPLOADCOMPLETION: "John"
+colourstream-frontend  | };
+colourstream-frontend  | console.log("Runtime configuration loaded:", window.RUNTIME_CONFIG);
+colourstream-frontend  | Injected runtime config into /app/build/index.html
+colourstream-frontend  | Starting server...
+colourstream-frontend  |  INFO  Accepting connections at http://localhost:3000
+colourstream-frontend  |  HTTP  3/15/2025 4:38:01 PM 172.19.0.2 GET /
+colourstream-frontend  |  HTTP  3/15/2025 4:38:01 PM 172.19.0.2 Returned 200 in 34 ms
+colourstream-frontend  |  HTTP  3/15/2025 4:38:01 PM 172.19.0.2 GET /assets/vendor-5Gg5Lqou.js
+colourstream-frontend  |  HTTP  3/15/2025 4:38:01 PM 172.19.0.2 GET /assets/index-_U_yp9fg.js
+colourstream-frontend  |  HTTP  3/15/2025 4:38:01 PM 172.19.0.2 GET /config/runtime-config.js
+colourstream-frontend  |  HTTP  3/15/2025 4:38:01 PM 172.19.0.2 GET /assets/index-BoAXaL_X.css
+colourstream-frontend  |  HTTP  3/15/2025 4:38:01 PM 172.19.0.2 Returned 304 in 6 ms
+colourstream-frontend  |  HTTP  3/15/2025 4:38:01 PM 172.19.0.2 Returned 304 in 4 ms
+colourstream-frontend  |  HTTP  3/15/2025 4:38:01 PM 172.19.0.2 Returned 304 in 3 ms
+colourstream-frontend  |  HTTP  3/15/2025 4:38:01 PM 172.19.0.2 Returned 200 in 11 ms
+colourstream-frontend  |  HTTP  3/15/2025 4:44:38 PM 172.19.0.2 GET /
+colourstream-frontend  |  HTTP  3/15/2025 4:44:38 PM 172.19.0.2 Returned 200 in 18 ms
+colourstream-frontend  |  HTTP  3/15/2025 4:44:38 PM 172.19.0.2 GET /assets/index-_U_yp9fg.js
+colourstream-frontend  |  HTTP  3/15/2025 4:44:38 PM 172.19.0.2 Returned 200 in 5 ms
+colourstream-frontend  |  HTTP  3/15/2025 4:44:38 PM 172.19.0.2 GET /config/runtime-config.js
+colourstream-frontend  |  HTTP  3/15/2025 4:44:38 PM 172.19.0.2 Returned 200 in 1 ms
+colourstream-frontend  |  HTTP  3/15/2025 4:44:38 PM 172.19.0.2 GET /assets/index-BoAXaL_X.css
+colourstream-frontend  |  HTTP  3/15/2025 4:44:38 PM 172.19.0.2 GET /assets/vendor-5Gg5Lqou.js
+colourstream-frontend  |  HTTP  3/15/2025 4:44:38 PM 172.19.0.2 Returned 200 in 2 ms
+colourstream-frontend  |  HTTP  3/15/2025 4:44:38 PM 172.19.0.2 Returned 200 in 2 ms
+colourstream-frontend  |  HTTP  3/15/2025 4:44:38 PM 172.19.0.2 GET /favicon.svg
+colourstream-frontend  |  HTTP  3/15/2025 4:44:38 PM 172.19.0.2 Returned 200 in 2 ms
+colourstream-frontend  |  HTTP  3/15/2025 4:52:50 PM 172.19.0.2 GET /
+colourstream-frontend  |  HTTP  3/15/2025 4:52:50 PM 172.19.0.2 Returned 304 in 7 ms
+colourstream-frontend  |  HTTP  3/15/2025 4:52:50 PM 172.19.0.2 GET /assets/vendor-5Gg5Lqou.js
+colourstream-frontend  |  HTTP  3/15/2025 4:52:50 PM 172.19.0.2 Returned 304 in 5 ms
+colourstream-frontend  |  HTTP  3/15/2025 4:52:50 PM 172.19.0.2 GET /config/runtime-config.js
+colourstream-frontend  |  HTTP  3/15/2025 4:52:50 PM 172.19.0.2 Returned 304 in 2 ms
+colourstream-frontend  |  HTTP  3/15/2025 4:52:50 PM 172.19.0.2 GET /assets/index-BoAXaL_X.css
+colourstream-frontend  |  HTTP  3/15/2025 4:52:50 PM 172.19.0.2 Returned 304 in 1 ms
+colourstream-frontend  |  HTTP  3/15/2025 4:52:50 PM 172.19.0.2 GET /assets/index-_U_yp9fg.js
+colourstream-frontend  |  HTTP  3/15/2025 4:52:50 PM 172.19.0.2 Returned 304 in 3 ms
