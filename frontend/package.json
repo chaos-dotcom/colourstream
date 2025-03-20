@@ -22,6 +22,8 @@
     "@uppy/aws-s3-multipart": "^4.0.0",
     "@uppy/core": "^4.4.2",
     "@uppy/dashboard": "^4.3.2",
+    "@uppy/dropbox": "^4.2.1",
+    "@uppy/google-drive-picker": "^0.3.3",
     "@uppy/react": "^4.2.1",
     "@uppy/tus": "^4.2.2",
     "@uppy/xhr-upload": "^4.3.3",

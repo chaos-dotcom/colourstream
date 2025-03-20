@@ -51,6 +51,9 @@ This project incorporates components with their own licenses:
 1. OvenMediaEngine: Licensed under AGPL-3.0
 2. Mirotalk: Licensed under AGPL-3.0
 3. UI elements from UK Government Design System: Available under MIT license
+4. Uppy: Licensed under MIT
+5. AWS S3 Multipart: Licensed under MIT
+6. Minio: Licensed under AGPL-3.0
 
 ## Support for LGBTQ+ Community
 

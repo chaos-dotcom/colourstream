@@ -575,9 +575,41 @@ router.post('/upload/:token', upload.array('files'), async (req: Request, res: R
 router.delete('/projects/:projectId', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { projectId } = req.params;
+
+    // Get project with all associated files
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      include: {
+        files: true,
+        client: true
+      }
+    });
+
+    if (!project) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Project not found'
+      });
+    }
+
+    // Delete all files from S3
+    for (const file of project.files) {
+      if (file.storage === 's3' && file.path) {
+        try {
+          await s3Service.deleteFile(file.path);
+          console.log(`Deleted file from S3: ${file.path}`);
+        } catch (s3Error) {
+          console.error(`Failed to delete file from S3: ${file.path}`, s3Error);
+          // Continue with deletion even if S3 deletion fails
+        }
+      }
+    }
+
+    // Delete the project (cascading delete will handle upload links)
     await prisma.project.delete({
       where: { id: projectId }
     });
+
     res.json({
       status: 'success',
       message: 'Project deleted successfully'
@@ -722,10 +754,17 @@ router.delete('/clients/:clientId', authenticateToken, async (req: Request, res:
   try {
     const { clientId } = req.params;
     
-    // Check if client exists
+    // Check if client exists and get all associated data
     const client = await prisma.client.findUnique({
       where: { id: clientId },
-      include: { projects: true }
+      include: { 
+        projects: {
+          include: {
+            files: true,
+            uploadLinks: true
+          }
+        }
+      }
     });
     
     if (!client) {
@@ -733,6 +772,21 @@ router.delete('/clients/:clientId', authenticateToken, async (req: Request, res:
         status: 'error',
         message: 'Client not found'
       });
+    }
+
+    // Delete all files from S3 for each project
+    for (const project of client.projects) {
+      for (const file of project.files) {
+        if (file.storage === 's3' && file.path) {
+          try {
+            await s3Service.deleteFile(file.path);
+            console.log(`Deleted file from S3: ${file.path}`);
+          } catch (s3Error) {
+            console.error(`Failed to delete file from S3: ${file.path}`, s3Error);
+            // Continue with deletion even if S3 deletion fails
+          }
+        }
+      }
     }
     
     // Delete the client (cascading delete will handle projects and upload links)

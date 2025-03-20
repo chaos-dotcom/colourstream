@@ -20,6 +20,9 @@ import ClientUploadPortal from './pages/UploadPortal';
 import AllUploadLinks from './pages/AllUploadLinks';
 import About from './pages/About';
 import License from './pages/License';
+import Privacy from './pages/Privacy';
+import Terms from './pages/Terms';
+import DropzoneTestPage from './pages/DropzoneTestPage';
 
 // Debug component to verify rendering
 const DebugAdminLoginPage = () => {
@@ -41,6 +44,8 @@ function App() {
         <Router>
           <Routes>
             <Route path="/portal/:token" element={<ClientUploadPortal />} />
+            <Route path="/dropzone/:token" element={<DropzoneTestPage />} />
+            <Route path="/dropzone" element={<DropzoneTestPage />} />
             <Route path="/" element={<Navigate to="/portal" replace />} />
             <Route path="/portal" element={<Navigate to="/portal/" replace />} />
             <Route path="*" element={<Navigate to="/portal" replace />} />
@@ -158,6 +163,12 @@ function App() {
             
             {/* License Page */}
             <Route path="/license" element={<License />} />
+            
+            {/* Privacy Policy Page */}
+            <Route path="/privacy" element={<Privacy />} />
+            
+            {/* Terms of Service Page */}
+            <Route path="/terms" element={<Terms />} />
             
             {/* Routes without GovUkLayout (no footer) */}
             <Route path="/room/:roomId" element={<RoomView isPasswordProtected={true} />} />

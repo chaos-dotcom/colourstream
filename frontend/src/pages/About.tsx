@@ -39,7 +39,7 @@ const About: React.FC = () => {
                 We are proud signatories of the <a href="https://live.colourstream.johnrogerscolour.co.uk/license" target="_blank" rel="noopener noreferrer" className="govuk-link">Pride Flag Covenant</a>, affirming our commitment to creating inclusive
                 technology that respects and supports all members of our community. We believe that diversity
                 strengthens our tools and ensures they serve everyone in the colour grading industry, regardless
-                of background or identity. You can read our full <a href="/license" className="govuk-link">license</a> for more details.
+                of background or identity. You can read our full <a href="/license" className="govuk-link">license</a> for more details and view our <a href="/privacy" className="govuk-link">privacy policy</a>.
               </p>
               <p className="govuk-body">
                 ColourStream was written by <a href="https://johnrogerscolour.co.uk" target="_blank" rel="noopener noreferrer" className="govuk-link">John Rogers</a>, 
@@ -86,6 +86,9 @@ const About: React.FC = () => {
               <p className="govuk-body">
                 To access the platform's features, please log in to your account or contact the administrator
                 for access credentials.
+              </p>
+              <p className="govuk-body">
+                Before using ColourStream, please review our <a href="/privacy" className="govuk-link">privacy policy</a> to understand how your data is handled.
               </p>
             </div>
           </div>

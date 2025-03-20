@@ -118,7 +118,8 @@ async function findFileInDatabase(key: string): Promise<{ clientCode: string | n
   const cleanFilename = filename.replace(UUID_REGEX, '');
   
   if (cleanFilename !== filename) {
-    // Try to match based on clean filename
+    // Try to match based on clean filename, but prioritize the most recent upload
+    // This ensures that when different clients use the same assets, we use the most recent context
     const fileByName = await prisma.uploadedFile.findFirst({
       where: {
         name: {
@@ -131,14 +132,33 @@ async function findFileInDatabase(key: string): Promise<{ clientCode: string | n
             client: true
           }
         }
+      },
+      orderBy: {
+        createdAt: 'desc' // Get the most recent file
       }
     });
     
     if (fileByName?.project?.client) {
-      logger.info(`Found similar file in database with client=${fileByName.project.client.code} project=${fileByName.project.name}`);
+      logger.info(`Found similar file in database with client=${fileByName.project.client.code} project=${fileByName.project.name} (most recent upload)`);
       return {
         clientCode: fileByName.project.client.code,
         projectCode: fileByName.project.name
+      };
+    }
+  }
+  
+  // Try to extract client/project information from existing path parts if available
+  const pathParts = key.split('/');
+  if (pathParts.length >= 3) {
+    // The key might already have client/project information in it
+    const possibleClient = pathParts[0];
+    const possibleProject = pathParts[1];
+    
+    if (possibleClient && possibleProject && possibleClient !== 'default' && possibleProject !== 'default') {
+      logger.info(`Using existing path structure for client=${possibleClient} project=${possibleProject}`);
+      return {
+        clientCode: possibleClient,
+        projectCode: possibleProject
       };
     }
   }
@@ -161,6 +181,20 @@ async function generateCleanKey(key: string): Promise<string> {
   // If we couldn't find in DB, try to extract from path
   const pathInfo = extractPathInfo(key);
   
+  // If the file is already in a client/project folder structure and not in default
+  // and we don't have specific DB info, preserve the existing structure
+  if (!dbInfo.clientCode && pathInfo.clientCode && pathInfo.projectCode && 
+      pathInfo.clientCode !== 'default' && pathInfo.projectCode !== 'default') {
+    // Keep existing organization if it looks valid
+    const filename = key.split('/').pop() || '';
+    const cleanFilename = filename.replace(UUID_REGEX, '').replace(/^-+/, '').replace(/-+/g, '-');
+    
+    logger.info(`Preserving existing folder structure: ${pathInfo.clientCode}/${pathInfo.projectCode}`);
+    
+    // Use the existing path structure but clean the filename
+    return `${pathInfo.clientCode}/${pathInfo.projectCode}/${cleanFilename}`;
+  }
+  
   // Use DB info if available, fall back to path info, then default
   const clientCode = dbInfo.clientCode || pathInfo.clientCode || 'default';
   const projectCode = dbInfo.projectCode || pathInfo.projectCode || 'default';
@@ -169,9 +203,14 @@ async function generateCleanKey(key: string): Promise<string> {
   const filename = key.split('/').pop() || '';
   const cleanFilename = filename.replace(UUID_REGEX, '').replace(/^-+/, '').replace(/-+/g, '-');
 
-  // Normalize client and project names - convert to lowercase, replace spaces with dashes
-  const normalizedClient = clientCode.toLowerCase().replace(/\s+/g, '-');
-  const normalizedProject = projectCode.toLowerCase().replace(/\s+/g, '-');
+  // Normalize client and project names - preserve case and replace spaces with underscores
+  const normalizedClient = clientCode.replace(/\s+/g, '_');
+  const normalizedProject = projectCode.replace(/\s+/g, '_');
+  
+  // Log if we're using default folders
+  if (clientCode === 'default' || projectCode === 'default') {
+    logger.warn(`Using default folder(s) for file: ${key} -> ${normalizedClient}/${normalizedProject}/${cleanFilename}`);
+  }
   
   // Format as /CLIENT/PROJECT/filename
   return `${normalizedClient}/${normalizedProject}/${cleanFilename}`;
@@ -187,11 +226,18 @@ export async function fixS3Filenames(): Promise<void> {
     // List all objects in S3 using our helper function
     const objects = await listAllS3Objects();
     let renamedCount = 0;
+    let skippedCount = 0;
     
     for (const object of objects) {
       const key = object.Key;
       
       if (!key) continue;
+      
+      // Skip thumbnail files and dotfiles (system files)
+      if (key.includes('/_thumb/') || key.split('/').pop()?.startsWith('.')) {
+        logger.debug(`Skipping system file or thumbnail: ${key}`);
+        continue;
+      }
       
       // Check if the key contains a UUID
       if (hasUuid(key)) {
@@ -202,7 +248,21 @@ export async function fixS3Filenames(): Promise<void> {
           // Don't rename if the key is already clean
           if (cleanKey === key) {
             logger.debug(`Key is already clean: ${key}`);
+            skippedCount++;
             continue;
+          }
+          
+          // Be cautious about renaming to default directory
+          const cleanKeyParts = cleanKey.split('/');
+          if (cleanKeyParts[0] === 'default' || cleanKeyParts[1] === 'default') {
+            // If the original key has a better structure than default/default, skip renaming
+            const originalParts = key.split('/');
+            if (originalParts.length >= 3 && 
+                (originalParts[0] !== 'default' && originalParts[1] !== 'default')) {
+              logger.warn(`Skipping renaming to default directory when original had better structure: ${key}`);
+              skippedCount++;
+              continue;
+            }
           }
           
           // Rename the object
@@ -228,7 +288,7 @@ export async function fixS3Filenames(): Promise<void> {
       }
     }
     
-    logger.info(`S3 filename cleanup completed. Renamed ${renamedCount} objects.`);
+    logger.info(`S3 filename cleanup completed. Renamed ${renamedCount} objects, skipped ${skippedCount} objects.`);
   } catch (error) {
     logger.error('Error during S3 filename cleanup:', error);
     throw error;

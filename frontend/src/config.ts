@@ -18,6 +18,12 @@ interface RuntimeConfig {
   COMPANION_URL: string;
   COMPANION_AWS_ENDPOINT: string;
   USE_COMPANION: string;
+  // Provider configuration
+  ENABLE_DROPBOX: string;
+  ENABLE_GOOGLE_DRIVE: string;
+  GOOGLE_DRIVE_CLIENT_ID: string;
+  GOOGLE_DRIVE_API_KEY: string;
+  GOOGLE_DRIVE_APP_ID: string;
 }
 
 // Declare the global runtime config
@@ -78,6 +84,17 @@ const getConfig = (key: keyof RuntimeConfig): string => {
       return envValue || 'https://upload.colourstream.johnrogerscolour.co.uk/companion';
     case 'USE_COMPANION':
       return envValue || 'true';
+    // Provider configuration defaults
+    case 'ENABLE_DROPBOX':
+      return envValue || 'false';
+    case 'ENABLE_GOOGLE_DRIVE':
+      return envValue || 'false';
+    case 'GOOGLE_DRIVE_CLIENT_ID':
+      return envValue || '';
+    case 'GOOGLE_DRIVE_API_KEY':
+      return envValue || '';
+    case 'GOOGLE_DRIVE_APP_ID':
+      return envValue || '';
     default:
       return envValue || '';
   }
@@ -102,6 +119,12 @@ export const S3_BUCKET = getConfig('S3_BUCKET');
 export const COMPANION_URL = getConfig('COMPANION_URL');
 export const COMPANION_AWS_ENDPOINT = getConfig('COMPANION_AWS_ENDPOINT');
 export const USE_COMPANION = getConfig('USE_COMPANION') === 'true';
+// Export Provider configuration
+export const ENABLE_DROPBOX = getConfig('ENABLE_DROPBOX') === 'true';
+export const ENABLE_GOOGLE_DRIVE = getConfig('ENABLE_GOOGLE_DRIVE') === 'true';
+export const GOOGLE_DRIVE_CLIENT_ID = getConfig('GOOGLE_DRIVE_CLIENT_ID');
+export const GOOGLE_DRIVE_API_KEY = getConfig('GOOGLE_DRIVE_API_KEY');
+export const GOOGLE_DRIVE_APP_ID = getConfig('GOOGLE_DRIVE_APP_ID');
 
 // For debugging
 if (typeof window !== 'undefined') {
@@ -122,6 +145,11 @@ if (typeof window !== 'undefined') {
     COMPANION_URL,
     COMPANION_AWS_ENDPOINT,
     USE_COMPANION,
+    ENABLE_DROPBOX,
+    ENABLE_GOOGLE_DRIVE,
+    GOOGLE_DRIVE_CLIENT_ID,
+    GOOGLE_DRIVE_API_KEY,
+    GOOGLE_DRIVE_APP_ID,
     source: window.RUNTIME_CONFIG ? 'runtime' : 'build-time'
   });
 }
@@ -142,5 +170,10 @@ export default {
   S3_BUCKET,
   COMPANION_URL,
   COMPANION_AWS_ENDPOINT,
-  USE_COMPANION
+  USE_COMPANION,
+  ENABLE_DROPBOX,
+  ENABLE_GOOGLE_DRIVE,
+  GOOGLE_DRIVE_CLIENT_ID,
+  GOOGLE_DRIVE_API_KEY,
+  GOOGLE_DRIVE_APP_ID
 }; 

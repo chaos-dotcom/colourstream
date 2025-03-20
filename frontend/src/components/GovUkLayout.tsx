@@ -111,6 +111,15 @@ const GovUkLayout: React.FC<GovUkLayoutProps> = ({ children, serviceName = 'Colo
               <Link href="/" color="inherit" sx={{ display: 'block', mb: 1 }}>
                 ColourStream
               </Link>
+              <Link href="/license" color="inherit" sx={{ display: 'block', mb: 1 }}>
+                License
+              </Link>
+              <Link href="/privacy" color="inherit" sx={{ display: 'block', mb: 1 }}>
+                Privacy Policy
+              </Link>
+              <Link href="/terms" color="inherit" sx={{ display: 'block', mb: 1 }}>
+                Terms of Service
+              </Link>
             </Box>
           </Box>
         </Container>

@@ -17,10 +17,10 @@ import {
 import { styled } from '@mui/material/styles';
 import { Dashboard } from '@uppy/react';
 import Uppy from '@uppy/core';
-import Tus from '@uppy/tus';
-import XHRUpload from '@uppy/xhr-upload';
 import AwsS3 from '@uppy/aws-s3';
 import AwsS3Multipart from '@uppy/aws-s3-multipart';
+import Dropbox from '@uppy/dropbox';
+import GoogleDrivePicker from '@uppy/google-drive-picker';
 import type { UppyFile } from '@uppy/core';
 import type { AwsS3UploadParameters } from '@uppy/aws-s3';
 import '@uppy/core/dist/style.min.css';
@@ -36,7 +36,12 @@ import {
   S3_BUCKET,
   COMPANION_URL,
   COMPANION_AWS_ENDPOINT,
-  USE_COMPANION
+  USE_COMPANION,
+  ENABLE_DROPBOX,
+  ENABLE_GOOGLE_DRIVE,
+  GOOGLE_DRIVE_CLIENT_ID,
+  GOOGLE_DRIVE_API_KEY,
+  GOOGLE_DRIVE_APP_ID
 } from '../config';
 
 const StyledDashboard = styled(Box)(({ theme }) => ({
@@ -224,7 +229,7 @@ const UploadPortal: React.FC = () => {
               retryDelays: [0, 1000, 3000, 5000, 10000], // Retry delays for failed chunks
               // For very large files, use large chunks to speed up upload
               // This is larger than the default 5MB chunks
-              chunkSize: 50 * 1024 * 1024, // 50MB chunks
+              chunkSize: 96 * 1024 * 1024, // 50MB chunks
               // Log progress for debugging
               getChunkSize(file: any) {
                 // For smaller files, use smaller chunks
@@ -239,6 +244,25 @@ const UploadPortal: React.FC = () => {
                 return 50 * 1024 * 1024; // 50MB chunks for very large files
               }
             });
+            
+            // Add Dropbox support if enabled
+            if (ENABLE_DROPBOX) {
+              console.log('Enabling Dropbox integration');
+              uppyInstance.use(Dropbox, {
+                companionUrl: COMPANION_URL,
+              });
+            }
+            
+            // Add Google Drive support if enabled
+            if (ENABLE_GOOGLE_DRIVE) {
+              console.log('Enabling Google Drive Picker integration');
+              uppyInstance.use(GoogleDrivePicker, {
+                companionUrl: COMPANION_URL,
+                clientId: GOOGLE_DRIVE_CLIENT_ID,
+                apiKey: GOOGLE_DRIVE_API_KEY,
+                appId: GOOGLE_DRIVE_APP_ID
+              });
+            }
             
             // Log all events for multipart uploads to help debug
             uppyInstance.on('upload-success', (file, response) => {
@@ -351,12 +375,11 @@ const UploadPortal: React.FC = () => {
                 console.log('Could not get files from Uppy:', err);
               }
             });
-          } 
-          // Fall back to regular S3 if Companion is not enabled
-          else if (useS3) {
-            console.log('Using regular (non-multipart) AWS S3 plugin for direct PUT uploads');
+          } else if (useS3) {
+            // Fall back to regular S3 if Companion is not enabled
+            console.log('Using AwsS3 for direct uploads (Companion disabled)');
+            console.log('S3 endpoint configured as:', S3_ENDPOINT);
             
-            // Use the regular AWS S3 plugin, explicitly disabling multipart uploads
             uppyInstance.use(AwsS3, {
               shouldUseMultipart: false, // Explicitly disable multipart uploads
               limit: 1, // Process one file at a time to avoid issues
@@ -526,22 +549,6 @@ const UploadPortal: React.FC = () => {
                 setError(`Error uploading ${file?.name}: ${error.message}`);
               }
             });
-          } else {
-            // Standard XHR uploader for local storage
-            console.log('Using XHRUpload for local storage');
-            
-            uppyInstance.use(XHRUpload, {
-              endpoint: `${API_URL}/upload/upload/${token}`,
-              fieldName: 'files', // Must match the field name expected by multer in backend
-              formData: true,
-              bundle: true,
-              limit: 10,
-              headers: {
-                'X-Requested-With': 'XMLHttpRequest',
-              }
-            });
-            
-            console.log('Local storage upload configured');
           }
           
           // Set up error handling
