@@ -112,24 +112,28 @@ check_configured() {
 get_domain() {
   local input_domain=""
   while [ -z "$input_domain" ]; do
-    read -p "Enter your domain name (e.g., example.com): " input_domain
+    echo -n "Enter your domain name (e.g., example.com): "
+    read input_domain
+    input_domain=$(echo "$input_domain" | tr -d '\n\r' | xargs)
     if [ -z "$input_domain" ]; then
-      echo "Domain name cannot be empty. Please try again."
-    fi
+    echo "Domain name cannot be empty. Please try again."
+  fi
   done
-  # Clean the domain name to ensure no newlines or extra spaces
-  input_domain=$(echo "$input_domain" | tr -d '\n\r' | xargs)
   echo "$input_domain"
 }
 
 # Function to prompt for admin email
 get_admin_email() {
-  read -p "Enter admin email address: " admin_email
-  if [ -z "$admin_email" ]; then
+  local input_email=""
+  while [ -z "$input_email" ]; do
+    echo -n "Enter admin email address: "
+    read input_email
+    input_email=$(echo "$input_email" | tr -d '\n\r' | xargs)
+    if [ -z "$input_email" ]; then
     echo "Admin email cannot be empty. Please try again."
-    get_admin_email
   fi
-  echo $admin_email
+  done
+  echo "$input_email"
 }
 
 # Function to generate a random password
@@ -137,143 +141,81 @@ generate_password() {
   openssl rand -hex 16
 }
 
-# Function to rotate secrets only
-rotate_secrets() {
-  echo "Rotating secrets for existing installation..."
+# Function to download template files
+download_templates() {
+  echo "Downloading template files..."
   
-  # Extract current domain and email from existing configuration
-  # DO NOT modify these during rotation
-  domain_name=$(grep "DOMAIN=" global.env | cut -d'=' -f2)
-  admin_email=$(grep "ADMIN_EMAIL=" global.env | cut -d'=' -f2)
+  # Create templates directory
+  mkdir -p templates
   
-  echo "Preserving existing domain configuration:"
-  echo "Domain: $domain_name"
-  echo "Admin Email: $admin_email"
+  # Define the base URL for raw template files
+  REPO_URL="https://raw.githubusercontent.com/johnr24/colourstream/main"
   
-  # Generate new passwords
-  db_password=$(generate_password)
-  jwt_key=$(generate_password)
-  jwt_secret=$(generate_password)  # Generate separate JWT_SECRET
-  admin_password=$(generate_password)
-  admin_auth_secret=$(generate_password)
-  mirotalk_api_key=$(generate_password)
-  turn_password=$(generate_password)
-  ome_api_token=$(generate_password)
-  ome_webhook_secret=$(generate_password)
+  # Download template files
+  echo "Downloading docker-compose template..."
+  curl -s -o templates/docker-compose.template.yml "${REPO_URL}/docker-compose.template.yml"
   
-  echo "Updating configuration files with new secrets..."
+  echo "Downloading .env templates..."
+  curl -s -o templates/global.env.template "${REPO_URL}/global.env.template"
+  curl -s -o templates/backend.env.template "${REPO_URL}/backend/.env.template"
+  curl -s -o templates/frontend.env.template "${REPO_URL}/frontend/.env.template"
+  curl -s -o templates/mirotalk.env.template "${REPO_URL}/mirotalk/.env.template"
+  curl -s -o templates/companion.env.template "${REPO_URL}/companion/.env.template"
+  curl -s -o templates/coturn.conf.template "${REPO_URL}/coturn/turnserver.conf.template"
   
-  # Update global.env with new secrets
-  sed -i.bak "s/DB_PASSWORD=.*/DB_PASSWORD=${db_password}/g" global.env
-  sed -i.bak "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${db_password}/g" global.env
-  sed -i.bak "s/JWT_KEY=.*/JWT_KEY=${jwt_key}/g" global.env
-  sed -i.bak "s/JWT_SECRET=.*/JWT_SECRET=${jwt_secret}/g" global.env
-  sed -i.bak "s/ADMIN_PASSWORD=.*/ADMIN_PASSWORD=${admin_password}/g" global.env
-  sed -i.bak "s/ADMIN_AUTH_SECRET=.*/ADMIN_AUTH_SECRET=${admin_auth_secret}/g" global.env
-  sed -i.bak "s/MIROTALK_API_KEY=.*/MIROTALK_API_KEY=${mirotalk_api_key}/g" global.env
-  sed -i.bak "s/MIROTALK_API_KEY_SECRET=.*/MIROTALK_API_KEY_SECRET=${mirotalk_api_key}/g" global.env
-  sed -i.bak "s/TURN_SERVER_CREDENTIAL=.*/TURN_SERVER_CREDENTIAL=${turn_password}/g" global.env
-  sed -i.bak "s/OME_API_ACCESS_TOKEN=.*/OME_API_ACCESS_TOKEN=${ome_api_token}/g" global.env
-  sed -i.bak "s/OME_WEBHOOK_SECRET=.*/OME_WEBHOOK_SECRET=${ome_webhook_secret}/g" global.env
-  
-  # Update backend/.env with new secrets
-  sed -i.bak "s/DATABASE_URL=.*/DATABASE_URL=postgresql:\/\/colourstream:${db_password}@colourstream-postgres:5432\/colourstream/g" backend/.env
-  sed -i.bak "s/JWT_KEY=.*/JWT_KEY=${jwt_key}/g" backend/.env
-  sed -i.bak "s/JWT_SECRET=.*/JWT_SECRET=${jwt_secret}/g" backend/.env
-  sed -i.bak "s/ADMIN_PASSWORD=.*/ADMIN_PASSWORD=${admin_password}/g" backend/.env
-  sed -i.bak "s/ADMIN_AUTH_SECRET=.*/ADMIN_AUTH_SECRET=${admin_auth_secret}/g" backend/.env
-  sed -i.bak "s/OME_API_ACCESS_TOKEN=.*/OME_API_ACCESS_TOKEN=${ome_api_token}/g" backend/.env
-  sed -i.bak "s/OME_WEBHOOK_SECRET=.*/OME_WEBHOOK_SECRET=${ome_webhook_secret}/g" backend/.env
-  # Update HOST_USERS configuration
-  sed -i.bak "s/HOST_USERS=.*/HOST_USERS=[{\"username\":\"admin\", \"password\":\"${admin_password}\"}]/g" backend/.env
-  
-  # Update mirotalk/.env with new secrets
-  sed -i.bak "s/TURN_SERVER_CREDENTIAL=.*/TURN_SERVER_CREDENTIAL=${turn_password}/g" mirotalk/.env
-  sed -i.bak "s/API_KEY_SECRET=.*/API_KEY_SECRET=${mirotalk_api_key}/g" mirotalk/.env
-  sed -i.bak "s/MIROTALK_API_KEY_SECRET=.*/MIROTALK_API_KEY_SECRET=${mirotalk_api_key}/g" mirotalk/.env
-  sed -i.bak "s/JWT_KEY=.*/JWT_KEY=${jwt_key}/g" mirotalk/.env
-  sed -i.bak "s/HOST_PASSWORD=.*/HOST_PASSWORD=${admin_password}/g" mirotalk/.env
-  # Update HOST_USERS configuration
-  sed -i.bak "s/HOST_USERS=.*/HOST_USERS=[{\"username\":\"admin\", \"password\":\"${admin_password}\"}]/g" mirotalk/.env
-  
-  # Update coturn config
-  sed -i.bak "s/user=colourstream:.*/user=colourstream:${turn_password}/g" coturn/turnserver.conf
-  
-  # Update docker-compose.yml - create it from the template if it doesn't exist
-  if [ ! -f "docker-compose.yml" ] && [ -f "docker-compose.template.yml" ]; then
-    echo "Creating docker-compose.yml from template..."
-    cp docker-compose.template.yml docker-compose.yml
+  # Check if downloads were successful
+  if [ ! -f "templates/docker-compose.template.yml" ]; then
+    echo "⚠️ Failed to download templates. Using embedded templates as fallback."
+    return 1
   fi
   
-  # Clean up backup files
-  find . -name "*.bak" -type f -delete
-  
-  # Create/update reference file for credentials
-  echo "Creating credentials reference file..."
-  cat > env.reference << EOL
-# Generated Configuration - $(date)
-# THIS IS A REFERENCE FILE ONLY - NOT USED BY THE APPLICATION
-# Keep this file secure as it contains sensitive credentials
-
-DOMAIN_NAME=${domain_name}
-ADMIN_EMAIL=${admin_email}
-DB_PASSWORD=${db_password}
-JWT_KEY=${jwt_key}
-JWT_SECRET=${jwt_secret}
-ADMIN_PASSWORD=${admin_password}
-ADMIN_AUTH_SECRET=${admin_auth_secret}
-MIROTALK_API_KEY=${mirotalk_api_key}
-TURN_PASSWORD=${turn_password}
-OME_API_TOKEN=${ome_api_token}
-OME_WEBHOOK_SECRET=${ome_webhook_secret}
-
-# Existing URLs (preserved)
-FRONTEND_URL=https://live.colourstream.${domain_name}
-VIDEO_URL=https://video.colourstream.${domain_name}
-EOL
-  chmod 600 env.reference
-  echo "✅ Created credentials reference file"
-  
-  echo
-  echo "Secrets rotation complete!"
-  echo "New credentials have been saved to env.reference"
-  echo
-  echo "To apply these changes, restart the containers with:"
-  echo "docker-compose down && docker-compose up -d"
+  echo "✅ Template files downloaded successfully"
+  return 0
 }
 
-# Function to perform full setup
-perform_full_setup() {
-  # Clean any stale docker-compose.yml
-  if [ -f "docker-compose.yml" ]; then
-    echo "Removing existing docker-compose.yml..."
-    rm docker-compose.yml
+# Function to apply values to a template file
+apply_template() {
+  local template_file="$1"
+  local output_file="$2"
+  local temp_file="${output_file}.tmp"
+  
+  if [ ! -f "$template_file" ]; then
+    echo "Template file not found: $template_file"
+    return 1
   fi
+  
+  # Create a copy of the template
+  cp "$template_file" "$temp_file"
+  
+  # Replace placeholders with actual values
+  sed -i "s/\${DOMAIN}/${domain_name}/g" "$temp_file"
+  sed -i "s/\${ADMIN_EMAIL}/${admin_email}/g" "$temp_file"
+  sed -i "s/\${DB_PASSWORD}/${db_password}/g" "$temp_file"
+  sed -i "s/\${JWT_KEY}/${jwt_key}/g" "$temp_file"
+  sed -i "s/\${JWT_SECRET}/${jwt_secret}/g" "$temp_file"
+  sed -i "s/\${ADMIN_PASSWORD}/${admin_password}/g" "$temp_file"
+  sed -i "s/\${ADMIN_AUTH_SECRET}/${admin_auth_secret}/g" "$temp_file"
+  sed -i "s/\${MIROTALK_API_KEY}/${mirotalk_api_key}/g" "$temp_file"
+  sed -i "s/\${MIROTALK_API_KEY_SECRET}/${mirotalk_api_key}/g" "$temp_file"
+  sed -i "s/\${TURN_SERVER_CREDENTIAL}/${turn_password}/g" "$temp_file"
+  sed -i "s/\${OME_API_ACCESS_TOKEN}/${ome_api_token}/g" "$temp_file"
+  sed -i "s/\${OME_WEBHOOK_SECRET}/${ome_webhook_secret}/g" "$temp_file"
+  sed -i "s/\${MINIO_ROOT_USER}/${minio_root_user}/g" "$temp_file"
+  sed -i "s/\${MINIO_ROOT_PASSWORD}/${minio_root_password}/g" "$temp_file"
+  sed -i "s/\${NAMEFORUPLOADCOMPLETION}/User/g" "$temp_file"
+  
+  # Move the processed file to the final location
+  mv "$temp_file" "$output_file"
+  chmod 600 "$output_file"
+  
+  echo "✅ Created $output_file from template"
+  return 0
+}
 
-  # Create directories
-  echo "Creating required directories..."
-  mkdir -p backend/logs backend/uploads backend/prisma postgres traefik certs/certs certs/private ovenmediaengine/origin_conf ovenmediaengine/edge_conf coturn mirotalk frontend
-
-  # Get user input
-  domain_name=$(get_domain)
-  admin_email=$(get_admin_email)
-
-  # Generate random passwords
-  db_password=$(generate_password)
-  jwt_key=$(generate_password)
-  jwt_secret=$(generate_password)  # Generate separate JWT_SECRET
-  admin_password=$(generate_password)
-  admin_auth_secret=$(generate_password)
-  mirotalk_api_key=$(generate_password)
-  turn_password=$(generate_password)
-  ome_api_token=$(generate_password)
-  ome_webhook_secret=$(generate_password)
-  minio_root_user=$(generate_password)
-  minio_root_password=$(generate_password)
-
-  echo
-  echo "Creating configuration files..."
-
+# Function to create configuration files from embedded templates as fallback
+create_embedded_configs() {
+  echo "Creating configuration files from embedded templates..."
+  
   # Create global.env
   cat > global.env << EOL
 # Global Environment Variables
@@ -405,7 +347,7 @@ COMPANION_AWS_FORCE_PATH_STYLE=true
 COMPANION_CLIENT_ORIGINS=https://live.colourstream.${domain_name}
 COMPANION_RETURN_URL=https://live.colourstream.${domain_name}
 EOL
-  chmod 600 .env.companion
+    chmod 600 .env.companion
   echo "✅ Created .env.companion"
 
   # Create docker-compose.yml
@@ -482,7 +424,7 @@ services:
       - POSTGRES_PASSWORD=\${DB_PASSWORD}
 
   origin:
-    image: ghcr.io/johnr24/ome-origin:latest
+    image: airensoft/ovenmediaengine:latest
     restart: unless-stopped
     ports:
       - "1935:1935"
@@ -504,7 +446,7 @@ services:
       - "traefik.http.services.origin-admin.loadbalancer.server.port=8081"
 
   edge:
-    image: ghcr.io/johnr24/ome-edge:latest
+    image: airensoft/ovenmediaengine:latest
     restart: unless-stopped
     depends_on:
       - origin
@@ -521,7 +463,7 @@ services:
       - "traefik.http.services.edge-webrtc.loadbalancer.server.port=3334"
 
   mirotalk:
-    image: ghcr.io/johnr24/colourstream-mirotalk:latest
+    image: mirotalk/p2p:latest
     restart: unless-stopped
     env_file:
       - ./mirotalk/.env
@@ -535,7 +477,7 @@ services:
       - "traefik.http.services.mirotalk.loadbalancer.server.port=3000"
 
   coturn:
-    image: ghcr.io/johnr24/colourstream-coturn:latest
+    image: coturn/coturn
     restart: unless-stopped
     volumes:
       - ./coturn/turnserver.conf:/etc/turnserver.conf
@@ -555,7 +497,7 @@ services:
       - "traefik.http.services.coturn.loadbalancer.server.port=3480"
 
   uppy-companion:
-    image: ghcr.io/johnr24/colourstream-uppy-companion:latest
+    image: transloadit/companion:latest
     restart: unless-stopped
     env_file:
       - ./.env.companion
@@ -611,7 +553,7 @@ services:
     env_file:
       - ./global.env
 EOL
-  chmod 600 docker-compose.yml
+    chmod 600 docker-compose.yml
   echo "✅ Created docker-compose.yml"
 
   # Create empty Traefik ACME file with proper permissions
@@ -680,6 +622,253 @@ EOL
   # Create directory for companion data
   mkdir -p companion-data
   mkdir -p minio-data
+
+  echo "Setup completed successfully!"
+  echo
+  echo "Next steps:"
+  echo "1. Add SSL certificates to the certs directory or let Traefik generate them automatically"
+  echo "2. Set up DNS records for your domains:"
+  printf "   - live.colourstream.%s -> Your server IP\n" "${domain_name}"
+  printf "   - video.colourstream.%s -> Your server IP\n" "${domain_name}"
+  printf "   - upload.colourstream.%s -> Your server IP\n" "${domain_name}"
+  printf "   - s3.colourstream.%s -> Your server IP\n" "${domain_name}"
+  printf "   - s3-console.colourstream.%s -> Your server IP\n" "${domain_name}"
+  printf "   - turn.colourstream.%s -> Your server IP\n" "${domain_name}"
+  echo "3. Start the application with: docker compose up -d"
+  echo
+  echo "Important: Check env.reference for your admin credentials and keep it secure!"
+}
+
+# Function to rotate secrets only
+rotate_secrets() {
+  echo "Rotating secrets for existing installation..."
+  
+  # Extract current domain and email from existing configuration
+  # DO NOT modify these during rotation
+  domain_name=$(grep "DOMAIN=" global.env | cut -d'=' -f2)
+  admin_email=$(grep "ADMIN_EMAIL=" global.env | cut -d'=' -f2)
+  
+  echo "Preserving existing domain configuration:"
+  echo "Domain: $domain_name"
+  echo "Admin Email: $admin_email"
+  
+  # Generate new passwords
+  db_password=$(generate_password)
+  jwt_key=$(generate_password)
+  jwt_secret=$(generate_password)  # Generate separate JWT_SECRET
+  admin_password=$(generate_password)
+  admin_auth_secret=$(generate_password)
+  mirotalk_api_key=$(generate_password)
+  turn_password=$(generate_password)
+  ome_api_token=$(generate_password)
+  ome_webhook_secret=$(generate_password)
+  
+  echo "Updating configuration files with new secrets..."
+  
+  # First, try to download and use templates (DRY approach)
+  download_templates
+  download_success=$?
+  
+  if [ $download_success -eq 0 ]; then
+    # Successfully downloaded templates, apply with just the security parameters
+    apply_template "templates/global.env.template" "global.env"
+    apply_template "templates/backend.env.template" "backend/.env"
+    apply_template "templates/mirotalk.env.template" "mirotalk/.env"
+    apply_template "templates/companion.env.template" ".env.companion"
+    apply_template "templates/coturn.conf.template" "coturn/turnserver.conf"
+  else
+    # Fallback to traditional find and replace
+    # Update global.env with new secrets
+    sed -i.bak "s/DB_PASSWORD=.*/DB_PASSWORD=${db_password}/g" global.env
+    sed -i.bak "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${db_password}/g" global.env
+    sed -i.bak "s/JWT_KEY=.*/JWT_KEY=${jwt_key}/g" global.env
+    sed -i.bak "s/JWT_SECRET=.*/JWT_SECRET=${jwt_secret}/g" global.env
+    sed -i.bak "s/ADMIN_PASSWORD=.*/ADMIN_PASSWORD=${admin_password}/g" global.env
+    sed -i.bak "s/ADMIN_AUTH_SECRET=.*/ADMIN_AUTH_SECRET=${admin_auth_secret}/g" global.env
+    sed -i.bak "s/MIROTALK_API_KEY=.*/MIROTALK_API_KEY=${mirotalk_api_key}/g" global.env
+    sed -i.bak "s/MIROTALK_API_KEY_SECRET=.*/MIROTALK_API_KEY_SECRET=${mirotalk_api_key}/g" global.env
+    sed -i.bak "s/TURN_SERVER_CREDENTIAL=.*/TURN_SERVER_CREDENTIAL=${turn_password}/g" global.env
+    sed -i.bak "s/OME_API_ACCESS_TOKEN=.*/OME_API_ACCESS_TOKEN=${ome_api_token}/g" global.env
+    sed -i.bak "s/OME_WEBHOOK_SECRET=.*/OME_WEBHOOK_SECRET=${ome_webhook_secret}/g" global.env
+    
+    # Update backend/.env with new secrets
+    sed -i.bak "s/DATABASE_URL=.*/DATABASE_URL=postgresql:\/\/colourstream:${db_password}@colourstream-postgres:5432\/colourstream/g" backend/.env
+    sed -i.bak "s/JWT_KEY=.*/JWT_KEY=${jwt_key}/g" backend/.env
+    sed -i.bak "s/JWT_SECRET=.*/JWT_SECRET=${jwt_secret}/g" backend/.env
+    sed -i.bak "s/ADMIN_PASSWORD=.*/ADMIN_PASSWORD=${admin_password}/g" backend/.env
+    sed -i.bak "s/ADMIN_AUTH_SECRET=.*/ADMIN_AUTH_SECRET=${admin_auth_secret}/g" backend/.env
+    sed -i.bak "s/OME_API_ACCESS_TOKEN=.*/OME_API_ACCESS_TOKEN=${ome_api_token}/g" backend/.env
+    sed -i.bak "s/OME_WEBHOOK_SECRET=.*/OME_WEBHOOK_SECRET=${ome_webhook_secret}/g" backend/.env
+    # Update HOST_USERS configuration
+    sed -i.bak "s/HOST_USERS=.*/HOST_USERS=[{\"username\":\"admin\", \"password\":\"${admin_password}\"}]/g" backend/.env
+    
+    # Update mirotalk/.env with new secrets
+    sed -i.bak "s/TURN_SERVER_CREDENTIAL=.*/TURN_SERVER_CREDENTIAL=${turn_password}/g" mirotalk/.env
+    sed -i.bak "s/API_KEY_SECRET=.*/API_KEY_SECRET=${mirotalk_api_key}/g" mirotalk/.env
+    sed -i.bak "s/MIROTALK_API_KEY_SECRET=.*/MIROTALK_API_KEY_SECRET=${mirotalk_api_key}/g" mirotalk/.env
+    sed -i.bak "s/JWT_KEY=.*/JWT_KEY=${jwt_key}/g" mirotalk/.env
+    sed -i.bak "s/HOST_PASSWORD=.*/HOST_PASSWORD=${admin_password}/g" mirotalk/.env
+    # Update HOST_USERS configuration
+    sed -i.bak "s/HOST_USERS=.*/HOST_USERS=[{\"username\":\"admin\", \"password\":\"${admin_password}\"}]/g" mirotalk/.env
+    
+    # Update coturn config
+    sed -i.bak "s/user=colourstream:.*/user=colourstream:${turn_password}/g" coturn/turnserver.conf
+  fi
+  
+  # Update docker-compose.yml - create it from the template if it doesn't exist
+  if [ ! -f "docker-compose.yml" ] && [ -f "templates/docker-compose.template.yml" ]; then
+    echo "Creating docker-compose.yml from template..."
+    apply_template "templates/docker-compose.template.yml" "docker-compose.yml"
+  elif [ ! -f "docker-compose.yml" ] && [ -f "docker-compose.template.yml" ]; then
+    echo "Creating docker-compose.yml from local template..."
+    cp docker-compose.template.yml docker-compose.yml
+  fi
+  
+  # Clean up backup files
+  find . -name "*.bak" -type f -delete
+  
+  # Create/update reference file for credentials
+  echo "Creating credentials reference file..."
+  cat > env.reference << EOL
+# Generated Configuration - $(date)
+# THIS IS A REFERENCE FILE ONLY - NOT USED BY THE APPLICATION
+# Keep this file secure as it contains sensitive credentials
+
+DOMAIN_NAME=${domain_name}
+ADMIN_EMAIL=${admin_email}
+DB_PASSWORD=${db_password}
+JWT_KEY=${jwt_key}
+JWT_SECRET=${jwt_secret}
+ADMIN_PASSWORD=${admin_password}
+ADMIN_AUTH_SECRET=${admin_auth_secret}
+MIROTALK_API_KEY=${mirotalk_api_key}
+TURN_PASSWORD=${turn_password}
+OME_API_TOKEN=${ome_api_token}
+OME_WEBHOOK_SECRET=${ome_webhook_secret}
+
+# Existing URLs (preserved)
+FRONTEND_URL=https://live.colourstream.${domain_name}
+VIDEO_URL=https://video.colourstream.${domain_name}
+EOL
+  chmod 600 env.reference
+  echo "✅ Created credentials reference file"
+  
+  echo
+  echo "Secrets rotation complete!"
+  echo "New credentials have been saved to env.reference"
+  echo
+  echo "To apply these changes, restart the containers with:"
+  echo "docker-compose down && docker-compose up -d"
+}
+
+# Function to perform full setup
+perform_full_setup() {
+  # Clean any stale docker-compose.yml
+  if [ -f "docker-compose.yml" ]; then
+    echo "Removing existing docker-compose.yml..."
+    rm docker-compose.yml
+  fi
+
+  # Create directories
+  echo "Creating required directories..."
+  mkdir -p backend/logs backend/uploads backend/prisma postgres traefik certs/certs certs/private ovenmediaengine/origin_conf ovenmediaengine/edge_conf coturn mirotalk frontend
+
+  # Get user input
+  echo "Please provide the following information:"
+  echo "----------------------------------------"
+  domain_name=$(get_domain)
+  echo "Domain set to: $domain_name"
+  admin_email=$(get_admin_email)
+  echo "Admin email set to: $admin_email"
+  echo "----------------------------------------"
+  
+  # Verify inputs
+  echo "Please confirm these settings:"
+  echo "Domain: $domain_name"
+  echo "Admin Email: $admin_email"
+  read -p "Are these correct? (y/n): " confirm
+  if [[ ! $confirm =~ ^[Yy] ]]; then
+    echo "Let's try again..."
+    perform_full_setup
+    return
+  fi
+
+  # Generate random passwords
+  db_password=$(generate_password)
+  jwt_key=$(generate_password)
+  jwt_secret=$(generate_password)  # Generate separate JWT_SECRET
+  admin_password=$(generate_password)
+  admin_auth_secret=$(generate_password)
+  mirotalk_api_key=$(generate_password)
+  turn_password=$(generate_password)
+  ome_api_token=$(generate_password)
+  ome_webhook_secret=$(generate_password)
+  minio_root_user=$(generate_password)
+  minio_root_password=$(generate_password)
+
+  echo
+  echo "Creating configuration files..."
+
+  # First, try to download and use templates (DRY approach)
+  download_templates
+  download_success=$?
+  
+  if [ $download_success -eq 0 ]; then
+    # Successfully downloaded templates, use them
+    apply_template "templates/global.env.template" "global.env"
+    apply_template "templates/backend.env.template" "backend/.env"
+    apply_template "templates/frontend.env.template" "frontend/.env"
+    apply_template "templates/mirotalk.env.template" "mirotalk/.env"
+    apply_template "templates/companion.env.template" ".env.companion"
+    apply_template "templates/docker-compose.template.yml" "docker-compose.yml"
+    apply_template "templates/coturn.conf.template" "coturn/turnserver.conf"
+  else
+    # Fallback to embedded templates if download failed
+    create_embedded_configs
+  fi
+
+  # Create empty Traefik ACME file with proper permissions
+  echo "Creating Traefik ACME file..."
+  mkdir -p traefik
+  touch traefik/acme.json
+  chmod 600 traefik/acme.json
+  echo "✅ Created Traefik ACME file"
+
+  # Create directories for data storage
+  mkdir -p companion-data
+  mkdir -p minio-data
+
+  # Create/update reference file for credentials
+  echo "Creating credentials reference file..."
+  cat > env.reference << EOL
+# Generated Configuration - $(date)
+# THIS IS A REFERENCE FILE ONLY - NOT USED BY THE APPLICATION
+# Keep this file secure as it contains sensitive credentials
+
+DOMAIN_NAME=${domain_name}
+ADMIN_EMAIL=${admin_email}
+DB_PASSWORD=${db_password}
+JWT_KEY=${jwt_key}
+JWT_SECRET=${jwt_secret}
+ADMIN_PASSWORD=${admin_password}
+ADMIN_AUTH_SECRET=${admin_auth_secret}
+MIROTALK_API_KEY=${mirotalk_api_key}
+TURN_PASSWORD=${turn_password}
+OME_API_TOKEN=${ome_api_token}
+OME_WEBHOOK_SECRET=${ome_webhook_secret}
+
+# MinIO S3 Credentials
+MINIO_ROOT_USER=${minio_root_user}
+MINIO_ROOT_PASSWORD=${minio_root_password}
+
+# URLs
+FRONTEND_URL=https://live.colourstream.${domain_name}
+VIDEO_URL=https://video.colourstream.${domain_name}
+S3_URL=https://s3.colourstream.${domain_name}
+S3_CONSOLE_URL=https://s3-console.colourstream.${domain_name}
+EOL
+  chmod 600 env.reference
+  echo "✅ Created credentials reference file"
 
   echo "Setup completed successfully!"
   echo
