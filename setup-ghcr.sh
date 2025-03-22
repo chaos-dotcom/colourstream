@@ -60,14 +60,16 @@ check_configured() {
 
 # Function to prompt for domain name
 get_domain() {
-  read -p "Enter your domain name (e.g., example.com): " domain_name
-  if [ -z "$domain_name" ]; then
-    echo "Domain name cannot be empty. Please try again."
-    get_domain
-  fi
+  local input_domain=""
+  while [ -z "$input_domain" ]; do
+    read -p "Enter your domain name (e.g., example.com): " input_domain
+    if [ -z "$input_domain" ]; then
+      echo "Domain name cannot be empty. Please try again."
+    fi
+  done
   # Clean the domain name to ensure no newlines or extra spaces
-  domain_name=$(echo "$domain_name" | tr -d '\n\r' | xargs)
-  echo $domain_name
+  input_domain=$(echo "$input_domain" | tr -d '\n\r' | xargs)
+  echo "$input_domain"
 }
 
 # Function to prompt for admin email
@@ -200,7 +202,7 @@ perform_full_setup() {
 
   # Create directories
   echo "Creating required directories..."
-  mkdir -p backend/logs backend/uploads backend/prisma postgres traefik certs/certs certs/private ovenmediaengine/origin_conf ovenmediaengine/edge_conf coturn mirotalk
+  mkdir -p backend/logs backend/uploads backend/prisma postgres traefik certs/certs certs/private ovenmediaengine/origin_conf ovenmediaengine/edge_conf coturn mirotalk frontend
 
   # Get user input
   domain_name=$(get_domain)
@@ -331,24 +333,236 @@ EOL
   echo "✅ Created mirotalk/.env"
 
   # Create .env.companion
-  if [ -f ".env.companion.template" ]; then
-    echo "Creating .env.companion from template..."
-    cp .env.companion.template .env.companion
-    chmod 600 .env.companion
-    echo "✅ Created .env.companion from template"
-  else
-    echo "❌ Warning: .env.companion.template not found. Please create .env.companion manually."
-  fi
+  cat > .env.companion << EOL
+# Companion Environment Variables
+NODE_ENV=production
+PORT=3020
+COMPANION_SECRET=${admin_auth_secret}
+COMPANION_PROTOCOL=https
+COMPANION_DOMAIN=upload.colourstream.${domain_name}
+COMPANION_DATADIR=/data
+COMPANION_ALLOW_LOCAL_URLs=true
 
-  # Create docker-compose.yml from template
-  if [ -f "docker-compose.template.yml" ]; then
-    echo "Creating docker-compose.yml from template..."
-    cp docker-compose.template.yml docker-compose.yml
-    chmod 600 docker-compose.yml
-    echo "✅ Created docker-compose.yml from template"
-  else
-    echo "❌ Warning: docker-compose.template.yml not found. Please create docker-compose.yml manually."
-  fi
+# S3 Configuration
+COMPANION_AWS_ENDPOINT=http://minio:9000
+COMPANION_AWS_BUCKET=${domain_name}-uploads
+COMPANION_AWS_KEY=${minio_root_user}
+COMPANION_AWS_SECRET=${minio_root_password}
+COMPANION_AWS_REGION=us-east-1
+COMPANION_AWS_FORCE_PATH_STYLE=true
+
+# Companion Client Integration
+COMPANION_CLIENT_ORIGINS=https://live.colourstream.${domain_name}
+COMPANION_RETURN_URL=https://live.colourstream.${domain_name}
+EOL
+  chmod 600 .env.companion
+  echo "✅ Created .env.companion"
+
+  # Create docker-compose.yml
+  cat > docker-compose.yml << EOL
+version: '3.8'
+
+services:
+  traefik:
+    image: traefik:v2.9
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/acme.json:/acme.json
+    command:
+      - "--log.level=INFO"
+      - "--api.insecure=false"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=\${ADMIN_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/acme.json"
+    labels:
+      - "traefik.enable=true"
+
+  frontend:
+    image: ghcr.io/johnr24/colourstream-frontend:latest
+    restart: unless-stopped
+    env_file:
+      - ./frontend/.env
+      - ./global.env
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(\`live.colourstream.\${DOMAIN}\`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls=true"
+      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
+
+  backend:
+    image: ghcr.io/johnr24/colourstream-backend:latest
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+      - ./global.env
+    volumes:
+      - ./backend/logs:/app/logs
+      - ./backend/uploads:/app/uploads
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=Host(\`live.colourstream.\${DOMAIN}\`) && PathPrefix(\`/api\`)"
+      - "traefik.http.routers.backend.entrypoints=websecure"
+      - "traefik.http.routers.backend.tls=true"
+      - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.backend.loadbalancer.server.port=5001"
+
+  colourstream-postgres:
+    image: postgres:14
+    restart: unless-stopped
+    volumes:
+      - ./postgres:/var/lib/postgresql/data
+    env_file:
+      - ./global.env
+    environment:
+      - POSTGRES_USER=colourstream
+      - POSTGRES_DB=colourstream
+      - POSTGRES_PASSWORD=\${DB_PASSWORD}
+
+  origin:
+    image: ghcr.io/johnr24/ome-origin:latest
+    restart: unless-stopped
+    ports:
+      - "1935:1935"
+    volumes:
+      - ./ovenmediaengine/origin_conf:/opt/ovenmediaengine/bin/origin_conf
+    environment:
+      - OME_API_ACCESS_TOKEN=\${OME_API_ACCESS_TOKEN}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.origin-ws.rule=Host(\`live.colourstream.\${DOMAIN}\`) && PathPrefix(\`/ws\`)"
+      - "traefik.http.routers.origin-ws.entrypoints=websecure"
+      - "traefik.http.routers.origin-ws.tls=true"
+      - "traefik.http.routers.origin-ws.tls.certresolver=letsencrypt"
+      - "traefik.http.services.origin-ws.loadbalancer.server.port=3333"
+      - "traefik.http.routers.origin-admin.rule=Host(\`live.colourstream.\${DOMAIN}\`) && (PathPrefix(\`/login\`) || PathPrefix(\`/admin\`))"
+      - "traefik.http.routers.origin-admin.entrypoints=websecure"
+      - "traefik.http.routers.origin-admin.tls=true"
+      - "traefik.http.routers.origin-admin.tls.certresolver=letsencrypt"
+      - "traefik.http.services.origin-admin.loadbalancer.server.port=8081"
+
+  edge:
+    image: ghcr.io/johnr24/ome-edge:latest
+    restart: unless-stopped
+    depends_on:
+      - origin
+    volumes:
+      - ./ovenmediaengine/edge_conf:/opt/ovenmediaengine/bin/edge_conf
+    environment:
+      - ORIGIN_SERVER=origin:8081
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.edge-webrtc.rule=Host(\`live.colourstream.\${DOMAIN}\`) && PathPrefix(\`/app\`)"
+      - "traefik.http.routers.edge-webrtc.entrypoints=websecure"
+      - "traefik.http.routers.edge-webrtc.tls=true"
+      - "traefik.http.routers.edge-webrtc.tls.certresolver=letsencrypt"
+      - "traefik.http.services.edge-webrtc.loadbalancer.server.port=3334"
+
+  mirotalk:
+    image: ghcr.io/johnr24/colourstream-mirotalk:latest
+    restart: unless-stopped
+    env_file:
+      - ./mirotalk/.env
+      - ./global.env
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mirotalk.rule=Host(\`video.colourstream.\${DOMAIN}\`)"
+      - "traefik.http.routers.mirotalk.entrypoints=websecure"
+      - "traefik.http.routers.mirotalk.tls=true"
+      - "traefik.http.routers.mirotalk.tls.certresolver=letsencrypt"
+      - "traefik.http.services.mirotalk.loadbalancer.server.port=3000"
+
+  coturn:
+    image: ghcr.io/johnr24/colourstream-coturn:latest
+    restart: unless-stopped
+    volumes:
+      - ./coturn/turnserver.conf:/etc/turnserver.conf
+      - ./certs/certs:/certs
+    ports:
+      - "3478:3478"
+      - "3478:3478/udp"
+      - "3480:3480"
+      - "3480:3480/udp"
+      - "30000-31000:30000-31000/udp"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.coturn.rule=Host(\`turn.colourstream.\${DOMAIN}\`)"
+      - "traefik.http.routers.coturn.entrypoints=websecure"
+      - "traefik.http.routers.coturn.tls=true"
+      - "traefik.http.routers.coturn.tls.certresolver=letsencrypt"
+      - "traefik.http.services.coturn.loadbalancer.server.port=3480"
+
+  uppy-companion:
+    image: ghcr.io/johnr24/colourstream-uppy-companion:latest
+    restart: unless-stopped
+    env_file:
+      - ./.env.companion
+    volumes:
+      - ./companion-data:/data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.companion.rule=Host(\`upload.colourstream.\${DOMAIN}\`)"
+      - "traefik.http.routers.companion.entrypoints=websecure"
+      - "traefik.http.routers.companion.tls=true"
+      - "traefik.http.routers.companion.tls.certresolver=letsencrypt"
+      - "traefik.http.services.companion.loadbalancer.server.port=3020"
+
+  # MinIO S3 Storage
+  minio:
+    image: quay.io/minio/minio
+    restart: unless-stopped
+    volumes:
+      - ./minio-data:/data
+    environment:
+      - MINIO_ROOT_USER=\${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=\${MINIO_ROOT_PASSWORD}
+    command: server /data --console-address ":9001"
+    env_file:
+      - ./global.env
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.minio-api.rule=Host(\`s3.colourstream.\${DOMAIN}\`)"
+      - "traefik.http.routers.minio-api.entrypoints=websecure"
+      - "traefik.http.routers.minio-api.tls=true"
+      - "traefik.http.routers.minio-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.minio-api.loadbalancer.server.port=9000"
+      - "traefik.http.routers.minio-console.rule=Host(\`s3-console.colourstream.\${DOMAIN}\`)"
+      - "traefik.http.routers.minio-console.entrypoints=websecure"
+      - "traefik.http.routers.minio-console.tls=true"
+      - "traefik.http.routers.minio-console.tls.certresolver=letsencrypt"
+      - "traefik.http.services.minio-console.loadbalancer.server.port=9001"
+
+  # MinIO Bucket setup
+  minio-mc:
+    image: minio/mc
+    restart: no
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 10;
+      /usr/bin/mc config host add myminio http://minio:9000 \${MINIO_ROOT_USER} \${MINIO_ROOT_PASSWORD};
+      /usr/bin/mc mb --ignore-existing myminio/uploads;
+      /usr/bin/mc policy set public myminio/uploads;
+      exit 0;
+      "
+    env_file:
+      - ./global.env
+EOL
+  chmod 600 docker-compose.yml
+  echo "✅ Created docker-compose.yml"
 
   # Create empty Traefik ACME file with proper permissions
   echo "Creating Traefik ACME file..."
@@ -413,6 +627,10 @@ EOL
   chmod 600 env.reference
   echo "✅ Created credentials reference file"
 
+  # Create directory for companion data
+  mkdir -p companion-data
+  mkdir -p minio-data
+
   echo "Setup completed successfully!"
   echo
   echo "Next steps:"
@@ -423,7 +641,8 @@ EOL
   printf "   - upload.colourstream.%s -> Your server IP\n" "${domain_name}"
   printf "   - s3.colourstream.%s -> Your server IP\n" "${domain_name}"
   printf "   - s3-console.colourstream.%s -> Your server IP\n" "${domain_name}"
-  echo "3. Start the application with: docker-compose up -d"
+  printf "   - turn.colourstream.%s -> Your server IP\n" "${domain_name}"
+  echo "3. Start the application with: docker compose up -d"
   echo
   echo "Important: Check env.reference for your admin credentials and keep it secure!"
 }
