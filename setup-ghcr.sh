@@ -112,12 +112,12 @@ check_configured() {
 get_domain() {
   local input_domain=""
   while [ -z "$input_domain" ]; do
-    echo -n "Enter your domain name (e.g., example.com): "
+    printf "Enter your domain name (e.g., example.com): "
     read input_domain
     input_domain=$(echo "$input_domain" | tr -d '\n\r' | xargs)
     if [ -z "$input_domain" ]; then
-    echo "Domain name cannot be empty. Please try again."
-  fi
+      echo "Domain name cannot be empty. Please try again."
+    fi
   done
   echo "$input_domain"
 }
@@ -126,12 +126,12 @@ get_domain() {
 get_admin_email() {
   local input_email=""
   while [ -z "$input_email" ]; do
-    echo -n "Enter admin email address: "
+    printf "Enter admin email address: "
     read input_email
     input_email=$(echo "$input_email" | tr -d '\n\r' | xargs)
     if [ -z "$input_email" ]; then
-    echo "Admin email cannot be empty. Please try again."
-  fi
+      echo "Admin email cannot be empty. Please try again."
+    fi
   done
   echo "$input_email"
 }
@@ -415,8 +415,8 @@ perform_full_setup() {
     apply_template "templates/docker-compose.template.yml" "docker-compose.yml"
     apply_template "templates/coturn.conf.template" "coturn/turnserver.conf"
   else
-    # Fallback to embedded templates if download failed
-    create_embedded_configs
+    # Exit with error message instead of using embedded fallbacks
+    create_embedded_configs  # This now exits with an error message
   fi
 
   # Create empty Traefik ACME file with proper permissions
