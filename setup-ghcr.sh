@@ -214,429 +214,30 @@ apply_template() {
 
 # Function to create configuration files from embedded templates as fallback
 create_embedded_configs() {
-  echo "Creating configuration files from embedded templates..."
-  
-  # Create global.env
-  cat > global.env << EOL
-# Global Environment Variables
-DOMAIN=${domain_name}
-ADMIN_EMAIL=${admin_email}
-NAMEFORUPLOADCOMPLETION=User
-DB_PASSWORD=${db_password}
-POSTGRES_PASSWORD=${db_password}
-JWT_KEY=${jwt_key}
-JWT_SECRET=${jwt_secret}
-ADMIN_PASSWORD=${admin_password}
-ADMIN_AUTH_SECRET=${admin_auth_secret}
-MIROTALK_API_KEY=${mirotalk_api_key}
-MIROTALK_API_KEY_SECRET=${mirotalk_api_key}
-TURN_SERVER_CREDENTIAL=${turn_password}
-OME_API_ACCESS_TOKEN=${ome_api_token}
-OME_WEBHOOK_SECRET=${ome_webhook_secret}
-
-# MinIO S3 Configuration
-MINIO_ROOT_USER=${minio_root_user}
-MINIO_ROOT_PASSWORD=${minio_root_password}
-MINIO_DOMAIN=colourstream.${domain_name}
-S3_ENDPOINT=http://minio:9000
-S3_PUBLIC_ENDPOINT=https://s3.colourstream.${domain_name}
-S3_REGION=us-east-1
-S3_ACCESS_KEY=${minio_root_user}
-S3_SECRET_KEY=${minio_root_password}
-S3_BUCKET=uploads
-EOL
-  chmod 600 global.env
-  echo "✅ Created global.env"
-
-  # Create backend/.env
-  cat > backend/.env << EOL
-# Backend Environment Variables
-NODE_ENV=production
-PORT=5001
-DATABASE_URL=postgresql://colourstream:${db_password}@colourstream-postgres:5432/colourstream
-JWT_KEY=${jwt_key}
-JWT_SECRET=${jwt_secret}
-ADMIN_AUTH_SECRET=${admin_auth_secret}
-ADMIN_PASSWORD=${admin_password}
-WEBAUTHN_RP_ID=live.colourstream.${domain_name}
-WEBAUTHN_ORIGIN=https://live.colourstream.${domain_name}
-DOMAIN=${domain_name}
-VIDEO_DOMAIN=video.colourstream.${domain_name}
-FRONTEND_URL=https://live.colourstream.${domain_name}
-BASE_PATH=/api
-OME_API_ACCESS_TOKEN=${ome_api_token}
-OME_API_URL=http://origin:8081
-OME_WEBHOOK_SECRET=${ome_webhook_secret}
-HOST_USERS=[{"username":"admin", "password":"${admin_password}"}]
-
-# S3 Configuration
-S3_ENDPOINT=http://minio:9000
-S3_REGION=us-east-1
-S3_ACCESS_KEY=${minio_root_user}
-S3_SECRET_KEY=${minio_root_password}
-S3_BUCKET=uploads
-EOL
-  chmod 600 backend/.env
-  echo "✅ Created backend/.env"
-
-  # Create frontend/.env
-  cat > frontend/.env << EOL
-# Frontend Environment Variables
-VITE_API_URL=https://live.colourstream.${domain_name}/api
-VITE_WEBRTC_WS_HOST=live.colourstream.${domain_name}
-VITE_WEBRTC_WS_PORT=3334
-VITE_WEBRTC_WS_PROTOCOL=wss
-VITE_WEBRTC_APP_PATH=app
-VITE_VIDEO_URL=https://video.colourstream.${domain_name}/join
-VITE_OVENPLAYER_SCRIPT_URL=https://cdn.jsdelivr.net/npm/ovenplayer/dist/ovenplayer.js
-VITE_UPLOAD_ENDPOINT_URL=https://upload.colourstream.${domain_name}/files/
-VITE_NAMEFORUPLOADCOMPLETION=User
-
-# S3 Integration
-VITE_S3_ENDPOINT=https://s3.colourstream.${domain_name}
-VITE_S3_REGION=us-east-1
-VITE_S3_BUCKET=uploads
-
-# Cloud Storage Integration
-VITE_ENABLE_DROPBOX=true
-VITE_ENABLE_GOOGLE_DRIVE=false
-EOL
-  chmod 600 frontend/.env
-  echo "✅ Created frontend/.env"
-
-  # Create mirotalk/.env
-  cat > mirotalk/.env << EOL
-# MiroTalk Environment Variables
-NODE_ENV=production
-PROTOCOL=https
-PORT=3000
-JWT_KEY=${jwt_key}
-HOST_PASSWORD=${admin_password}
-HOST_USERS=[{"username":"admin", "password":"${admin_password}"}]
-TURN_SERVER_ENABLED=true
-TURN_SERVER_HOST=turn.colourstream.${domain_name}
-TURN_SERVER_PORT=3478
-TURN_SERVER_USERNAME=colourstream
-TURN_SERVER_CREDENTIAL=${turn_password}
-API_KEY_SECRET=${mirotalk_api_key}
-MIROTALK_API_KEY_SECRET=${mirotalk_api_key}
-EOL
-  chmod 600 mirotalk/.env
-  echo "✅ Created mirotalk/.env"
-
-  # Create .env.companion
-  cat > .env.companion << EOL
-# Companion Environment Variables
-NODE_ENV=production
-PORT=3020
-COMPANION_SECRET=${admin_auth_secret}
-COMPANION_PROTOCOL=https
-COMPANION_DOMAIN=upload.colourstream.${domain_name}
-COMPANION_DATADIR=/data
-COMPANION_ALLOW_LOCAL_URLs=true
-
-# S3 Configuration
-COMPANION_AWS_ENDPOINT=http://minio:9000
-COMPANION_AWS_BUCKET=${domain_name}-uploads
-COMPANION_AWS_KEY=${minio_root_user}
-COMPANION_AWS_SECRET=${minio_root_password}
-COMPANION_AWS_REGION=us-east-1
-COMPANION_AWS_FORCE_PATH_STYLE=true
-
-# Companion Client Integration
-COMPANION_CLIENT_ORIGINS=https://live.colourstream.${domain_name}
-COMPANION_RETURN_URL=https://live.colourstream.${domain_name}
-EOL
-    chmod 600 .env.companion
-  echo "✅ Created .env.companion"
-
-  # Create docker-compose.yml
-  cat > docker-compose.yml << EOL
-version: '3.8'
-
-services:
-  traefik:
-    image: traefik:v2.9
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./traefik/acme.json:/acme.json
-    command:
-      - "--log.level=INFO"
-      - "--api.insecure=false"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
-      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
-      - "--entrypoints.websecure.address=:443"
-      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
-      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
-      - "--certificatesresolvers.letsencrypt.acme.email=\${ADMIN_EMAIL}"
-      - "--certificatesresolvers.letsencrypt.acme.storage=/acme.json"
-    labels:
-      - "traefik.enable=true"
-
-  frontend:
-    image: ghcr.io/johnr24/colourstream-frontend:latest
-    restart: unless-stopped
-    env_file:
-      - ./frontend/.env
-      - ./global.env
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.frontend.rule=Host(\`live.colourstream.\${DOMAIN}\`)"
-      - "traefik.http.routers.frontend.entrypoints=websecure"
-      - "traefik.http.routers.frontend.tls=true"
-      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
-      - "traefik.http.services.frontend.loadbalancer.server.port=80"
-
-  backend:
-    image: ghcr.io/johnr24/colourstream-backend:latest
-    restart: unless-stopped
-    env_file:
-      - ./backend/.env
-      - ./global.env
-    volumes:
-      - ./backend/logs:/app/logs
-      - ./backend/uploads:/app/uploads
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.backend.rule=Host(\`live.colourstream.\${DOMAIN}\`) && PathPrefix(\`/api\`)"
-      - "traefik.http.routers.backend.entrypoints=websecure"
-      - "traefik.http.routers.backend.tls=true"
-      - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
-      - "traefik.http.services.backend.loadbalancer.server.port=5001"
-
-  colourstream-postgres:
-    image: postgres:14
-    restart: unless-stopped
-    volumes:
-      - ./postgres:/var/lib/postgresql/data
-    env_file:
-      - ./global.env
-    environment:
-      - POSTGRES_USER=colourstream
-      - POSTGRES_DB=colourstream
-      - POSTGRES_PASSWORD=\${DB_PASSWORD}
-
-  origin:
-    image: airensoft/ovenmediaengine:latest
-    restart: unless-stopped
-    ports:
-      - "1935:1935"
-    volumes:
-      - ./ovenmediaengine/origin_conf:/opt/ovenmediaengine/bin/origin_conf
-    environment:
-      - OME_API_ACCESS_TOKEN=\${OME_API_ACCESS_TOKEN}
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.origin-ws.rule=Host(\`live.colourstream.\${DOMAIN}\`) && PathPrefix(\`/ws\`)"
-      - "traefik.http.routers.origin-ws.entrypoints=websecure"
-      - "traefik.http.routers.origin-ws.tls=true"
-      - "traefik.http.routers.origin-ws.tls.certresolver=letsencrypt"
-      - "traefik.http.services.origin-ws.loadbalancer.server.port=3333"
-      - "traefik.http.routers.origin-admin.rule=Host(\`live.colourstream.\${DOMAIN}\`) && (PathPrefix(\`/login\`) || PathPrefix(\`/admin\`))"
-      - "traefik.http.routers.origin-admin.entrypoints=websecure"
-      - "traefik.http.routers.origin-admin.tls=true"
-      - "traefik.http.routers.origin-admin.tls.certresolver=letsencrypt"
-      - "traefik.http.services.origin-admin.loadbalancer.server.port=8081"
-
-  edge:
-    image: airensoft/ovenmediaengine:latest
-    restart: unless-stopped
-    depends_on:
-      - origin
-    volumes:
-      - ./ovenmediaengine/edge_conf:/opt/ovenmediaengine/bin/edge_conf
-    environment:
-      - ORIGIN_SERVER=origin:8081
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.edge-webrtc.rule=Host(\`live.colourstream.\${DOMAIN}\`) && PathPrefix(\`/app\`)"
-      - "traefik.http.routers.edge-webrtc.entrypoints=websecure"
-      - "traefik.http.routers.edge-webrtc.tls=true"
-      - "traefik.http.routers.edge-webrtc.tls.certresolver=letsencrypt"
-      - "traefik.http.services.edge-webrtc.loadbalancer.server.port=3334"
-
-  mirotalk:
-    image: mirotalk/p2p:latest
-    restart: unless-stopped
-    env_file:
-      - ./mirotalk/.env
-      - ./global.env
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.mirotalk.rule=Host(\`video.colourstream.\${DOMAIN}\`)"
-      - "traefik.http.routers.mirotalk.entrypoints=websecure"
-      - "traefik.http.routers.mirotalk.tls=true"
-      - "traefik.http.routers.mirotalk.tls.certresolver=letsencrypt"
-      - "traefik.http.services.mirotalk.loadbalancer.server.port=3000"
-
-  coturn:
-    image: coturn/coturn
-    restart: unless-stopped
-    volumes:
-      - ./coturn/turnserver.conf:/etc/turnserver.conf
-      - ./certs/certs:/certs
-    ports:
-      - "3478:3478"
-      - "3478:3478/udp"
-      - "3480:3480"
-      - "3480:3480/udp"
-      - "30000-31000:30000-31000/udp"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.coturn.rule=Host(\`turn.colourstream.\${DOMAIN}\`)"
-      - "traefik.http.routers.coturn.entrypoints=websecure"
-      - "traefik.http.routers.coturn.tls=true"
-      - "traefik.http.routers.coturn.tls.certresolver=letsencrypt"
-      - "traefik.http.services.coturn.loadbalancer.server.port=3480"
-
-  uppy-companion:
-    image: transloadit/companion:latest
-    restart: unless-stopped
-    env_file:
-      - ./.env.companion
-    volumes:
-      - ./companion-data:/data
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.companion.rule=Host(\`upload.colourstream.\${DOMAIN}\`)"
-      - "traefik.http.routers.companion.entrypoints=websecure"
-      - "traefik.http.routers.companion.tls=true"
-      - "traefik.http.routers.companion.tls.certresolver=letsencrypt"
-      - "traefik.http.services.companion.loadbalancer.server.port=3020"
-
-  # MinIO S3 Storage
-  minio:
-    image: quay.io/minio/minio
-    restart: unless-stopped
-    volumes:
-      - ./minio-data:/data
-    environment:
-      - MINIO_ROOT_USER=\${MINIO_ROOT_USER}
-      - MINIO_ROOT_PASSWORD=\${MINIO_ROOT_PASSWORD}
-    command: server /data --console-address ":9001"
-    env_file:
-      - ./global.env
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.minio-api.rule=Host(\`s3.colourstream.\${DOMAIN}\`)"
-      - "traefik.http.routers.minio-api.entrypoints=websecure"
-      - "traefik.http.routers.minio-api.tls=true"
-      - "traefik.http.routers.minio-api.tls.certresolver=letsencrypt"
-      - "traefik.http.services.minio-api.loadbalancer.server.port=9000"
-      - "traefik.http.routers.minio-console.rule=Host(\`s3-console.colourstream.\${DOMAIN}\`)"
-      - "traefik.http.routers.minio-console.entrypoints=websecure"
-      - "traefik.http.routers.minio-console.tls=true"
-      - "traefik.http.routers.minio-console.tls.certresolver=letsencrypt"
-      - "traefik.http.services.minio-console.loadbalancer.server.port=9001"
-
-  # MinIO Bucket setup
-  minio-mc:
-    image: minio/mc
-    restart: no
-    depends_on:
-      - minio
-    entrypoint: >
-      /bin/sh -c "
-      sleep 10;
-      /usr/bin/mc config host add myminio http://minio:9000 \${MINIO_ROOT_USER} \${MINIO_ROOT_PASSWORD};
-      /usr/bin/mc mb --ignore-existing myminio/uploads;
-      /usr/bin/mc policy set public myminio/uploads;
-      exit 0;
-      "
-    env_file:
-      - ./global.env
-EOL
-    chmod 600 docker-compose.yml
-  echo "✅ Created docker-compose.yml"
-
-  # Create empty Traefik ACME file with proper permissions
-  echo "Creating Traefik ACME file..."
-  mkdir -p traefik
-  touch traefik/acme.json
-  chmod 600 traefik/acme.json
-  echo "✅ Created Traefik ACME file"
-
-  # Create coturn config
-  echo "Creating Coturn configuration..."
-  mkdir -p coturn
-  cat > coturn/turnserver.conf << EOL
-# Coturn TURN SERVER configuration file
-# Simple configuration file for ColourStream TURN server
-listening-port=3480
-min-port=30000
-max-port=31000
-fingerprint
-lt-cred-mech
-user=colourstream:${turn_password}
-realm=colourstream.${domain_name}
-cert=/certs/video.colourstream.${domain_name}.crt
-pkey=/certs/video.colourstream.${domain_name}.key
-# For debugging only
-# verbose
-# Bandwidth limitation
-user-quota=12800
-total-quota=102400
-EOL
-  chmod 600 coturn/turnserver.conf
-  echo "✅ Created Coturn configuration"
-
-  # Create/update reference file for credentials
-  echo "Creating credentials reference file..."
-  cat > env.reference << EOL
-# Generated Configuration - $(date)
-# THIS IS A REFERENCE FILE ONLY - NOT USED BY THE APPLICATION
-# Keep this file secure as it contains sensitive credentials
-
-DOMAIN_NAME=${domain_name}
-ADMIN_EMAIL=${admin_email}
-DB_PASSWORD=${db_password}
-JWT_KEY=${jwt_key}
-JWT_SECRET=${jwt_secret}
-ADMIN_PASSWORD=${admin_password}
-ADMIN_AUTH_SECRET=${admin_auth_secret}
-MIROTALK_API_KEY=${mirotalk_api_key}
-TURN_PASSWORD=${turn_password}
-OME_API_TOKEN=${ome_api_token}
-OME_WEBHOOK_SECRET=${ome_webhook_secret}
-
-# MinIO S3 Credentials
-MINIO_ROOT_USER=${minio_root_user}
-MINIO_ROOT_PASSWORD=${minio_root_password}
-
-# URLs
-FRONTEND_URL=https://live.colourstream.${domain_name}
-VIDEO_URL=https://video.colourstream.${domain_name}
-S3_URL=https://s3.colourstream.${domain_name}
-S3_CONSOLE_URL=https://s3-console.colourstream.${domain_name}
-EOL
-  chmod 600 env.reference
-  echo "✅ Created credentials reference file"
-
-  # Create directory for companion data
-  mkdir -p companion-data
-  mkdir -p minio-data
-
-  echo "Setup completed successfully!"
+  echo "Error: Unable to download templates automatically."
   echo
-  echo "Next steps:"
-  echo "1. Add SSL certificates to the certs directory or let Traefik generate them automatically"
-  echo "2. Set up DNS records for your domains:"
-  printf "   - live.colourstream.%s -> Your server IP\n" "${domain_name}"
-  printf "   - video.colourstream.%s -> Your server IP\n" "${domain_name}"
-  printf "   - upload.colourstream.%s -> Your server IP\n" "${domain_name}"
-  printf "   - s3.colourstream.%s -> Your server IP\n" "${domain_name}"
-  printf "   - s3-console.colourstream.%s -> Your server IP\n" "${domain_name}"
-  printf "   - turn.colourstream.%s -> Your server IP\n" "${domain_name}"
-  echo "3. Start the application with: docker compose up -d"
+  echo "Please try one of the following approaches:"
   echo
-  echo "Important: Check env.reference for your admin credentials and keep it secure!"
+  echo "1. Check your internet connection and retry this script."
+  echo
+  echo "2. Download the templates manually with the following commands:"
+  echo "   mkdir -p templates"
+  echo "   curl -o templates/docker-compose.template.yml https://raw.githubusercontent.com/johnr24/colourstream/main/docker-compose.template.yml"
+  echo "   curl -o templates/global.env.template https://raw.githubusercontent.com/johnr24/colourstream/main/.env.template"
+  echo "   curl -o templates/backend.env.template https://raw.githubusercontent.com/johnr24/colourstream/main/backend/.env.template"
+  echo "   curl -o templates/frontend.env.template https://raw.githubusercontent.com/johnr24/colourstream/main/frontend/.env.template" 
+  echo "   curl -o templates/mirotalk.env.template https://raw.githubusercontent.com/johnr24/colourstream/main/mirotalk/.env.template"
+  echo "   curl -o templates/companion.env.template https://raw.githubusercontent.com/johnr24/colourstream/main/companion/.env.template"
+  echo "   curl -o templates/coturn.conf.template https://raw.githubusercontent.com/johnr24/colourstream/main/coturn/turnserver.conf.template"
+  echo
+  echo "   Then run this script again."
+  echo
+  echo "3. Clone the entire repository to access all templates:"
+  echo "   git clone https://github.com/johnr24/colourstream.git"
+  echo "   cd colourstream"
+  echo "   ./setup-ghcr.sh"
+  echo
+  exit 1
 }
 
 # Function to rotate secrets only
@@ -677,42 +278,30 @@ rotate_secrets() {
     apply_template "templates/companion.env.template" ".env.companion"
     apply_template "templates/coturn.conf.template" "coturn/turnserver.conf"
   else
-    # Fallback to traditional find and replace
-    # Update global.env with new secrets
-    sed -i.bak "s/DB_PASSWORD=.*/DB_PASSWORD=${db_password}/g" global.env
-    sed -i.bak "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${db_password}/g" global.env
-    sed -i.bak "s/JWT_KEY=.*/JWT_KEY=${jwt_key}/g" global.env
-    sed -i.bak "s/JWT_SECRET=.*/JWT_SECRET=${jwt_secret}/g" global.env
-    sed -i.bak "s/ADMIN_PASSWORD=.*/ADMIN_PASSWORD=${admin_password}/g" global.env
-    sed -i.bak "s/ADMIN_AUTH_SECRET=.*/ADMIN_AUTH_SECRET=${admin_auth_secret}/g" global.env
-    sed -i.bak "s/MIROTALK_API_KEY=.*/MIROTALK_API_KEY=${mirotalk_api_key}/g" global.env
-    sed -i.bak "s/MIROTALK_API_KEY_SECRET=.*/MIROTALK_API_KEY_SECRET=${mirotalk_api_key}/g" global.env
-    sed -i.bak "s/TURN_SERVER_CREDENTIAL=.*/TURN_SERVER_CREDENTIAL=${turn_password}/g" global.env
-    sed -i.bak "s/OME_API_ACCESS_TOKEN=.*/OME_API_ACCESS_TOKEN=${ome_api_token}/g" global.env
-    sed -i.bak "s/OME_WEBHOOK_SECRET=.*/OME_WEBHOOK_SECRET=${ome_webhook_secret}/g" global.env
-    
-    # Update backend/.env with new secrets
-    sed -i.bak "s/DATABASE_URL=.*/DATABASE_URL=postgresql:\/\/colourstream:${db_password}@colourstream-postgres:5432\/colourstream/g" backend/.env
-    sed -i.bak "s/JWT_KEY=.*/JWT_KEY=${jwt_key}/g" backend/.env
-    sed -i.bak "s/JWT_SECRET=.*/JWT_SECRET=${jwt_secret}/g" backend/.env
-    sed -i.bak "s/ADMIN_PASSWORD=.*/ADMIN_PASSWORD=${admin_password}/g" backend/.env
-    sed -i.bak "s/ADMIN_AUTH_SECRET=.*/ADMIN_AUTH_SECRET=${admin_auth_secret}/g" backend/.env
-    sed -i.bak "s/OME_API_ACCESS_TOKEN=.*/OME_API_ACCESS_TOKEN=${ome_api_token}/g" backend/.env
-    sed -i.bak "s/OME_WEBHOOK_SECRET=.*/OME_WEBHOOK_SECRET=${ome_webhook_secret}/g" backend/.env
-    # Update HOST_USERS configuration
-    sed -i.bak "s/HOST_USERS=.*/HOST_USERS=[{\"username\":\"admin\", \"password\":\"${admin_password}\"}]/g" backend/.env
-    
-    # Update mirotalk/.env with new secrets
-    sed -i.bak "s/TURN_SERVER_CREDENTIAL=.*/TURN_SERVER_CREDENTIAL=${turn_password}/g" mirotalk/.env
-    sed -i.bak "s/API_KEY_SECRET=.*/API_KEY_SECRET=${mirotalk_api_key}/g" mirotalk/.env
-    sed -i.bak "s/MIROTALK_API_KEY_SECRET=.*/MIROTALK_API_KEY_SECRET=${mirotalk_api_key}/g" mirotalk/.env
-    sed -i.bak "s/JWT_KEY=.*/JWT_KEY=${jwt_key}/g" mirotalk/.env
-    sed -i.bak "s/HOST_PASSWORD=.*/HOST_PASSWORD=${admin_password}/g" mirotalk/.env
-    # Update HOST_USERS configuration
-    sed -i.bak "s/HOST_USERS=.*/HOST_USERS=[{\"username\":\"admin\", \"password\":\"${admin_password}\"}]/g" mirotalk/.env
-    
-    # Update coturn config
-    sed -i.bak "s/user=colourstream:.*/user=colourstream:${turn_password}/g" coturn/turnserver.conf
+    # Show error and exit - force use of templates to maintain DRY
+    echo "Error: Unable to download templates for rotation."
+    echo
+    echo "To comply with DRY principles, this script requires template files."
+    echo "Please try one of the following approaches:"
+    echo
+    echo "1. Check your internet connection and retry this script."
+    echo
+    echo "2. Download the templates manually with the following commands:"
+    echo "   mkdir -p templates"
+    echo "   curl -o templates/global.env.template https://raw.githubusercontent.com/johnr24/colourstream/main/global.env.template"
+    echo "   curl -o templates/backend.env.template https://raw.githubusercontent.com/johnr24/colourstream/main/backend/.env.template"
+    echo "   curl -o templates/mirotalk.env.template https://raw.githubusercontent.com/johnr24/colourstream/main/mirotalk/.env.template"
+    echo "   curl -o templates/companion.env.template https://raw.githubusercontent.com/johnr24/colourstream/main/companion/.env.template"
+    echo "   curl -o templates/coturn.conf.template https://raw.githubusercontent.com/johnr24/colourstream/main/coturn/turnserver.conf.template"
+    echo
+    echo "   Then run this script again."
+    echo
+    echo "3. Clone the entire repository to access all templates:"
+    echo "   git clone https://github.com/johnr24/colourstream.git"
+    echo "   cd colourstream"
+    echo "   ./setup-ghcr.sh"
+    echo
+    exit 1
   fi
   
   # Update docker-compose.yml - create it from the template if it doesn't exist
@@ -723,9 +312,6 @@ rotate_secrets() {
     echo "Creating docker-compose.yml from local template..."
     cp docker-compose.template.yml docker-compose.yml
   fi
-  
-  # Clean up backup files
-  find . -name "*.bak" -type f -delete
   
   # Create/update reference file for credentials
   echo "Creating credentials reference file..."
@@ -746,9 +332,15 @@ TURN_PASSWORD=${turn_password}
 OME_API_TOKEN=${ome_api_token}
 OME_WEBHOOK_SECRET=${ome_webhook_secret}
 
-# Existing URLs (preserved)
+# MinIO S3 Credentials
+MINIO_ROOT_USER=${minio_root_user}
+MINIO_ROOT_PASSWORD=${minio_root_password}
+
+# URLs
 FRONTEND_URL=https://live.colourstream.${domain_name}
 VIDEO_URL=https://video.colourstream.${domain_name}
+S3_URL=https://s3.colourstream.${domain_name}
+S3_CONSOLE_URL=https://s3-console.colourstream.${domain_name}
 EOL
   chmod 600 env.reference
   echo "✅ Created credentials reference file"
