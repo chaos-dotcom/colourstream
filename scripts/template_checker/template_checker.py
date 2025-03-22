@@ -11,9 +11,10 @@ Usage:
 Options:
     --dir DIR     Directory to search for template files (default: current directory)
     --verbose     Display more detailed output
+    --env-file    Path to .env file (default: .env in base directory)
 
 Example:
-    python template_checker.py --dir /path/to/project --verbose
+    python template_checker.py --dir /path/to/project --verbose --env-file /path/to/.env
 """
 
 import os
@@ -24,6 +25,25 @@ import difflib
 import fnmatch
 import datetime
 from typing import List, Dict, Tuple, Set, Optional
+
+# Try to import dotenv for environment variable handling
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    print("Warning: python-dotenv package not installed. Environment variable support limited.")
+    
+    def load_dotenv(dotenv_path=None):
+        """Minimal dotenv implementation if the package is not available."""
+        if not dotenv_path or not os.path.exists(dotenv_path):
+            return False
+        with open(dotenv_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                key, value = line.split('=', 1)
+                os.environ[key.strip()] = value.strip().strip('"\'')
+        return True
 
 # Define patterns for template files
 TEMPLATE_PATTERNS = [
@@ -63,12 +83,25 @@ IGNORE_PATTERNS = [
 REPORTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'reports')
 
 class TemplateChecker:
-    def __init__(self, base_dir: str, verbose: bool = False):
+    def __init__(self, base_dir: str, verbose: bool = False, env_file: str = None):
         self.base_dir = os.path.abspath(base_dir)
         self.verbose = verbose
         self.template_files = []
         self.parent_files = {}  # Map of template file to parent file
         self.differences = {}   # Map of template file to missing lines
+        
+        # Load environment variables from .env file
+        if env_file:
+            env_path = env_file
+        else:
+            env_path = os.path.join(self.base_dir, '.env')
+        
+        if os.path.exists(env_path):
+            load_dotenv(env_path)
+            if self.verbose:
+                print(f"Loaded environment variables from {env_path}")
+        elif self.verbose:
+            print(f"No .env file found at {env_path}")
         
     def is_excluded_file(self, file_path: str) -> bool:
         """Check if a file should be excluded based on the exclude patterns."""
@@ -310,6 +343,7 @@ def main():
     parser.add_argument('--verbose', action='store_true', help='Display more detailed output')
     parser.add_argument('--output', help='Output file for the report (default: stdout)')
     parser.add_argument('--exclude', action='append', help='Additional patterns to exclude (can be used multiple times)')
+    parser.add_argument('--env-file', help='Path to .env file')
     args = parser.parse_args()
     
     # Add any additional exclude patterns from command line
@@ -317,7 +351,7 @@ def main():
         for pattern in args.exclude:
             EXCLUDE_PATTERNS.append(pattern)
     
-    checker = TemplateChecker(args.dir, args.verbose)
+    checker = TemplateChecker(args.dir, args.verbose, args.env_file)
     report = checker.run()
     
     if args.output:

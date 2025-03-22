@@ -128,19 +128,11 @@ rotate_secrets() {
   # Update coturn config
   sed -i.bak "s/user=colourstream:.*/user=colourstream:${turn_password}/g" coturn/turnserver.conf
   
-  # Update docker-compose.yml
-  sed -i.bak "s/POSTGRES_PASSWORD: \"[^\"]*\"/POSTGRES_PASSWORD: \"${db_password}\"/g" docker-compose.yml
-  sed -i.bak "s/DATABASE_URL: \"postgresql:\/\/colourstream:.*@colourstream-postgres/DATABASE_URL: \"postgresql:\/\/colourstream:${db_password}@colourstream-postgres/g" docker-compose.yml
-  sed -i.bak "s/JWT_KEY: \"[^\"]*\"/JWT_KEY: \"${jwt_key}\"/g" docker-compose.yml
-  sed -i.bak "s/JWT_SECRET: \"[^\"]*\"/JWT_SECRET: \"${jwt_secret}\"/g" docker-compose.yml
-  sed -i.bak "s/ADMIN_AUTH_SECRET: \"[^\"]*\"/ADMIN_AUTH_SECRET: \"${admin_auth_secret}\"/g" docker-compose.yml
-  sed -i.bak "s/OME_API_ACCESS_TOKEN: \"[^\"]*\"/OME_API_ACCESS_TOKEN: \"${ome_api_token}\"/g" docker-compose.yml
-  sed -i.bak "s/OME_WEBHOOK_SECRET: \"[^\"]*\"/OME_WEBHOOK_SECRET: \"${ome_webhook_secret}\"/g" docker-compose.yml
-  sed -i.bak "s/TURN_SERVER_CREDENTIAL: \"[^\"]*\"/TURN_SERVER_CREDENTIAL: \"${turn_password}\"/g" docker-compose.yml
-  sed -i.bak "s/MIROTALK_API_KEY: \"[^\"]*\"/MIROTALK_API_KEY: \"${mirotalk_api_key}\"/g" docker-compose.yml
-  sed -i.bak "s/MIROTALK_API_KEY_SECRET: \"[^\"]*\"/MIROTALK_API_KEY_SECRET: \"${mirotalk_api_key}\"/g" docker-compose.yml
-  # Update HOST_USERS configuration
-  sed -i.bak "s/HOST_USERS: \"[^\"]*\"/HOST_USERS: \"[{\\\"username\\\":\\\"admin\\\", \\\"password\\\":\\\"${admin_password}\\\"}]\"/g" docker-compose.yml
+  # Update docker-compose.yml - create it from the template if it doesn't exist
+  if [ ! -f "docker-compose.yml" ] && [ -f "docker-compose.template.yml" ]; then
+    echo "Creating docker-compose.yml from template..."
+    cp docker-compose.template.yml docker-compose.yml
+  fi
   
   # Clean up backup files
   find . -name "*.bak" -type f -delete
@@ -205,6 +197,8 @@ perform_full_setup() {
   turn_password=$(generate_password)
   ome_api_token=$(generate_password)
   ome_webhook_secret=$(generate_password)
+  minio_root_user=$(generate_password)
+  minio_root_password=$(generate_password)
 
   echo
   echo "Creating configuration files..."
@@ -214,6 +208,7 @@ perform_full_setup() {
 # Global Environment Variables
 DOMAIN=${domain_name}
 ADMIN_EMAIL=${admin_email}
+NAMEFORUPLOADCOMPLETION=User
 DB_PASSWORD=${db_password}
 POSTGRES_PASSWORD=${db_password}
 JWT_KEY=${jwt_key}
@@ -225,6 +220,17 @@ MIROTALK_API_KEY_SECRET=${mirotalk_api_key}
 TURN_SERVER_CREDENTIAL=${turn_password}
 OME_API_ACCESS_TOKEN=${ome_api_token}
 OME_WEBHOOK_SECRET=${ome_webhook_secret}
+
+# MinIO S3 Configuration
+MINIO_ROOT_USER=${minio_root_user}
+MINIO_ROOT_PASSWORD=${minio_root_password}
+MINIO_DOMAIN=colourstream.${domain_name}
+S3_ENDPOINT=http://minio:9000
+S3_PUBLIC_ENDPOINT=https://s3.colourstream.${domain_name}
+S3_REGION=us-east-1
+S3_ACCESS_KEY=${minio_root_user}
+S3_SECRET_KEY=${minio_root_password}
+S3_BUCKET=uploads
 EOL
   chmod 600 global.env
   echo "✅ Created global.env"
@@ -249,9 +255,41 @@ OME_API_ACCESS_TOKEN=${ome_api_token}
 OME_API_URL=http://origin:8081
 OME_WEBHOOK_SECRET=${ome_webhook_secret}
 HOST_USERS=[{"username":"admin", "password":"${admin_password}"}]
+
+# S3 Configuration
+S3_ENDPOINT=http://minio:9000
+S3_REGION=us-east-1
+S3_ACCESS_KEY=${minio_root_user}
+S3_SECRET_KEY=${minio_root_password}
+S3_BUCKET=uploads
 EOL
   chmod 600 backend/.env
   echo "✅ Created backend/.env"
+
+  # Create frontend/.env
+  cat > frontend/.env << EOL
+# Frontend Environment Variables
+VITE_API_URL=https://live.colourstream.${domain_name}/api
+VITE_WEBRTC_WS_HOST=live.colourstream.${domain_name}
+VITE_WEBRTC_WS_PORT=3334
+VITE_WEBRTC_WS_PROTOCOL=wss
+VITE_WEBRTC_APP_PATH=app
+VITE_VIDEO_URL=https://video.colourstream.${domain_name}/join
+VITE_OVENPLAYER_SCRIPT_URL=https://cdn.jsdelivr.net/npm/ovenplayer/dist/ovenplayer.js
+VITE_UPLOAD_ENDPOINT_URL=https://upload.colourstream.${domain_name}/files/
+VITE_NAMEFORUPLOADCOMPLETION=User
+
+# S3 Integration
+VITE_S3_ENDPOINT=https://s3.colourstream.${domain_name}
+VITE_S3_REGION=us-east-1
+VITE_S3_BUCKET=uploads
+
+# Cloud Storage Integration
+VITE_ENABLE_DROPBOX=true
+VITE_ENABLE_GOOGLE_DRIVE=false
+EOL
+  chmod 600 frontend/.env
+  echo "✅ Created frontend/.env"
 
   # Create mirotalk/.env
   cat > mirotalk/.env << EOL
@@ -273,26 +311,56 @@ EOL
   chmod 600 mirotalk/.env
   echo "✅ Created mirotalk/.env"
 
-  # Create docker-compose.yml
-  cat > docker-compose.yml << EOL
-version: '3.8'
+  # Create .env.companion
+  if [ -f ".env.companion.template" ]; then
+    echo "Creating .env.companion from template..."
+    cp .env.companion.template .env.companion
+    chmod 600 .env.companion
+    echo "✅ Created .env.companion from template"
+  else
+    echo "❌ Warning: .env.companion.template not found. Please create .env.companion manually."
+  fi
 
-services:
-  # ... existing services ...
-  backend:
-    environment:
-      - HOST_USERS=[{"username":"admin", "password":"${admin_password}"}]
-      # ... other environment variables ...
+  # Create docker-compose.yml from template
+  if [ -f "docker-compose.template.yml" ]; then
+    echo "Creating docker-compose.yml from template..."
+    cp docker-compose.template.yml docker-compose.yml
+    chmod 600 docker-compose.yml
+    echo "✅ Created docker-compose.yml from template"
+  else
+    echo "❌ Warning: docker-compose.template.yml not found. Please create docker-compose.yml manually."
+  fi
 
-  mirotalk:
-    environment:
-      - HOST_USERS=[{"username":"admin", "password":"${admin_password}"}]
-      # ... other environment variables ...
+  # Create empty Traefik ACME file with proper permissions
+  echo "Creating Traefik ACME file..."
+  mkdir -p traefik
+  touch traefik/acme.json
+  chmod 600 traefik/acme.json
+  echo "✅ Created Traefik ACME file"
 
-  # ... rest of docker-compose.yml ...
+  # Create coturn config
+  echo "Creating Coturn configuration..."
+  mkdir -p coturn
+  cat > coturn/turnserver.conf << EOL
+# Coturn TURN SERVER configuration file
+# Simple configuration file for ColourStream TURN server
+listening-port=3480
+min-port=30000
+max-port=31000
+fingerprint
+lt-cred-mech
+user=colourstream:${turn_password}
+realm=colourstream.${domain_name}
+cert=/certs/video.colourstream.${domain_name}.crt
+pkey=/certs/video.colourstream.${domain_name}.key
+# For debugging only
+# verbose
+# Bandwidth limitation
+user-quota=12800
+total-quota=102400
 EOL
-  chmod 600 docker-compose.yml
-  echo "✅ Created docker-compose.yml"
+  chmod 600 coturn/turnserver.conf
+  echo "✅ Created Coturn configuration"
 
   # Create/update reference file for credentials
   echo "Creating credentials reference file..."
@@ -313,14 +381,32 @@ TURN_PASSWORD=${turn_password}
 OME_API_TOKEN=${ome_api_token}
 OME_WEBHOOK_SECRET=${ome_webhook_secret}
 
+# MinIO S3 Credentials
+MINIO_ROOT_USER=${minio_root_user}
+MINIO_ROOT_PASSWORD=${minio_root_password}
+
 # URLs
 FRONTEND_URL=https://live.colourstream.${domain_name}
 VIDEO_URL=https://video.colourstream.${domain_name}
+S3_URL=https://s3.colourstream.${domain_name}
+S3_CONSOLE_URL=https://s3-console.colourstream.${domain_name}
 EOL
   chmod 600 env.reference
   echo "✅ Created credentials reference file"
 
-  # ... rest of perform_full_setup function ...
+  echo "Setup completed successfully!"
+  echo
+  echo "Next steps:"
+  echo "1. Add SSL certificates to the certs directory or let Traefik generate them automatically"
+  echo "2. Set up DNS records for your domains:"
+  printf "   - live.colourstream.%s -> Your server IP\n" "${domain_name}"
+  printf "   - video.colourstream.%s -> Your server IP\n" "${domain_name}"
+  printf "   - upload.colourstream.%s -> Your server IP\n" "${domain_name}"
+  printf "   - s3.colourstream.%s -> Your server IP\n" "${domain_name}"
+  printf "   - s3-console.colourstream.%s -> Your server IP\n" "${domain_name}"
+  echo "3. Start the application with: docker-compose up -d"
+  echo
+  echo "Important: Check env.reference for your admin credentials and keep it secure!"
 }
 
 # Main script logic
@@ -370,6 +456,9 @@ echo "Next steps:"
 echo "1. Set up DNS records:"
 printf "   - live.colourstream.%s -> Your server IP\n" "${domain_name}"
 printf "   - video.colourstream.%s -> Your server IP\n" "${domain_name}"
+printf "   - upload.colourstream.%s -> Your server IP\n" "${domain_name}"
+printf "   - s3.colourstream.%s -> Your server IP\n" "${domain_name}"
+printf "   - s3-console.colourstream.%s -> Your server IP\n" "${domain_name}"
 echo
 echo "2. Start the application:"
 echo "   docker-compose up -d"

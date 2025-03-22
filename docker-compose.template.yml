@@ -7,17 +7,24 @@ services:
     #   context: ./frontend
     #   dockerfile: Dockerfile
     container_name: colourstream-frontend
+    env_file: 
+      - ./frontend/.env # Frontend specific env
     environment:
-      VITE_API_URL: https://live.colourstream.example.com/api
-      VITE_OIDC_AUTH_ENDPOINT: ${OIDC_AUTH_ENDPOINT:-https://sso.example.com/authorize}
-      VITE_WEBRTC_WS_HOST: live.colourstream.example.com
+      VITE_API_URL: https://live.colourstream.${DOMAIN}/api
+      VITE_OIDC_AUTH_ENDPOINT: ${OIDC_AUTH_ENDPOINT}
+      VITE_WEBRTC_WS_HOST: live.colourstream.${DOMAIN}
       VITE_WEBRTC_WS_PORT: 3334
       VITE_WEBRTC_WS_PROTOCOL: wss
       VITE_WEBRTC_APP_PATH: app
-      VITE_VIDEO_URL: https://video.colourstream.example.com/join
+      VITE_VIDEO_URL: https://video.colourstream.${DOMAIN}/join
       VITE_OVENPLAYER_SCRIPT_URL: https://cdn.jsdelivr.net/npm/ovenplayer/dist/ovenplayer.js
-      VITE_UPLOAD_ENDPOINT_URL: https://upload.colourstream.example.com/files/
-      VITE_NAMEFORUPLOADCOMPLETION: ${NAMEFORUPLOADCOMPLETION:-John}
+      VITE_UPLOAD_ENDPOINT_URL: https://upload.colourstream.${DOMAIN}/files/
+      VITE_NAMEFORUPLOADCOMPLETION: ${NAMEFORUPLOADCOMPLETION}
+      VITE_ENABLE_DROPBOX: "true"
+      VITE_ENABLE_GOOGLE_DRIVE: ${VITE_ENABLE_GOOGLE_DRIVE:-false}
+      VITE_GOOGLE_DRIVE_CLIENT_ID: ${VITE_GOOGLE_DRIVE_CLIENT_ID}
+      VITE_GOOGLE_DRIVE_API_KEY: ${VITE_GOOGLE_DRIVE_API_KEY}
+      VITE_GOOGLE_DRIVE_APP_ID: ${VITE_GOOGLE_DRIVE_APP_ID}
     ports:
       - "3000:3000"
     networks:
@@ -27,7 +34,7 @@ services:
       - "traefik.enable=true"
       
       # Main frontend application - primary domain
-      - "traefik.http.routers.frontend.rule=Host(`live.colourstream.example.com`)"
+      - "traefik.http.routers.frontend.rule=Host(`live.colourstream.${DOMAIN}`)"
       - "traefik.http.routers.frontend.entrypoints=websecure"
       - "traefik.http.routers.frontend.tls=true"
       - "traefik.http.routers.frontend.tls.certresolver=myresolver"
@@ -36,7 +43,7 @@ services:
       - "traefik.http.routers.frontend.priority=10"  # Lower priority than backend
       
       # Static assets router configuration - primary domain
-      - "traefik.http.routers.frontend-static.rule=Host(`live.colourstream.example.com`) && (PathPrefix(`/assets`) || PathPrefix(`/static`) || Path(`/favicon.ico`) || Path(`/manifest.json`) || Path(`/robots.txt`) || Path(`/config/runtime-config.js`))"
+      - "traefik.http.routers.frontend-static.rule=Host(`live.colourstream.${DOMAIN}`) && (PathPrefix(`/assets`) || PathPrefix(`/static`) || Path(`/favicon.ico`) || Path(`/manifest.json`) || Path(`/robots.txt`) || Path(`/config/runtime-config.js`))"
       - "traefik.http.routers.frontend-static.entrypoints=websecure"
       - "traefik.http.routers.frontend-static.tls=true"
       - "traefik.http.routers.frontend-static.tls.certresolver=myresolver"
@@ -44,7 +51,7 @@ services:
       - "traefik.http.routers.frontend-static.priority=200"
       
       # SPA router configuration - primary domain
-      - "traefik.http.routers.frontend-spa.rule=Host(`live.colourstream.example.com`) && (PathPrefix(`/admin`) || PathPrefix(`/login`) || PathPrefix(`/room`) || PathPrefix(`/upload`)) && !PathPrefix(`/files`) && !HeadersRegexp(`X-Requested-With`, `XMLHttpRequest`) && !Method(`POST`) && !Method(`PATCH`) && !Method(`HEAD`)"
+      - "traefik.http.routers.frontend-spa.rule=Host(`live.colourstream.${DOMAIN}`) && (PathPrefix(`/admin`) || PathPrefix(`/login`) || PathPrefix(`/room`) || PathPrefix(`/upload`)) && !PathPrefix(`/files`) && !HeadersRegexp(`X-Requested-With`, `XMLHttpRequest`) && !Method(`POST`) && !Method(`PATCH`) && !Method(`HEAD`)"
       - "traefik.http.routers.frontend-spa.entrypoints=websecure"
       - "traefik.http.routers.frontend-spa.tls=true"
       - "traefik.http.routers.frontend-spa.tls.certresolver=myresolver"
@@ -57,7 +64,7 @@ services:
       - "traefik.http.middlewares.spa-fallback.replacepathregex.replacement=/"
       
       # Root router configuration - primary domain
-      - "traefik.http.routers.frontend-root.rule=Host(`live.colourstream.example.com`) && Path(`/`) && !PathPrefix(`/files`)"
+      - "traefik.http.routers.frontend-root.rule=Host(`live.colourstream.${DOMAIN}`) && Path(`/`) && !PathPrefix(`/files`)"
       - "traefik.http.routers.frontend-root.entrypoints=websecure"
       - "traefik.http.routers.frontend-root.tls=true"
       - "traefik.http.routers.frontend-root.tls.certresolver=myresolver"
@@ -65,7 +72,7 @@ services:
       - "traefik.http.routers.frontend-root.priority=50"
       
       # Upload Portal - upload subdomain
-      - "traefik.http.routers.frontend-upload.rule=Host(`upload.colourstream.example.com`)"
+      - "traefik.http.routers.frontend-upload.rule=Host(`upload.colourstream.${DOMAIN}`)"
       - "traefik.http.routers.frontend-upload.entrypoints=websecure"
       - "traefik.http.routers.frontend-upload.tls=true"
       - "traefik.http.routers.frontend-upload.tls.certresolver=myresolver"
@@ -116,13 +123,13 @@ services:
       - ./global.env
     environment:
       NODE_ENV: production
-      WEBAUTHN_RP_ID: live.colourstream.example.com
-      WEBAUTHN_ORIGIN: https://live.colourstream.example.com
-      DOMAIN: example.com
-      VIDEO_DOMAIN: video.colourstream.example.com
-      FRONTEND_URL: https://live.colourstream.example.com
+      WEBAUTHN_RP_ID: live.colourstream.${DOMAIN}
+      WEBAUTHN_ORIGIN: https://live.colourstream.${DOMAIN}
+      DOMAIN: ${DOMAIN}
+      VIDEO_DOMAIN: video.colourstream.${DOMAIN}
+      FRONTEND_URL: https://live.colourstream.${DOMAIN}
       BASE_PATH: /api
-      OME_WEBHOOK_SECRET: "your_webhook_secret_here"
+      OME_WEBHOOK_SECRET: ${OME_WEBHOOK_SECRET}
       POSTGRES_USER: colourstream
       POSTGRES_DB: colourstream
     depends_on:
@@ -138,7 +145,7 @@ services:
     labels:
       - "traefik.enable=true"
       # API routes with higher priority
-      - "traefik.http.routers.backend.rule=Host(`live.colourstream.example.com`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.backend.rule=Host(`live.colourstream.${DOMAIN}`) && PathPrefix(`/api`)"
       - "traefik.http.routers.backend.entrypoints=websecure"
       - "traefik.http.routers.backend.tls=true"
       - "traefik.http.routers.backend.tls.certresolver=myresolver"
@@ -150,13 +157,13 @@ services:
       # Headers for regular API requests
       - "traefik.http.middlewares.backend-headers.headers.accesscontrolallowmethods=GET,OPTIONS,PUT,POST,DELETE"
       - "traefik.http.middlewares.backend-headers.headers.accesscontrolallowheaders=*"
-      - "traefik.http.middlewares.backend-headers.headers.accesscontrolalloworiginlist=https://live.colourstream.example.com,https://upload.colourstream.example.com,http://localhost:8000"
+      - "traefik.http.middlewares.backend-headers.headers.accesscontrolalloworiginlist=https://live.colourstream.${DOMAIN},https://upload.colourstream.${DOMAIN},http://localhost:8000"
       - "traefik.http.middlewares.backend-headers.headers.accesscontrolmaxage=100"
       - "traefik.http.middlewares.backend-headers.headers.addvaryheader=true"
       - "traefik.http.middlewares.backend-headers.headers.accesscontrolallowcredentials=true"
       
       # WebSocket routes - updated to handle all WebSocket paths
-      - "traefik.http.routers.backend-ws.rule=Host(`live.colourstream.example.com`) && PathPrefix(`/api/ws`)"
+      - "traefik.http.routers.backend-ws.rule=Host(`live.colourstream.${DOMAIN}`) && PathPrefix(`/api/ws`)"
       - "traefik.http.routers.backend-ws.entrypoints=websecure"
       - "traefik.http.routers.backend-ws.tls=true"
       - "traefik.http.routers.backend-ws.tls.certresolver=myresolver"
@@ -192,7 +199,7 @@ services:
       - "--entrypoints.websecure.transport.respondingTimeouts.idleTimeout=600s"
       - "--certificatesresolvers.myresolver.acme.httpchallenge=true"
       - "--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web"
-      - "--certificatesresolvers.myresolver.acme.email=admin@example.com"
+      - "--certificatesresolvers.myresolver.acme.email=${ADMIN_EMAIL}"
       - "--certificatesresolvers.myresolver.acme.storage=/acme.json"
       - "--log.level=DEBUG"
       - "--serversTransport.forwardingTimeouts.dialTimeout=60s"
@@ -224,7 +231,7 @@ services:
       - "10000-10004:10000-10004/udp" # WebRTC Candidate
     environment:
       # Use domain name instead of IP address for WebRTC ICE candidates
-      OME_HOST_IP: "live.colourstream.example.com"
+      OME_HOST_IP: "live.colourstream.${DOMAIN}"
       OME_ORIGIN_PORT: "9000"
       OME_RTMP_PROV_PORT: "1935"
       OME_SRT_PROV_PORT: "9999"
@@ -235,8 +242,8 @@ services:
       OME_WEBRTC_CANDIDATE_PORT: "10002-10004/udp"
       OME_API_PORT: "8081"
       OME_API_TLS_PORT: "8082"
-      OME_WEBHOOK_SECRET: "your_webhook_secret_here"
-      OME_API_ACCESS_TOKEN: "your_ome_api_token_here"
+      OME_WEBHOOK_SECRET: ${OME_WEBHOOK_SECRET}
+      OME_API_ACCESS_TOKEN: ${OME_API_ACCESS_TOKEN}
     env_file:
       - global.env
     restart: always
@@ -244,12 +251,12 @@ services:
       - network
     volumes:
       - ./ovenmediaengine/origin_conf:/opt/ovenmediaengine/bin/origin_conf
-      - ./certs/certs/live.colourstream.example.com.crt:/opt/ovenmediaengine/bin/cert/cert.crt
-      - ./certs/private/live.colourstream.example.com.key:/opt/ovenmediaengine/bin/cert/priv.key
+      - ./certs/certs/live.colourstream.${DOMAIN}.crt:/opt/ovenmediaengine/bin/cert/cert.crt
+      - ./certs/private/live.colourstream.${DOMAIN}.key:/opt/ovenmediaengine/bin/cert/priv.key
     labels:
       - "traefik.enable=true"
       # WebRTC WebSocket for /ws path
-      - "traefik.http.routers.ome-webrtc.rule=Host(`video.colourstream.example.com`) && PathPrefix(`/ws`)"
+      - "traefik.http.routers.ome-webrtc.rule=Host(`video.colourstream.${DOMAIN}`) && PathPrefix(`/ws`)"
       - "traefik.http.routers.ome-webrtc.entrypoints=websecure"
       - "traefik.http.routers.ome-webrtc.tls.certresolver=myresolver"
       - "traefik.http.routers.ome-webrtc.service=ome-webrtc-service"
@@ -262,7 +269,7 @@ services:
       - "traefik.http.routers.ome-webrtc.middlewares=ome-websocket"
       
       # WebRTC TLS Signaling for /app path on live domain
-      - "traefik.http.routers.ome-webrtc-tls.rule=Host(`live.colourstream.example.com`) && PathPrefix(`/app`)"
+      - "traefik.http.routers.ome-webrtc-tls.rule=Host(`live.colourstream.${DOMAIN}`) && PathPrefix(`/app`)"
       - "traefik.http.routers.ome-webrtc-tls.entrypoints=websecure"
       - "traefik.http.routers.ome-webrtc-tls.tls.certresolver=myresolver"
       - "traefik.http.routers.ome-webrtc-tls.service=ome-webrtc-tls-service"
@@ -275,7 +282,7 @@ services:
       - "traefik.http.routers.ome-webrtc-tls.middlewares=ome-websocket-tls"
       
       # WebRTC TLS Signaling for /app path on video domain
-      - "traefik.http.routers.ome-webrtc-tls-video.rule=Host(`video.colourstream.example.com`) && PathPrefix(`/app`)"
+      - "traefik.http.routers.ome-webrtc-tls-video.rule=Host(`video.colourstream.${DOMAIN}`) && PathPrefix(`/app`)"
       - "traefik.http.routers.ome-webrtc-tls-video.entrypoints=websecure"
       - "traefik.http.routers.ome-webrtc-tls-video.tls.certresolver=myresolver"
       - "traefik.http.routers.ome-webrtc-tls-video.service=ome-webrtc-tls-video-service"
@@ -295,7 +302,7 @@ services:
       - "10005-10009:10005-10009/udp" # WebRTC Candidate
     environment:
       # Also use domain name for edge instead of IP address
-      OME_HOST_IP: "live.colourstream.example.com"
+      OME_HOST_IP: "live.colourstream.${DOMAIN}"
       DEFAULT_ORIGIN_SERVER: "origin"
       DEFAULT_ORIGIN_PORT: "9000"
       OME_LLHLS_STREAM_PORT: "3330"
@@ -303,15 +310,15 @@ services:
       OME_WEBRTC_SIGNALLING_TLS_PORT: "3334"
       OME_WEBRTC_TCP_RELAY_PORT: "3479"
       OME_WEBRTC_CANDIDATE_PORT: "10005-10009/udp"
-      OME_API_ACCESS_TOKEN: "your_ome_api_token_here"
+      OME_API_ACCESS_TOKEN: ${OME_API_ACCESS_TOKEN}
     env_file:
       - global.env
     restart: always
     volumes:
       - ./ovenmediaengine/edge_conf:/opt/ovenmediaengine/bin/edge_conf
       - ./ovenmediaengine/edge_conf:/opt/ovenmediaengine/bin/origin_conf
-      - ./certs/certs/live.colourstream.example.com.crt:/opt/ovenmediaengine/bin/cert/cert.crt
-      - ./certs/private/live.colourstream.example.com.key:/opt/ovenmediaengine/bin/cert/priv.key
+      - ./certs/certs/live.colourstream.${DOMAIN}.crt:/opt/ovenmediaengine/bin/cert/cert.crt
+      - ./certs/private/live.colourstream.${DOMAIN}.key:/opt/ovenmediaengine/bin/cert/priv.key
     networks:
       - network
 
@@ -328,7 +335,7 @@ services:
       STUN_SERVER_ENABLED: "true"
       STUN_SERVER_URL: "stun:stun.l.google.com:19302"
       TURN_SERVER_ENABLED: "true"
-      TURN_SERVER_URL: "turn:video.colourstream.example.com:3480"
+      TURN_SERVER_URL: "turn:video.colourstream.${DOMAIN}:3480"
       TURN_SERVER_USERNAME: "colourstream"
       OIDC_ENABLED: "false"
       HOST_PROTECTED: "true"
@@ -342,14 +349,14 @@ services:
     labels:
       - "traefik.enable=true"
       # Main route
-      - "traefik.http.routers.mirotalk.rule=Host(`video.colourstream.example.com`)"
+      - "traefik.http.routers.mirotalk.rule=Host(`video.colourstream.${DOMAIN}`)"
       - "traefik.http.routers.mirotalk.entrypoints=websecure"
       - "traefik.http.routers.mirotalk.tls.certresolver=myresolver"
       - "traefik.http.routers.mirotalk.service=mirotalk-service"
       - "traefik.http.services.mirotalk-service.loadbalancer.server.port=3000"
       
       # WebSocket route for socket.io
-      - "traefik.http.routers.mirotalk-ws.rule=Host(`video.colourstream.example.com`) && PathPrefix(`/socket.io`)"
+      - "traefik.http.routers.mirotalk-ws.rule=Host(`video.colourstream.${DOMAIN}`) && PathPrefix(`/socket.io`)"
       - "traefik.http.routers.mirotalk-ws.entrypoints=websecure"
       - "traefik.http.routers.mirotalk-ws.tls.certresolver=myresolver"
       - "traefik.http.routers.mirotalk-ws.service=mirotalk-ws-service"
@@ -363,8 +370,8 @@ services:
     restart: always
     volumes:
       - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf
-      - ./certs/certs/video.colourstream.example.com.crt:/certs/video.colourstream.example.com.crt
-      - ./certs/private/video.colourstream.example.com.key:/certs/video.colourstream.example.com.key
+      - ./certs/certs/video.colourstream.${DOMAIN}.crt:/certs/video.colourstream.${DOMAIN}.crt
+      - ./certs/private/video.colourstream.${DOMAIN}.key:/certs/video.colourstream.${DOMAIN}.key
     ports:
       - "3480:3480"
       - "3480:3480/udp"
@@ -379,6 +386,108 @@ services:
       - "traefik.tcp.routers.coturn.entrypoints=websecure"
       - "traefik.tcp.routers.coturn.service=coturn"
       - "traefik.tcp.services.coturn.loadbalancer.server.port=3480"
+
+  minio:
+    image: minio/minio:latest
+    container_name: colourstream-minio
+    command: server --console-address ":9001" /data
+    environment:
+      # Enable CORS
+      MINIO_BROWSER: "on"
+      MINIO_CORS_ALLOW_ALL: "true"
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_IDENTITY_OPENID_CONFIG_URL: ${MINIO_IDENTITY_OPENID_CONFIG_URL}
+      MINIO_IDENTITY_OPENID_CLIENT_ID: ${MINIO_IDENTITY_OPENID_CLIENT_ID}
+      MINIO_IDENTITY_OPENID_CLIENT_SECRET: ${MINIO_IDENTITY_OPENID_CLIENT_SECRET}
+      MINIO_BROWSER_REDIRECT_URL: ${MINIO_BROWSER_REDIRECT_URL}
+      # PocketID-specific OIDC settings
+      MINIO_IDENTITY_OPENID_CLAIM_NAME: "groups"
+      MINIO_IDENTITY_OPENID_DISPLAY_NAME: "name"
+      MINIO_IDENTITY_OPENID_CLAIM_PREFIX: "minio-"
+    expose:
+      - 9000
+      - 9001
+    volumes:
+      - minio_data:/data
+    networks:
+      - network
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      # API endpoint
+      - "traefik.http.routers.minio-api.rule=Host(`s3.colourstream.${DOMAIN}`)"
+      - "traefik.http.routers.minio-api.entrypoints=websecure"
+      - "traefik.http.routers.minio-api.tls=true"
+      - "traefik.http.routers.minio-api.service=minio-api"
+      - "traefik.http.services.minio-api.loadbalancer.server.port=9000"
+      - "traefik.http.middlewares.minio-cors-headers.headers.accesscontrolallowheaders=*"
+      - "traefik.http.middlewares.minio-cors-headers.headers.accesscontrolalloworiginlist=*"
+      - "traefik.http.middlewares.minio-cors-headers.headers.accesscontrolmaxage=3600"
+      - "traefik.http.middlewares.minio-cors-headers.headers.addvaryheader=true"
+      - "traefik.http.middlewares.minio-cors-headers.headers.accesscontrolallowcredentials=true"
+      - "traefik.http.middlewares.minio-cors-headers.headers.customresponseheaders.Access-Control-Expose-Headers=ETag,Content-Length,Content-Type"
+      # Console endpoint
+      - "traefik.http.routers.minio-console.rule=Host(`s3-console.colourstream.${DOMAIN}`)"
+      - "traefik.http.routers.minio-console.entrypoints=websecure"
+      - "traefik.http.routers.minio-console.tls=true"
+      - "traefik.http.routers.minio-console.tls.certresolver=myresolver"
+      - "traefik.http.routers.minio-console.service=minio-console"
+      - "traefik.http.services.minio-console.loadbalancer.server.port=9001"
+
+  # Add Uppy Companion service for handling large file uploads
+  companion:
+    image: transloadit/companion:latest
+    restart: unless-stopped
+    environment:
+      # Core Companion settings
+      COMPANION_ALLOW_LOCAL_URLS: "true"
+      COMPANION_CLIENT_ORIGINS: "https://upload.colourstream.${DOMAIN},https://live.colourstream.${DOMAIN}"
+
+      # S3 Connection settings using environment variables from .env file
+      COMPANION_AWS_KEY: "${S3_ACCESS_KEY}"
+      COMPANION_AWS_SECRET: "${S3_SECRET_KEY}"
+      COMPANION_AWS_BUCKET: "${S3_BUCKET}"
+      COMPANION_AWS_REGION: "${S3_REGION}"
+      COMPANION_AWS_ENDPOINT: "${S3_PUBLIC_ENDPOINT}"
+      COMPANION_AWS_FORCE_PATH_STYLE: "true"
+
+      # Dropbox integration
+      COMPANION_DROPBOX_KEY: "${DROPBOX_KEY}"
+      COMPANION_DROPBOX_SECRET: "${DROPBOX_SECRET}"
+
+      # Google Drive integration
+      COMPANION_GOOGLE_SECRET: "${GOOGLE_DRIVE_SECRET}"
+
+      # Custom S3 key generator to strip UUIDs from filenames
+      # Uses /CLIENT/PROJECT/filename structure for consistent organization
+      COMPANION_S3_GET_KEY_NAME: "stripUuid"
+      COMPANION_S3_GET_KEY_FROM_NAME: "true"
+
+      # Performance optimizations for large files
+      COMPANION_UPLOAD_TIMEOUT: 86400000 # 24 hours in milliseconds
+      COMPANION_STREAMING_UPLOAD: "true"
+      COMPANION_MAX_FILE_SIZE: "650000000000" # 650GB max file size
+
+      # Required file path setting
+      COMPANION_DATADIR: "/data"
+      # Redis for session storage (optional, can add later if needed)
+      COMPANION_PATH: "/companion"
+      COMPANION_DOMAIN: "upload.colourstream.${DOMAIN}"
+    env_file:
+      - ./.env.companion
+    volumes:
+      - companion_data:/data
+    networks:
+      - network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.companion.rule=Host(`upload.colourstream.${DOMAIN}`) && PathPrefix(`/companion`)"
+      - "traefik.http.routers.companion.entrypoints=websecure"
+      - "traefik.http.routers.companion.tls=true"
+      - "traefik.http.routers.companion.tls.certresolver=myresolver"
+      - "traefik.http.routers.companion.service=companion"
+      - "traefik.http.services.companion.loadbalancer.server.port=3020"
 
   tusd:
     image: tusproject/tusd:latest
@@ -428,7 +537,7 @@ services:
     labels:
       - "traefik.enable=true"
       # TUS server should handle requests to the /files path with highest priority
-      - "traefik.http.routers.tusd.rule=Host(`upload.colourstream.example.com`) && PathPrefix(`/files`)"
+      - "traefik.http.routers.tusd.rule=Host(`upload.colourstream.${DOMAIN}`) && PathPrefix(`/files`)"
       - "traefik.http.routers.tusd.entrypoints=websecure"
       - "traefik.http.routers.tusd.tls=true"
       - "traefik.http.routers.tusd.tls.certresolver=myresolver"
@@ -436,7 +545,7 @@ services:
       - "traefik.http.services.tusd.loadbalancer.server.port=1080"
       - "traefik.http.middlewares.tusd-cors.headers.accesscontrolallowmethods=GET,HEAD,POST,PATCH,DELETE,OPTIONS"
       - "traefik.http.middlewares.tusd-cors.headers.accesscontrolallowheaders=*"
-      - "traefik.http.middlewares.tusd-cors.headers.accesscontrolalloworiginlist=https://live.colourstream.example.com,https://upload.colourstream.example.com,https://video.colourstream.example.com"
+      - "traefik.http.middlewares.tusd-cors.headers.accesscontrolalloworiginlist=https://live.colourstream.${DOMAIN},https://upload.colourstream.${DOMAIN},https://video.colourstream.${DOMAIN}"
       - "traefik.http.middlewares.tusd-cors.headers.accesscontrolexposeheaders=Location,Upload-Offset,Upload-Length,Upload-Metadata,Tus-Version,Tus-Resumable,Tus-Max-Size,Tus-Extension,Upload-Concat"
       - "traefik.http.middlewares.tusd-cors.headers.accesscontrolmaxage=86400"
       - "traefik.http.middlewares.tusd-cors.headers.accesscontrolallowcredentials=true"
@@ -451,6 +560,10 @@ volumes:
     name: colourstream_uploads_data
   organized_data:
     name: colourstream_organized_data
+  minio_data:
+    name: colourstream_minio_data
+  companion_data:
+    name: colourstream_companion_data
 
 networks:
   network:
