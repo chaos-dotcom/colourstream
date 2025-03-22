@@ -174,13 +174,7 @@ For more security information, see [SECURITY.md](SECURITY.md).
 
 ## 🚀 Getting Started
 
-### Option 1: Local Build Setup
-Run the setup-template.sh script to configure your environment with local builds:
-```bash
-./setup-template.sh
-```
-
-### Option 2: Pre-built Container Images
+### Pre-built Container Images
 For a faster setup using pre-built images from GitHub Container Registry:
 ```bash
 curl -s https://raw.githubusercontent.com/johnr24/colourstream/main/setup-ghcr.sh | bash

@@ -12,15 +12,34 @@ command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
 
+# Function to check if docker compose is available (either format)
+docker_compose_exists() {
+  if command_exists "docker-compose"; then
+    return 0
+  elif command_exists "docker" && docker compose version >/dev/null 2>&1; then
+    return 0
+  else
+    return 1
+  fi
+}
+
 # Check for required commands
 echo "Checking dependencies..."
-for cmd in docker docker-compose curl git openssl; do
+for cmd in docker curl git openssl; do
   if ! command_exists $cmd; then
     echo "Error: $cmd is not installed."
     echo "Please install $cmd and run this script again."
     exit 1
   fi
 done
+
+# Special check for docker compose
+if ! docker_compose_exists; then
+  echo "Error: docker compose is not installed."
+  echo "Please install Docker Compose (either as 'docker-compose' or 'docker compose') and run this script again."
+  exit 1
+fi
+
 echo "All dependencies found."
 echo
 
@@ -461,7 +480,7 @@ printf "   - s3.colourstream.%s -> Your server IP\n" "${domain_name}"
 printf "   - s3-console.colourstream.%s -> Your server IP\n" "${domain_name}"
 echo
 echo "2. Start the application:"
-echo "   docker-compose up -d"
+echo "   docker compose up -d"
 echo
 echo "3. Login with the admin credentials found in env.reference"
 echo "   KEEP THIS FILE SECURE!" 
