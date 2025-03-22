@@ -3,9 +3,59 @@
 # ColourStream GHCR Setup Script
 # This script downloads and sets up ColourStream using GitHub Container Registry images
 
+# Parse command line arguments
+CLEAR_CONFIG=false
+HELP=false
+
+for arg in "$@"; do
+  case $arg in
+    --clear)
+      CLEAR_CONFIG=true
+      shift
+      ;;
+    --help)
+      HELP=true
+      shift
+      ;;
+    *)
+      # Unknown option
+      ;;
+  esac
+done
+
+if $HELP; then
+  echo "ColourStream GHCR Setup Script"
+  echo "Usage: ./setup-ghcr.sh [options]"
+  echo
+  echo "Options:"
+  echo "  --clear    Clear existing configuration before setup"
+  echo "  --help     Show this help message"
+  echo
+  exit 0
+fi
+
 echo "ColourStream GHCR Setup"
 echo "======================"
 echo
+
+# Function to clear existing configuration
+clear_configuration() {
+  echo "Clearing existing configuration..."
+  
+  # Remove configuration files
+  rm -f global.env backend/.env frontend/.env mirotalk/.env .env.companion docker-compose.yml traefik/acme.json coturn/turnserver.conf env.reference
+  
+  # Optionally remove data directories - commented out for safety
+  # rm -rf postgres/* backend/logs/* backend/uploads/* companion-data/* minio-data/*
+  
+  echo "Existing configuration cleared."
+  echo
+}
+
+# If --clear was specified, clear configuration first
+if $CLEAR_CONFIG; then
+  clear_configuration
+fi
 
 # Function to check if a command exists
 command_exists() {
