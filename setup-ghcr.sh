@@ -108,9 +108,26 @@ get_input() {
 generate_configs() {
   echo "Generating secure configurations..."
   
-  # Get required user input
-  domain_name=$(get_input "Enter your domain name (e.g., example.com)" "Domain name")
-  admin_email=$(get_input "Enter admin email address" "Admin email")
+  # Get required user input with proper input handling
+  domain_name=""
+  while [ -z "$domain_name" ]; do
+    printf "Enter your domain name (e.g., example.com): "
+    read domain_name
+    domain_name=$(echo "$domain_name" | tr -d '\n\r' | xargs)
+    if [ -z "$domain_name" ]; then
+      echo "Domain name cannot be empty. Please try again."
+    fi
+  done
+  
+  admin_email=""
+  while [ -z "$admin_email" ]; do
+    printf "Enter admin email address: "
+    read admin_email
+    admin_email=$(echo "$admin_email" | tr -d '\n\r' | xargs)
+    if [ -z "$admin_email" ]; then
+      echo "Admin email cannot be empty. Please try again."
+    fi
+  done
   
   # Generate all secrets
   db_password=$(generate_password)
