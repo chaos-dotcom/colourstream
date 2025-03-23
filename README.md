@@ -1,4 +1,4 @@
-# 🏳️‍🌈 ColourStream: A Self Hosted Suite of Open Source Tools for Colorists
+# 🏳️‍🌈 ColourStream: A Self Hosted Suite of Open Source Tools for Colourists
 
 
 ## 🚀 Overview

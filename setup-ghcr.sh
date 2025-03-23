@@ -193,6 +193,14 @@ process_template() {
   # Replace values in HOST_USERS JSON object
   sed -i "s|\"password\":\"your_admin_password_here\"|\"password\":\"${admin_password}\"|g" "$output_file"
 
+  # Ensure DATABASE_URL is correctly set with the proper password
+  if [[ "$output_file" == *"backend/.env"* ]]; then
+    # Create a properly formatted DATABASE_URL with the correct password
+    local db_url="postgresql://colourstream:${db_password}@colourstream-postgres:5432/colourstream"
+    sed -i "s|DATABASE_URL=.*|DATABASE_URL=${db_url}|g" "$output_file"
+    echo "✅ Set correct DATABASE_URL in backend/.env"
+  fi
+
   # Replace any remaining ${VARIABLES} with their values
   sed -i "s|\${DB_PASSWORD}|${db_password}|g" "$output_file"
   sed -i "s|\${JWT_KEY}|${jwt_key}|g" "$output_file"
@@ -229,6 +237,28 @@ process_all_templates() {
   process_template "$TEMPLATES_DIR/coturn/turnserver.conf.template" "coturn/turnserver.conf"
   
   echo "✅ All templates processed."
+}
+
+# Function to verify configuration consistency
+verify_configs() {
+  echo "Verifying configuration consistency..."
+  
+  # Check that passwords match across files
+  main_db_password=$(grep POSTGRES_PASSWORD .env | cut -d'=' -f2)
+  backend_db_url=$(grep DATABASE_URL backend/.env | cut -d'=' -f2-)
+  
+  if [[ "$backend_db_url" != *"$main_db_password"* ]]; then
+    echo "⚠️ Database password mismatch detected in backend/.env"
+    echo "Fixing DATABASE_URL in backend/.env..."
+    
+    # Create a properly formatted DATABASE_URL with the correct password
+    local db_url="postgresql://colourstream:${main_db_password}@colourstream-postgres:5432/colourstream"
+    sed -i "s|DATABASE_URL=.*|DATABASE_URL=${db_url}|g" "backend/.env"
+    
+    echo "✅ Fixed DATABASE_URL in backend/.env"
+  else
+    echo "✅ Database passwords consistent across configuration files"
+  fi
 }
 
 # Function to create a reference file for credentials
@@ -319,6 +349,9 @@ main() {
   
   # Process all templates
   process_all_templates
+  
+  # Verify configuration consistency
+  verify_configs
   
   # Create reference file
   create_reference_file
