@@ -43,6 +43,20 @@ create_directories() {
   echo "✅ Directories created."
 }
 
+# Function to download postgres.conf file
+download_postgres_conf() {
+  echo "Downloading PostgreSQL configuration file..."
+  
+  # Download postgres.conf directly from the repository
+  if ! curl -s -o "postgres/postgresql.conf" "$REPO_URL/postgres/postgresql.conf"; then
+    echo "⚠️ Failed to download postgresql.conf"
+    return 1
+  fi
+  
+  echo "✅ PostgreSQL configuration file downloaded successfully"
+  return 0
+}
+
 # Function to download templates
 download_templates() {
   echo "Downloading template files..."
@@ -285,6 +299,13 @@ main() {
   
   # Create required directories
   create_directories
+  
+  # Download PostgreSQL configuration file
+  if ! download_postgres_conf; then
+    echo "Failed to download PostgreSQL configuration file."
+    echo "Please check your internet connection or download it manually."
+    exit 1
+  fi
   
   # Download templates
   if ! download_templates; then
