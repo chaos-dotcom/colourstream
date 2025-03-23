@@ -50,7 +50,7 @@ download_templates() {
   # Define template files to download
   templates=(
     "docker-compose.template.yml"
-    "global.env.template"
+    ".env.template"
     "backend/.env.template"
     "frontend/.env.template"
     "mirotalk/.env.template"
@@ -187,7 +187,7 @@ process_all_templates() {
   
   # Process each template file
   process_template "$TEMPLATES_DIR/docker-compose.template.yml" "docker-compose.yml"
-  process_template "$TEMPLATES_DIR/global.env.template" "global.env"
+  process_template "$TEMPLATES_DIR/.env.template" ".env"
   process_template "$TEMPLATES_DIR/backend/.env.template" "backend/.env"
   process_template "$TEMPLATES_DIR/frontend/.env.template" "frontend/.env"
   process_template "$TEMPLATES_DIR/mirotalk/.env.template" "mirotalk/.env"

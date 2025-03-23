@@ -90,6 +90,8 @@ services:
     restart: always
     expose:
       - "5432"
+    env_file:
+      - ./.env
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_DB: ${POSTGRES_DB}
@@ -118,8 +120,8 @@ services:
     expose:
       - 5001
     env_file:
+      - ./.env
       - ./backend/.env
-      - ./global.env
     environment:
       NODE_ENV: production
       WEBAUTHN_RP_ID: live.colourstream.${DOMAIN}
@@ -244,7 +246,7 @@ services:
       OME_WEBHOOK_SECRET: ${OME_WEBHOOK_SECRET}
       OME_API_ACCESS_TOKEN: ${OME_API_ACCESS_TOKEN}
     env_file:
-      - global.env
+      - ./.env
     restart: always
     networks:
       - network
@@ -311,7 +313,7 @@ services:
       OME_WEBRTC_CANDIDATE_PORT: "10005-10009/udp"
       OME_API_ACCESS_TOKEN: ${OME_API_ACCESS_TOKEN}
     env_file:
-      - global.env
+      - ./.env
     restart: always
     volumes:
       - ./ovenmediaengine/edge_conf:/opt/ovenmediaengine/bin/edge_conf
@@ -341,7 +343,7 @@ services:
       TRUST_PROXY: "true"
       SEVER_TUNNEL: "false"
     env_file:
-      - global.env
+      - ./.env
       - mirotalk/.env
     networks:
       - network
@@ -514,7 +516,7 @@ services:
       - "1080"
     user: "root"
     env_file:
-      - ./global.env
+      - ./.env
     environment:
       - TUS_ORGANIZED_DIR=/data/organized
       - TUS_INFO_DIR=/data/tusd-uploads
