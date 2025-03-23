@@ -108,25 +108,19 @@ get_input() {
 generate_configs() {
   echo "Generating secure configurations..."
   
-  # Get required user input with proper input handling
-  domain_name=""
+  # Get required user input with Ubuntu-compatible input handling
+  echo -n "Enter your domain name (e.g., example.com): "
+  read domain_name
   while [ -z "$domain_name" ]; do
-    printf "Enter your domain name (e.g., example.com): "
+    echo -n "Domain name cannot be empty. Please try again: "
     read domain_name
-    domain_name=$(echo "$domain_name" | tr -d '\n\r' | xargs)
-    if [ -z "$domain_name" ]; then
-      echo "Domain name cannot be empty. Please try again."
-    fi
   done
   
-  admin_email=""
+  echo -n "Enter admin email address: "
+  read admin_email
   while [ -z "$admin_email" ]; do
-    printf "Enter admin email address: "
+    echo -n "Admin email cannot be empty. Please try again: "
     read admin_email
-    admin_email=$(echo "$admin_email" | tr -d '\n\r' | xargs)
-    if [ -z "$admin_email" ]; then
-      echo "Admin email cannot be empty. Please try again."
-    fi
   done
   
   # Generate all secrets
@@ -163,22 +157,22 @@ process_template() {
   # Copy template to output file
   cp "$template_file" "$output_file"
   
-  # Replace placeholders with values
-  sed -i "s/\${DOMAIN}/${domain_name}/g" "$output_file"
-  sed -i "s/\${ADMIN_EMAIL}/${admin_email}/g" "$output_file"
-  sed -i "s/\${DB_PASSWORD}/${db_password}/g" "$output_file"
-  sed -i "s/\${JWT_KEY}/${jwt_key}/g" "$output_file"
-  sed -i "s/\${JWT_SECRET}/${jwt_secret}/g" "$output_file"
-  sed -i "s/\${ADMIN_PASSWORD}/${admin_password}/g" "$output_file"
-  sed -i "s/\${ADMIN_AUTH_SECRET}/${admin_auth_secret}/g" "$output_file"
-  sed -i "s/\${MIROTALK_API_KEY}/${mirotalk_api_key}/g" "$output_file"
-  sed -i "s/\${MIROTALK_API_KEY_SECRET}/${mirotalk_api_key}/g" "$output_file"
-  sed -i "s/\${TURN_SERVER_CREDENTIAL}/${turn_password}/g" "$output_file"
-  sed -i "s/\${OME_API_ACCESS_TOKEN}/${ome_api_token}/g" "$output_file"
-  sed -i "s/\${OME_WEBHOOK_SECRET}/${ome_webhook_secret}/g" "$output_file"
-  sed -i "s/\${MINIO_ROOT_USER}/${minio_root_user}/g" "$output_file"
-  sed -i "s/\${MINIO_ROOT_PASSWORD}/${minio_root_password}/g" "$output_file"
-  sed -i "s/\${NAMEFORUPLOADCOMPLETION}/User/g" "$output_file"
+  # Replace placeholders with values - Ubuntu compatible sed
+  sed -i "s|\${DOMAIN}|${domain_name}|g" "$output_file"
+  sed -i "s|\${ADMIN_EMAIL}|${admin_email}|g" "$output_file"
+  sed -i "s|\${DB_PASSWORD}|${db_password}|g" "$output_file"
+  sed -i "s|\${JWT_KEY}|${jwt_key}|g" "$output_file"
+  sed -i "s|\${JWT_SECRET}|${jwt_secret}|g" "$output_file"
+  sed -i "s|\${ADMIN_PASSWORD}|${admin_password}|g" "$output_file"
+  sed -i "s|\${ADMIN_AUTH_SECRET}|${admin_auth_secret}|g" "$output_file"
+  sed -i "s|\${MIROTALK_API_KEY}|${mirotalk_api_key}|g" "$output_file"
+  sed -i "s|\${MIROTALK_API_KEY_SECRET}|${mirotalk_api_key}|g" "$output_file"
+  sed -i "s|\${TURN_SERVER_CREDENTIAL}|${turn_password}|g" "$output_file"
+  sed -i "s|\${OME_API_ACCESS_TOKEN}|${ome_api_token}|g" "$output_file"
+  sed -i "s|\${OME_WEBHOOK_SECRET}|${ome_webhook_secret}|g" "$output_file"
+  sed -i "s|\${MINIO_ROOT_USER}|${minio_root_user}|g" "$output_file"
+  sed -i "s|\${MINIO_ROOT_PASSWORD}|${minio_root_password}|g" "$output_file"
+  sed -i "s|\${NAMEFORUPLOADCOMPLETION}|User|g" "$output_file"
   
   # Set proper permissions
   chmod 600 "$output_file"
