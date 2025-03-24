@@ -34,7 +34,7 @@ graph TD
     %% Client connections
     Client([User/Client Browser]) --> |HTTPS| Traefik
     OBS([OBS/Encoder]) --> |RTMP/SRT| OME_Origin
-    ClientUpload([Client Upload]) --> |HTTPS| Traefik
+    ClientUpload([Client Upload Browser]) --> |HTTPS| Traefik
     
     %% Traefik routing
     Traefik[(Traefik Proxy)] <--> |Route: live.colourstream...| Frontend
@@ -42,12 +42,22 @@ graph TD
     Traefik --> |Route: video.colourstream...| Mirotalk
     Traefik --> |Route: /app, /ws| OME_Origin
     Traefik --> |Route: upload.colourstream...| UploadPortal
+    Traefik --> |Route: s3.colourstream...| MinIO
     
     %% Backend connections
     Backend <--> PostgreSQL[(PostgreSQL DB)]
     Backend <--> |WebSockets| Frontend
     Backend --> |API Calls| OME_Origin
     Backend <--> |Upload Management| UploadPortal
+    Backend <--> |S3 Storage API| MinIO
+    
+    %% Storage connections
+    UploadPortal --> |Direct S3 Upload| MinIO[(MinIO S3)]
+    
+    %% File processing connections
+    MinIO --> |Optional| TurboSort([TurboSort])
+    MinIO --> |Direct Access| UserFilesystem[(User Filesystem)]
+    TurboSort --> |Project Structure Sync| UserFilesystem
     
     %% Media connections
     OME_Origin[OvenMediaEngine Origin] --> OME_Edge[OvenMediaEngine Edge]
@@ -73,18 +83,32 @@ graph TD
         UploadPortal[Upload Portal]
     end
     
+    subgraph "Storage Layer"
+        PostgreSQL
+        MinIO
+        UserFilesystem
+    end
+    
+    subgraph "Optional Components" 
+        TurboSort
+    end
+    
     %% Styling
     classDef proxy fill:,stroke:#333,stroke-width:2px;
     classDef app fill,stroke:#33f,stroke-width:1px;
     classDef db fill:,stroke:#3f3,stroke-width:1px;
+    classDef storage fill:,stroke:#f93,stroke-width:1px;
     classDef media fill:,stroke:#f3f,stroke-width:1px;
     classDef client fill:,stroke:#999,stroke-width:1px;
+    classDef optional fill:,stroke:#aaa,stroke-width:1px,stroke-dasharray: 5 5;
 
     class Traefik proxy;
     class Frontend,Backend,Mirotalk,UploadPortal app;
     class PostgreSQL db;
+    class MinIO,UserFilesystem storage;
     class OME_Origin,OME_Edge,Coturn media;
     class Client,OBS,ClientUpload client;
+    class TurboSort optional;
 ```
 
 ### 🧩 Components
@@ -94,8 +118,11 @@ graph TD
 - **OvenMediaEngine**: Handles video streaming (SRT, RTMP, WebRTC)
 - **Mirotalk**: Provides WebRTC-based video conferencing
 - **Upload Portal**: Secure file sharing portal for client uploads and downloads
+- **MinIO**: S3-compatible object storage for file uploads and storage
 - **Traefik**: Manages routing, SSL termination, and load balancing
 - **PostgreSQL**: Stores user data, room configurations, and system settings
+- **TurboSort**: Optional tool for linking uploaded files to existing project structure
+- **User Filesystem**: Local storage where media files are ultimately accessed for grading work
 
 ## 📤 Upload Portal
 
