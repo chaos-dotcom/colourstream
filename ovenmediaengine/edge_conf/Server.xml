@@ -45,12 +45,12 @@
 
 	<VirtualHosts>
 		<VirtualHost>
-			<Name>live.colourstream.johnrogerscolour.co.uk</Name>
-			<Distribution>live.colourstream.johnrogerscolour.co.uk</Distribution>
+			<Name>live.colourstream.${env:DOMAIN}</Name>
+			<Distribution>live.colourstream.${env:DOMAIN}</Distribution>
 
 			<Host>
 				<Names>
-					<Name>live.colourstream.johnrogerscolour.co.uk</Name>
+					<Name>live.colourstream.${env:DOMAIN}</Name>
 				</Names>
 				<TLS>
 					<CertPath>/opt/ovenmediaengine/bin/cert/cert.crt</CertPath>

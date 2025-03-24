@@ -318,8 +318,8 @@ services:
     volumes:
       - ./ovenmediaengine/edge_conf:/opt/ovenmediaengine/bin/edge_conf
       - ./ovenmediaengine/edge_conf:/opt/ovenmediaengine/bin/origin_conf
-      - ./certs/certs/live.colourstream.${DOMAIN}.crt:/opt/ovenmediaengine/bin/cert/cert.crt
-      - ./certs/private/live.colourstream.${DOMAIN}.key:/opt/ovenmediaengine/bin/cert/priv.key
+      - ./certs/certs/live.colourstream.${DOMAIN}.crt:/opt/ovenmediaengine/bin/cert/cert.crt:ro
+      - ./certs/private/live.colourstream.${DOMAIN}.key:/opt/ovenmediaengine/bin/cert/priv.key:ro
     networks:
       - network
 
@@ -331,7 +331,10 @@ services:
     expose:
       - 3000
     volumes:
-      - ./mirotalk/.env:/src/.env
+      - ./mirotalk/.env:/src/.env:ro
+      - ./mirotalk/public:/src/public:ro
+      - ./mirotalk/app:/src/app:ro
+
     environment:
       STUN_SERVER_ENABLED: "true"
       STUN_SERVER_URL: "stun:stun.l.google.com:19302"
@@ -342,6 +345,10 @@ services:
       HOST_PROTECTED: "true"
       TRUST_PROXY: "true"
       SEVER_TUNNEL: "false"
+      NGROK_ENABLED: "false"
+      HTTPS: "false"
+      PORT: "3000"
+      PROTOCOL: "http"
     env_file:
       - ./.env
       - mirotalk/.env

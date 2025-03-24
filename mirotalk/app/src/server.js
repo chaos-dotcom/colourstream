@@ -198,8 +198,11 @@ const apiDisabledString = process.env.MIROTALK_API_DISABLED || '["token", "meeti
 const api_disabled = JSON.parse(apiDisabledString);
 
 // Ngrok config
-const ngrok = require('ngrok');
+let ngrok;
 const ngrokEnabled = getEnvBoolean(process.env.NGROK_ENABLED);
+if (ngrokEnabled) {
+    ngrok = require('ngrok');
+}
 const ngrokAuthToken = process.env.NGROK_AUTH_TOKEN;
 
 // Stun (https://bloggeek.me/webrtcglossary/stun/)

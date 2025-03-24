@@ -104,13 +104,13 @@
 	  <VirtualHost include="VHost*.xml" />
 		<VirtualHost>
 			<Name>default</Name>
-			<Distribution>video.colourstream.johnrogerscolour.co.uk</Distribution>
+			<Distribution>video.colourstream.${env:DOMAIN}</Distribution>
 			
 			<Host>
 				<Names>
-					<Name>video.colourstream.johnrogerscolour.co.uk</Name>
-					<Name>live.colourstream.johnrogerscolour.co.uk</Name>
-					<Name>live.johnrogerscolour.co.uk</Name>
+					<Name>video.colourstream.${env:DOMAIN}</Name>
+					<Name>live.colourstream.${env:DOMAIN}</Name>
+					<Name>live.${env:DOMAIN}</Name>
 					<Name>*</Name>
 				</Names>
 				<TLS>

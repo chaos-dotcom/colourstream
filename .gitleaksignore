@@ -89,3 +89,7 @@ c61a264694befb34f207afad803ab4a8ce661e76:mirotalk/README.md:curl-auth-header:256
 c61a264694befb34f207afad803ab4a8ce661e76:mirotalk/README.md:curl-auth-header:258
 c61a264694befb34f207afad803ab4a8ce661e76:mirotalk/README.md:curl-auth-header:259
 c61a264694befb34f207afad803ab4a8ce661e76:mirotalk/README.md:curl-auth-header:260
+
+# Dumpcerts.traefik.v2.sh - Private key not actually a key just how it works and finds the private key
+473785228b553fcdf6da588a7cffa56df9096b76:dumpcerts.traefik.v2.sh:private-key:137
+473785228b553fcdf6da588a7cffa56df9096b76:dumpcerts.traefik.v2.sh:private-key:142
