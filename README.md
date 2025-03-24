@@ -205,7 +205,7 @@ For more security information, see [SECURITY.md](SECURITY.md).
 
 ```bash
 # Clone the repository
-git clone https://github.com/JohnRogersColour/colourstream.git
+git clone https://github.com/johnr24/colourstream.git
 cd colourstream
 
 # Setup firewall rules
