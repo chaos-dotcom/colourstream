@@ -10,21 +10,22 @@ set -e  # Exit on error
 # Configuration variables with relative paths
 ACME_JSON="../traefik/acme.json"
 CERT_DIR="../certs"
-DOMAINS=(
-  "live.colourstream.johnrogerscolour.co.uk"
-  "video.colourstream.johnrogerscolour.co.uk"
-  "upload.colourstream.johnrogerscolour.co.uk"
-)
 
 # Create certificate directories if they don't exist
 mkdir -p "${CERT_DIR}/certs"
 mkdir -p "${CERT_DIR}/private"
 
+# Clean out any existing certificates
+echo "Cleaning existing certificates..."
+rm -f "${CERT_DIR}/certs/"*.crt "${CERT_DIR}/certs/"*.pem
+rm -f "${CERT_DIR}/private/"*.key "${CERT_DIR}/private/"*.pem
+echo "Certificate directories cleaned."
+
 echo "===== Certificate Renewal Process Started ====="
 echo "$(date)"
 echo "Extracting certificates from Traefik acme.json..."
 
-# Use the dumpcerts script to extract certificates
+# Use the dumpcerts script to extract all certificates
 ./dumpcerts.traefik.v2.sh "${ACME_JSON}" "${CERT_DIR}"
 
 if [ $? -ne 0 ]; then
@@ -34,13 +35,24 @@ fi
 
 echo "Certificates extracted successfully!"
 
-# Process each domain
-for DOMAIN in "${DOMAINS[@]}"; do
+# Process all certificate files found in the output directory
+echo "Processing extracted certificates..."
+CERT_COUNT=0
+
+for CERT_FILE in "${CERT_DIR}/certs/"*.crt; do
+  # Skip if no files were found
+  if [[ ! -f "$CERT_FILE" ]]; then
+    echo "No certificate files found."
+    break
+  fi
+  
+  # Extract domain name from filename
+  DOMAIN=$(basename "$CERT_FILE" .crt)
   echo "Setting up certificates for ${DOMAIN}..."
   
-  # Verify that the certificates exist
-  if [ ! -f "${CERT_DIR}/certs/${DOMAIN}.crt" ] || [ ! -f "${CERT_DIR}/private/${DOMAIN}.key" ]; then
-    echo "Warning: Certificates for ${DOMAIN} not found. Skipping..."
+  # Verify that we have the key file as well
+  if [ ! -f "${CERT_DIR}/private/${DOMAIN}.key" ]; then
+    echo "Warning: Private key for ${DOMAIN} not found. Skipping..."
     continue
   fi
   
@@ -49,7 +61,10 @@ for DOMAIN in "${DOMAINS[@]}"; do
   ln -sf "${CERT_DIR}/private/${DOMAIN}.key" "${CERT_DIR}/private/${DOMAIN}.pem"
   
   echo "Certificate for ${DOMAIN} processed successfully."
+  CERT_COUNT=$((CERT_COUNT + 1))
 done
+
+echo "Processed $CERT_COUNT certificates."
 
 echo "All certificates processed. Now updating services..."
 

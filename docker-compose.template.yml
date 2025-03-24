@@ -252,8 +252,8 @@ services:
       - network
     volumes:
       - ./ovenmediaengine/origin_conf:/opt/ovenmediaengine/bin/origin_conf
-      - ./certs/certs/live.colourstream.${DOMAIN}.crt:/opt/ovenmediaengine/bin/cert/cert.crt
-      - ./certs/private/live.colourstream.${DOMAIN}.key:/opt/ovenmediaengine/bin/cert/priv.key
+      - ./certs/certs/live.colourstream.${DOMAIN}.crt:/opt/ovenmediaengine/bin/cert/cert.crt:ro
+      - ./certs/private/live.colourstream.${DOMAIN}.key:/opt/ovenmediaengine/bin/cert/priv.key:ro
     labels:
       - "traefik.enable=true"
       # WebRTC WebSocket for /ws path

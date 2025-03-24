@@ -183,18 +183,26 @@ cd colourstream
 
 # Setup firewall rules
 cd setup
+chmod +x ./setup_ufw_rules.sh
+chmod +x ./renew_certificates.sh
+chmod +x ./dumpcerts.traefik.v2.sh
 ./setup_ufw_rules.sh
 cd ..
 
 # Run the setup script
+chmod +x ./setup-ghcr.sh
 ./setup-ghcr.sh
 
-# Start the application
-docker compose up -d
+# Start the to spawn certs
+docker compose up -d 
 
 # Setup certificate renewal
 cd setup
 ./renew_certificates.sh
+
+# restart all services
+cd ..
+docker compose up -d
 ```
 
 That's it! Access your ColourStream installation at:
