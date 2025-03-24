@@ -20,7 +20,7 @@ services:
       VITE_OVENPLAYER_SCRIPT_URL: https://cdn.jsdelivr.net/npm/ovenplayer/dist/ovenplayer.js
       VITE_UPLOAD_ENDPOINT_URL: https://upload.colourstream.${DOMAIN}/files/
       VITE_NAMEFORUPLOADCOMPLETION: ${NAMEFORUPLOADCOMPLETION}
-      VITE_ENABLE_DROPBOX: "true"
+      VITE_ENABLE_DROPBOX: "false"
       VITE_ENABLE_GOOGLE_DRIVE: ${VITE_ENABLE_GOOGLE_DRIVE:-false}
       VITE_GOOGLE_DRIVE_CLIENT_ID: ${VITE_GOOGLE_DRIVE_CLIENT_ID}
       VITE_GOOGLE_DRIVE_API_KEY: ${VITE_GOOGLE_DRIVE_API_KEY}
@@ -86,7 +86,7 @@ services:
 
   postgres:
     container_name: colourstream-postgres
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     restart: always
     expose:
       - "5432"

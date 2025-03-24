@@ -87,6 +87,17 @@ download_templates() {
     echo "Downloading $template..."
     if ! curl -s -o "$TEMPLATES_DIR/$template" "$REPO_URL/$template"; then
       echo "⚠️ Failed to download $template"
+      # If the file fails to download and it's the turnserver.conf.template,
+      # try copying from local path as fallback
+      if [ "$template" = "coturn/turnserver.conf.template" ] && [ -f "coturn/turnserver.conf.template" ]; then
+        echo "Using local turnserver.conf.template instead..."
+        mkdir -p "$TEMPLATES_DIR/coturn"
+        cp "coturn/turnserver.conf.template" "$TEMPLATES_DIR/coturn/turnserver.conf.template"
+        if [ $? -eq 0 ]; then
+          echo "✅ Successfully copied local turnserver.conf.template"
+          continue
+        fi
+      fi
       return 1
     fi
   done
@@ -173,6 +184,7 @@ process_template() {
   
   # Replace placeholders with values - Ubuntu compatible sed
   sed -i "s|\${DOMAIN}|${domain_name}|g" "$output_file"
+  sed -i "s|example.com|${domain_name}|g" "$output_file"
   sed -i "s|\${ADMIN_EMAIL}|${admin_email}|g" "$output_file"
   sed -i "s|your_secure_password_here|${db_password}|g" "$output_file"
   sed -i "s|DB_PASSWORD=your_secure_password_here|DB_PASSWORD=${db_password}|g" "$output_file"
@@ -185,6 +197,7 @@ process_template() {
   sed -i "s|your_mirotalk_api_key_secret_here|${mirotalk_api_key}|g" "$output_file"
   sed -i "s|your_mirotalk_password_here|${admin_password}|g" "$output_file"  
   sed -i "s|your_turn_server_credential_here|${turn_password}|g" "$output_file"
+  sed -i "s|your_turn_credential_here|${turn_password}|g" "$output_file"
   sed -i "s|your_ome_api_token_here|${ome_api_token}|g" "$output_file"
   sed -i "s|your_ome_webhook_secret_here|${ome_webhook_secret}|g" "$output_file"
   sed -i "s|your_minio_root_user_here|${minio_root_user}|g" "$output_file"
@@ -234,7 +247,17 @@ process_all_templates() {
   process_template "$TEMPLATES_DIR/frontend/.env.template" "frontend/.env"
   process_template "$TEMPLATES_DIR/mirotalk/.env.template" "mirotalk/.env"
   process_template "$TEMPLATES_DIR/companion/.env.template" ".env.companion"
-  process_template "$TEMPLATES_DIR/coturn/turnserver.conf.template" "coturn/turnserver.conf"
+  
+  # Check if turnserver.conf.template exists before processing
+  if [ -f "$TEMPLATES_DIR/coturn/turnserver.conf.template" ]; then
+    process_template "$TEMPLATES_DIR/coturn/turnserver.conf.template" "coturn/turnserver.conf"
+  elif [ -f "coturn/turnserver.conf.template" ]; then
+    # Fallback to direct processing from local template
+    echo "Processing turnserver.conf.template directly from local copy..."
+    process_template "coturn/turnserver.conf.template" "coturn/turnserver.conf"
+  else
+    echo "⚠️ Warning: turnserver.conf.template not found. TURN server configuration will not be generated."
+  fi
   
   echo "✅ All templates processed."
 }
