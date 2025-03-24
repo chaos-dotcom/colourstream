@@ -237,13 +237,17 @@ cd setup
 # restart all services
 cd ..
 docker compose up -d
+
+
+
 ```
 
 That's it! Access your ColourStream installation at:
 - Main app: `https://live.colourstream.yourdomain.com`
 - Video conferencing: `https://video.colourstream.yourdomain.com`
 - Upload portal: `https://upload.colourstream.yourdomain.com`
-
+- the admin dashboard is accessible at live.colourstream.yourdomain.com/admin/login
+    - you will need to register a passkey to login to the admin dashboard, if you click the login button you will be taken to a one time setup page where you will be able to register a passkey.
 ### Basic Requirements
 
 =
