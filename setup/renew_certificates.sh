@@ -17,8 +17,8 @@ mkdir -p "${CERT_DIR}/private"
 
 # Clean out any existing certificates
 echo "Cleaning existing certificates..."
-rm -f "${CERT_DIR}/certs/"*.crt "${CERT_DIR}/certs/"*.pem
-rm -f "${CERT_DIR}/private/"*.key "${CERT_DIR}/private/"*.pem
+rm -rf "${CERT_DIR}/certs/"*
+rm -rf "${CERT_DIR}/private/"*
 echo "Certificate directories cleaned."
 
 echo "===== Certificate Renewal Process Started ====="
