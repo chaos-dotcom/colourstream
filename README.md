@@ -212,12 +212,9 @@ rather than setting separate records for each subdomain.
 git clone https://github.com/johnr24/colourstream.git
 cd colourstream
 
-
 # Setup firewall rules
 cd setup
-chmod +x ./setup_ufw_rules.sh
-chmod +x ./renew_certificates.sh
-chmod +x ./dumpcerts.traefik.v2.sh
+chmod +x ./setup/*.sh
 ./setup_ufw_rules.sh
 cd ..
 
@@ -231,7 +228,6 @@ docker compose up -d
 
 ## Please note that you may need to quit out of this docker compose command using ctrl+c and then move to the next step.
 
-}
 # Setup certificate renewal
 cd setup
 ./renew_certificates.sh
