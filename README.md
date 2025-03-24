@@ -229,6 +229,9 @@ chmod +x ./setup-ghcr.sh
 # Start the to spawn certs
 docker compose up -d 
 
+## Please note that you may need to quit out of this docker compose command using ctrl+c and then move to the next step.
+
+}
 # Setup certificate renewal
 cd setup
 ./renew_certificates.sh
