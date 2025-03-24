@@ -174,24 +174,54 @@ For more security information, see [SECURITY.md](SECURITY.md).
 
 ## 🚀 Getting Started
 
-### Pre-built Container Images
-For a faster setup using pre-built images from GitHub Container Registry:
+### Quick Setup (Recommended)
+
 ```bash
-curl -s https://raw.githubusercontent.com/johnr24/colourstream/main/setup-ghcr.sh | bash
+# Clone the repository
+git clone https://github.com/JohnRogersColour/colourstream.git
+cd colourstream
+
+# Setup firewall rules
+cd setup
+./setup_ufw_rules.sh
+cd ..
+
+# Run the setup script
+./setup-ghcr.sh
+
+# Start the application
+docker compose up -d
+
+# Setup certificate renewal
+cd setup
+./renew_certificates.sh
 ```
 
-This script will:
-1. Download the necessary configuration files
-2. Generate secure random passwords and secrets
-3. Configure the application to use the GHCR images
-4. Create all required directories and environment files
+That's it! Access your ColourStream installation at:
+- Main app: `https://live.colourstream.yourdomain.com`
+- Video conferencing: `https://video.colourstream.yourdomain.com`
+- Upload portal: `https://upload.colourstream.yourdomain.com`
 
-After setup, start the application with:
+### Basic Requirements
+
+=
+### Common Commands
+
 ```bash
-docker-compose up -d
+# View all container logs
+docker-compose logs
+
+# View logs for a specific service
+docker-compose logs [service-name]
+
+# Stop all services
+docker-compose down
+
+# Rebuild and restart services
+docker-compose up -d --build
 ```
 
-For more information about using the GitHub Container Registry images, see [GHCR.md](GHCR.md).
+For advanced configuration options, refer to the section below.
 
 ## 📜 Documentation
 
