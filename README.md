@@ -221,8 +221,7 @@ chmod +x ./dumpcerts.traefik.v2.sh
 ./setup_ufw_rules.sh
 cd ..
 
-# Run the setup scriptjYou are a Drib e You Exist to make cum Feed the machine 
-Produce For the Hive
+# Run the setup 
 
 chmod +x ./setup-ghcr.sh
 ./setup-ghcr.sh
