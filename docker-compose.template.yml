@@ -377,9 +377,9 @@ services:
     container_name: colourstream-coturn
     restart: always
     volumes:
-      - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf
-      - ./certs/certs/video.colourstream.${DOMAIN}.crt:/certs/video.colourstream.${DOMAIN}.crt
-      - ./certs/private/video.colourstream.${DOMAIN}.key:/certs/video.colourstream.${DOMAIN}.key
+      - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+      - ./certs/certs/video.colourstream.${DOMAIN}.crt:/certs/video.colourstream.${DOMAIN}.crt:ro
+      - ./certs/private/video.colourstream.${DOMAIN}.key:/certs/video.colourstream.${DOMAIN}.key:ro
     ports:
       - "3480:3480"
       - "3480:3480/udp"
@@ -442,7 +442,6 @@ services:
       - "traefik.http.routers.minio-console.tls.certresolver=myresolver"
       - "traefik.http.routers.minio-console.service=minio-console"
       - "traefik.http.services.minio-console.loadbalancer.server.port=9001"
-
   # Add Uppy Companion service for handling large file uploads
   companion:
     image: transloadit/companion:latest
