@@ -214,7 +214,9 @@ cd colourstream
 
 # Setup firewall rules
 cd setup
+# This will make the setup scripts executable
 chmod +x ./setup/*.sh
+# This will setup the ufw rules for the server.
 ./setup_ufw_rules.sh
 cd ..
 
