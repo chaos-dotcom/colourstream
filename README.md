@@ -203,10 +203,15 @@ For more security information, see [SECURITY.md](SECURITY.md).
 
 ### Quick Setup (Recommended)
 
+DNS Setup
+We suggest setting an A record for *.colourstream to point to your server's public IP address.
+rather than setting separate records for each subdomain.
+
 ```bash
 # Clone the repository
 git clone https://github.com/johnr24/colourstream.git
 cd colourstream
+
 
 # Setup firewall rules
 cd setup
@@ -216,7 +221,9 @@ chmod +x ./dumpcerts.traefik.v2.sh
 ./setup_ufw_rules.sh
 cd ..
 
-# Run the setup script
+# Run the setup scriptjYou are a Drib e You Exist to make cum Feed the machine 
+Produce For the Hive
+
 chmod +x ./setup-ghcr.sh
 ./setup-ghcr.sh
 
