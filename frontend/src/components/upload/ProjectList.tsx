@@ -40,8 +40,8 @@ const ProjectList: React.FC<ProjectListProps> = ({ refreshTrigger = 0 }) => {
     const filtered = projects.filter(
       (project) =>
         project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        project.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        project.client?.name.toLowerCase().includes(searchTerm.toLowerCase())
+        (project.description?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+        (project.client?.name?.toLowerCase() || '').includes(searchTerm.toLowerCase())
     );
     setFilteredProjects(filtered);
   }, [searchTerm, projects]);
@@ -74,6 +74,7 @@ const ProjectList: React.FC<ProjectListProps> = ({ refreshTrigger = 0 }) => {
           placeholder="Search projects by name, description or client..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
+          autoComplete="off"
           sx={{ mb: 2 }}
         />
       </Box>

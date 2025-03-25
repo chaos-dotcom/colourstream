@@ -22,12 +22,14 @@ import {
   TextField,
   Alert,
   Stack,
-  InputAdornment
+  InputAdornment,
+  InputBase
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import SearchIcon from '@mui/icons-material/Search';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
@@ -72,11 +74,23 @@ const gdsStyles = {
     '&:hover': {
       bgcolor: '#b13118'
     }
+  },
+  searchBox: {
+    display: 'flex',
+    alignItems: 'center',
+    padding: '8px 12px',
+    backgroundColor: '#f8f8f8',
+    borderRadius: '4px',
+    marginBottom: 3,
+    width: '100%',
+    border: '1px solid #E4E4E7',
   }
 };
 
 const AllUploadLinks: React.FC = () => {
   const [uploadLinks, setUploadLinks] = useState<UploadLink[]>([]);
+  const [filteredLinks, setFilteredLinks] = useState<UploadLink[]>([]);
+  const [searchTerm, setSearchTerm] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
@@ -137,6 +151,7 @@ const AllUploadLinks: React.FC = () => {
         
         if (response.status === 'success') {
           setUploadLinks(response.data || []);
+          setFilteredLinks(response.data || []);
           console.log('Links loaded:', response.data?.length || 0);
         } else {
           console.error('API returned error status:', response.status, response.message);
@@ -152,6 +167,28 @@ const AllUploadLinks: React.FC = () => {
     
     fetchUploadLinks();
   }, [refreshTrigger]);
+  
+  // Filter upload links when search term changes
+  useEffect(() => {
+    if (searchTerm.trim() === '') {
+      setFilteredLinks(uploadLinks);
+      return;
+    }
+    
+    const lowerSearchTerm = searchTerm.toLowerCase();
+    const filtered = uploadLinks.filter(link => {
+      return (
+        // Search in client name
+        (link.project?.client?.name?.toLowerCase().includes(lowerSearchTerm) || false) ||
+        // Search in project name
+        (link.project?.name?.toLowerCase().includes(lowerSearchTerm) || false) ||
+        // Search in token
+        link.token.toLowerCase().includes(lowerSearchTerm)
+      );
+    });
+    
+    setFilteredLinks(filtered);
+  }, [searchTerm, uploadLinks]);
   
   // Copy upload link to clipboard
   const handleCopyLink = (token: string) => {
@@ -293,14 +330,27 @@ const AllUploadLinks: React.FC = () => {
         </Alert>
       )}
       
+      {/* Search box */}
+      <Box sx={gdsStyles.searchBox}>
+        <SearchIcon sx={{ color: 'action.active', mr: 1 }} />
+        <InputBase
+          placeholder="Search by client, project, or token..."
+          fullWidth
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </Box>
+      
       <Paper sx={gdsStyles.card}>
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
             <CircularProgress />
           </Box>
-        ) : uploadLinks.length === 0 ? (
+        ) : filteredLinks.length === 0 ? (
           <Box sx={{ p: 4 }}>
-            <Typography>No upload links found.</Typography>
+            <Typography>
+              {searchTerm ? "No upload links match your search." : "No upload links found."}
+            </Typography>
           </Box>
         ) : (
           <TableContainer>
@@ -317,7 +367,7 @@ const AllUploadLinks: React.FC = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {uploadLinks.map((link) => (
+                {filteredLinks.map((link) => (
                   <TableRow key={link.id}>
                     <TableCell>
                       {link.project?.client?.name || 'Unknown Client'}
