@@ -36,6 +36,7 @@ import { format, parseISO, isAfter } from 'date-fns';
 import { UploadLink } from '../../types/upload';
 import { getAllUploadLinks, deleteUploadLink, updateUploadLink } from '../../services/uploadService';
 import { useSnackbar } from 'notistack';
+import { API_URL } from '../../config';
 
 // Define component styles based on GDS styling
 const gdsStyles = {
@@ -93,6 +94,19 @@ const AllUploadLinks: React.FC = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false);
   const [deleteLoading, setDeleteLoading] = useState<boolean>(false);
   
+  // Log authentication status when component mounts
+  useEffect(() => {
+    const adminToken = localStorage.getItem('adminToken');
+    const isAuthenticated = localStorage.getItem('isAdminAuthenticated');
+    console.log('Authentication status in AllUploadLinks:', { 
+      isAuthenticated: Boolean(isAuthenticated), 
+      hasToken: Boolean(adminToken),
+      tokenLength: adminToken ? adminToken.length : 0,
+      tokenPrefix: adminToken ? adminToken.substring(0, 10) + '...' : null,
+      apiUrl: API_URL
+    });
+  }, []);
+  
   // Fetch all upload links
   useEffect(() => {
     const fetchUploadLinks = async () => {
@@ -100,6 +114,24 @@ const AllUploadLinks: React.FC = () => {
       setError(null);
       try {
         console.log('Fetching upload links...');
+        // Fetch directly with fetch API for debugging
+        const adminToken = localStorage.getItem('adminToken');
+        
+        console.log('Making direct fetch request to:', `${API_URL}/upload/upload-links-all`);
+        const directResponse = await fetch(`${API_URL}/upload/upload-links-all`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${adminToken}`,
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include'
+        });
+        
+        console.log('Direct fetch response status:', directResponse.status);
+        const directData = await directResponse.json();
+        console.log('Direct fetch response data:', directData);
+        
+        // Also try the regular API call
         const response = await getAllUploadLinks();
         console.log('API response:', response);
         

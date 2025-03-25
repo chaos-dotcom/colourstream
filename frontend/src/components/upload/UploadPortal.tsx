@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Routes, Route, Link as RouterLink } from 'react-router-dom';
 import {
   Box,
@@ -17,11 +17,24 @@ import ProjectList from './ProjectList';
 import CreateClientForm from './CreateClientForm';
 import ClientDetails from './ClientDetails';
 import ProjectDetails from './ProjectDetails';
+import AllUploadLinks from './AllUploadLinks';
 
 // Main container for the upload portal admin interface
 const UploadPortal: React.FC = () => {
   const [clientRefreshTrigger, setClientRefreshTrigger] = useState(0);
   const [projectRefreshTrigger, setProjectRefreshTrigger] = useState(0);
+
+  // Log authentication status when component mounts
+  useEffect(() => {
+    const adminToken = localStorage.getItem('adminToken');
+    const isAuthenticated = localStorage.getItem('isAdminAuthenticated');
+    console.log('Authentication status in UploadPortal:', { 
+      isAuthenticated: Boolean(isAuthenticated), 
+      hasToken: Boolean(adminToken),
+      tokenLength: adminToken ? adminToken.length : 0,
+      tokenPrefix: adminToken ? adminToken.substring(0, 10) + '...' : null
+    });
+  }, []);
 
   const handleClientCreated = () => {
     // Increment the refresh trigger to cause ClientList to re-fetch data
@@ -42,6 +55,9 @@ const UploadPortal: React.FC = () => {
           </Button>
           <Button color="inherit" component={RouterLink} to="/upload/projects">
             Projects
+          </Button>
+          <Button color="inherit" component={RouterLink} to="/upload/upload-links">
+            Upload Links
           </Button>
         </Toolbar>
       </AppBar>
@@ -74,6 +90,19 @@ const UploadPortal: React.FC = () => {
                   </Breadcrumbs>
                 </Box>
                 <ProjectList refreshTrigger={projectRefreshTrigger} />
+              </>
+            }
+          />
+          <Route
+            path="/upload-links"
+            element={
+              <>
+                <Box mb={4}>
+                  <Breadcrumbs>
+                    <Typography color="text.primary">Upload Links</Typography>
+                  </Breadcrumbs>
+                </Box>
+                <AllUploadLinks />
               </>
             }
           />

@@ -99,7 +99,7 @@ export const updateUploadLink = async (
 
 export const getAllUploadLinks = async (): Promise<ApiResponse<UploadLink[]>> => {
   try {
-    const response = await api.get('/upload/upload-links/all');
+    const response = await api.get('/upload/upload-links-all');
     return response.data;
   } catch (error: any) {
     console.error('Error fetching upload links:', error);
