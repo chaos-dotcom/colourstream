@@ -39,6 +39,11 @@ export const getClientProjects = async (clientId: string): Promise<ApiResponse<P
   return response.data;
 };
 
+export const getAllProjects = async (): Promise<ApiResponse<Project[]>> => {
+  const response = await api.get('/upload/projects');
+  return response.data;
+};
+
 export const createProject = async (
   clientId: string,
   data: CreateProjectRequest

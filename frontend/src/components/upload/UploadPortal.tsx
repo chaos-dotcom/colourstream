@@ -13,6 +13,7 @@ import {
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import ClientList from './ClientList';
+import ProjectList from './ProjectList';
 import CreateClientForm from './CreateClientForm';
 import ClientDetails from './ClientDetails';
 import ProjectDetails from './ProjectDetails';
@@ -20,10 +21,13 @@ import ProjectDetails from './ProjectDetails';
 // Main container for the upload portal admin interface
 const UploadPortal: React.FC = () => {
   const [clientRefreshTrigger, setClientRefreshTrigger] = useState(0);
+  const [projectRefreshTrigger, setProjectRefreshTrigger] = useState(0);
 
   const handleClientCreated = () => {
     // Increment the refresh trigger to cause ClientList to re-fetch data
     setClientRefreshTrigger(prev => prev + 1);
+    // Also refresh projects as a new client may impact projects view
+    setProjectRefreshTrigger(prev => prev + 1);
   };
 
   return (
@@ -35,6 +39,9 @@ const UploadPortal: React.FC = () => {
           </Typography>
           <Button color="inherit" component={RouterLink} to="/upload">
             Clients
+          </Button>
+          <Button color="inherit" component={RouterLink} to="/upload/projects">
+            Projects
           </Button>
         </Toolbar>
       </AppBar>
@@ -54,6 +61,19 @@ const UploadPortal: React.FC = () => {
                   <CreateClientForm onSuccess={handleClientCreated} />
                 </Box>
                 <ClientList refreshTrigger={clientRefreshTrigger} />
+              </>
+            }
+          />
+          <Route
+            path="/projects"
+            element={
+              <>
+                <Box mb={4}>
+                  <Breadcrumbs>
+                    <Typography color="text.primary">Projects</Typography>
+                  </Breadcrumbs>
+                </Box>
+                <ProjectList refreshTrigger={projectRefreshTrigger} />
               </>
             }
           />
@@ -79,8 +99,8 @@ const UploadPortal: React.FC = () => {
               <>
                 <Box mb={4}>
                   <Breadcrumbs>
-                    <Link component={RouterLink} to="/upload">
-                      Clients
+                    <Link component={RouterLink} to="/upload/projects">
+                      Projects
                     </Link>
                     <Typography color="text.primary">Project Details</Typography>
                   </Breadcrumbs>

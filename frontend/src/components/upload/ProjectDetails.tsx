@@ -482,6 +482,13 @@ const ProjectDetails: React.FC = () => {
             >
               Back to Client
             </Button>
+            <Button
+              component={RouterLink}
+              to="/upload/projects"
+              sx={{...gdsStyles.secondaryButton, ml: 2}}
+            >
+              Back to Projects
+            </Button>
           </Box>
         </Box>
       </Paper>

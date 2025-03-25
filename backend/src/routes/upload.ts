@@ -235,6 +235,28 @@ router.get('/clients/:clientId/projects', authenticateToken, async (req: Request
   }
 });
 
+// Get all projects regardless of client
+router.get('/projects', authenticateToken, async (_req: Request, res: Response) => {
+  try {
+    const projects = await prisma.project.findMany({
+      include: {
+        client: true,
+        uploadLinks: true,
+        files: true,
+      }
+    });
+    res.json({
+      status: 'success',
+      data: projects
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      status: 'error',
+      message: 'Failed to fetch projects'
+    });
+  }
+});
+
 // Create an upload link for a project
 router.post('/projects/:projectId/upload-links', authenticateToken, async (req: Request, res: Response) => {
   try {
