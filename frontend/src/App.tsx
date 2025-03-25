@@ -17,12 +17,10 @@ import OIDCCallback from './components/OIDCCallback';
 import PasskeySetupPage from './components/PasskeySetupPage';
 import UploadPortal from './components/upload/UploadPortal';
 import ClientUploadPortal from './pages/UploadPortal';
-import AllUploadLinks from './pages/AllUploadLinks';
 import About from './pages/About';
 import License from './pages/License';
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
-import DropzoneTestPage from './pages/DropzoneTestPage';
 
 // Debug component to verify rendering
 const DebugAdminLoginPage = () => {
@@ -44,8 +42,6 @@ function App() {
         <Router>
           <Routes>
             <Route path="/portal/:token" element={<ClientUploadPortal />} />
-            <Route path="/dropzone/:token" element={<DropzoneTestPage />} />
-            <Route path="/dropzone" element={<DropzoneTestPage />} />
             <Route path="/" element={<Navigate to="/portal" replace />} />
             <Route path="/portal" element={<Navigate to="/portal/" replace />} />
             <Route path="*" element={<Navigate to="/portal" replace />} />
@@ -90,7 +86,7 @@ function App() {
             <Route
               path="/admin/dashboard"
               element={
-                <GovUkLayout serviceName="ColourStream">
+                <GovUkLayout serviceName="ColourStream" isAdminPage={true}>
                   <ProtectedRoute>
                     <RequirePasskey>
                       <AdminDashboard />
@@ -102,7 +98,7 @@ function App() {
             <Route
               path="/admin/setup-passkey"
               element={
-                <GovUkLayout serviceName="ColourStream">
+                <GovUkLayout serviceName="ColourStream" isAdminPage={true}>
                   <ProtectedRoute>
                     <PasskeySetupPage />
                   </ProtectedRoute>
@@ -123,24 +119,10 @@ function App() {
             <Route
               path="/upload/*"
               element={
-                <GovUkLayout serviceName="ColourStream">
+                <GovUkLayout serviceName="ColourStream" isAdminPage={true}>
                   <ProtectedRoute>
                     <RequirePasskey>
                       <UploadPortal />
-                    </RequirePasskey>
-                  </ProtectedRoute>
-                </GovUkLayout>
-              }
-            />
-            
-            {/* All Upload Links Route */}
-            <Route
-              path="/upload-links"
-              element={
-                <GovUkLayout serviceName="ColourStream">
-                  <ProtectedRoute>
-                    <RequirePasskey>
-                      <AllUploadLinks />
                     </RequirePasskey>
                   </ProtectedRoute>
                 </GovUkLayout>

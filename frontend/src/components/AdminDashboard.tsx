@@ -41,10 +41,6 @@ import RoomManagement from './rooms/RoomManagement';
 import IPSecurity from './security/IPSecurity';
 import PasskeyManagement from './security/PasskeyManagement';
 import { OvenMediaConfig } from './OvenMediaConfig';
-import ClientList from './upload/ClientList';
-import CreateClientForm from './upload/CreateClientForm';
-import ProjectDetails from './upload/ProjectDetails';
-import AllUploadLinks from '../pages/AllUploadLinks';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -91,7 +87,6 @@ const AdminDashboard: React.FC = () => {
   const [isGeneratingToken, setIsGeneratingToken] = useState(false);
   const [value, setValue] = useState(0);
   const [stoppingStream, setStoppingStream] = useState(false);
-  const [forceClientListRefresh, setForceClientListRefresh] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -184,8 +179,17 @@ const AdminDashboard: React.FC = () => {
             <Tab label="OBS" {...a11yProps(1)} />
             <Tab label="Security" {...a11yProps(2)} />
             <Tab label="Settings" {...a11yProps(3)} />
-            <Tab label="Upload Clients" {...a11yProps(4)} />
-            <Tab label="All Upload Links" {...a11yProps(5)} />
+            <Tab 
+              label="Upload Clients" 
+              component={RouterLink}
+              to="/upload"
+              onClick={(e) => {
+                // Prevent the tab from being selected in the Tabs component
+                e.preventDefault();
+                // Navigate to the upload page
+                navigate('/upload');
+              }}
+            />
           </Tabs>
         </Box>
         <Box sx={{ padding: 2, display: 'flex', justifyContent: 'flex-end' }}>
@@ -251,35 +255,6 @@ const AdminDashboard: React.FC = () => {
             Oven Media Configuration
           </Typography>
           <OvenMediaConfig />
-        </TabPanel>
-
-        <TabPanel value={value} index={4}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="h6">Upload Clients</Typography>
-              <Button 
-                component={RouterLink} 
-                to="/upload-links" 
-                variant="contained" 
-                color="primary"
-                startIcon={<OpenInNew />}
-              >
-                View All Upload Links
-              </Button>
-            </Box>
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <CreateClientForm onSuccess={() => {
-                // Trigger a refresh of the client list using refreshTrigger
-                setForceClientListRefresh(prev => prev + 1);
-                console.log('Client created successfully');
-              }} />
-            </Box>
-            <ClientList refreshTrigger={forceClientListRefresh} />
-          </Box>
-        </TabPanel>
-
-        <TabPanel value={value} index={5}>
-          <AllUploadLinks />
         </TabPanel>
       </Box>
 

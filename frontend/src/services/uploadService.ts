@@ -9,6 +9,8 @@ import {
   CreateUploadLinkRequest,
 } from '../types/upload';
 import { api } from '../utils/api';
+import { API_URL } from '../config';
+import axios from 'axios';
 
 // Client Management
 export const getClients = async (): Promise<ApiResponse<Client[]>> => {
@@ -84,15 +86,24 @@ export const deleteUploadLink = async (linkId: string): Promise<ApiResponse<void
 
 export const updateUploadLink = async (
   linkId: string,
-  data: { expiresAt?: string; maxUses?: number }
+  data: { expiresAt?: string; maxUses?: number | null }
 ): Promise<ApiResponse<UploadLink>> => {
   const response = await api.put(`/upload/upload-links/${linkId}`, data);
   return response.data;
 };
 
 export const getAllUploadLinks = async (): Promise<ApiResponse<UploadLink[]>> => {
-  const response = await api.get('/upload/upload-links/all');
-  return response.data;
+  try {
+    const response = await api.get('/upload/upload-links/all');
+    return response.data;
+  } catch (error: any) {
+    console.error('Error fetching upload links:', error);
+    return {
+      status: 'error',
+      message: error.response?.data?.message || 'Failed to fetch upload links',
+      data: [] as UploadLink[]
+    };
+  }
 };
 
 // File Management

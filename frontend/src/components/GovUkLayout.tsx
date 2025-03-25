@@ -36,9 +36,10 @@ const StyledFooter = styled(Box)(() => ({
 interface GovUkLayoutProps {
   children: ReactNode;
   serviceName?: string;
+  isAdminPage?: boolean;
 }
 
-const GovUkLayout: React.FC<GovUkLayoutProps> = ({ children, serviceName = 'ColourStream' }) => {
+const GovUkLayout: React.FC<GovUkLayoutProps> = ({ children, serviceName = 'ColourStream', isAdminPage = false }) => {
   const [accentColor, setAccentColor] = useState('#1d70b8');
 
   useEffect(() => {
@@ -73,6 +74,26 @@ const GovUkLayout: React.FC<GovUkLayoutProps> = ({ children, serviceName = 'Colo
             </Link>
           </Box>
           <Box sx={{ flexGrow: 1 }} />
+          {isAdminPage && (
+            <Link 
+              href="/admin/dashboard" 
+              color="inherit" 
+              underline="none" 
+              sx={{ 
+                display: 'flex', 
+                alignItems: 'center',
+                fontSize: '1rem',
+                fontWeight: 400,
+                padding: '8px 16px',
+                '&:hover': {
+                  textDecoration: 'underline',
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                }
+              }}
+            >
+              Back to Admin Dashboard
+            </Link>
+          )}
           <Box sx={{ height: '8px', width: '100%', position: 'absolute', bottom: 0, left: 0, backgroundColor: accentColor }} />
         </Toolbar>
       </StyledAppBar>

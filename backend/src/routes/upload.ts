@@ -906,8 +906,15 @@ router.put('/upload-links/:linkId', authenticateToken, async (req: Request, res:
 });
 
 // Get all upload links with client and project information
-router.get('/upload-links/all', authenticateToken, async (_req: Request, res: Response) => {
+router.get('/upload-links/all', authenticateToken, async (req: Request, res: Response) => {
   try {
+    console.log('GET /upload-links/all - Request received');
+    console.log('User ID from auth token:', req.user?.userId);
+    
+    // Check if we have upload links in the database
+    const count = await prisma.uploadLink.count();
+    console.log(`Total upload links in database: ${count}`);
+    
     const uploadLinks = await prisma.uploadLink.findMany({
       include: {
         project: {
@@ -920,6 +927,9 @@ router.get('/upload-links/all', authenticateToken, async (_req: Request, res: Re
         { createdAt: 'desc' }
       ]
     });
+    
+    console.log(`Found ${uploadLinks.length} upload links`);
+    console.log('Upload links:', JSON.stringify(uploadLinks, null, 2));
     
     res.json({
       status: 'success',
