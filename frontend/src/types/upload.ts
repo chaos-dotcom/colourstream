@@ -61,6 +61,7 @@ export interface CreateUploadLinkRequest {
   projectId: string;
   expiresAt: string;
   usageLimit?: number;
+  token?: string;
 }
 
 export interface FileStats {

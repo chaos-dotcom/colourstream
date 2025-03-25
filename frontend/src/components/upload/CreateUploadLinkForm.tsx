@@ -8,7 +8,11 @@ import {
   CircularProgress,
   Alert,
   Stack,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DateTimePicker } from '@mui/x-date-pickers';
 import { createUploadLink } from '../../services/uploadService';
@@ -29,6 +33,7 @@ const CreateUploadLinkForm: React.FC<CreateUploadLinkFormProps> = ({
     new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // Default to 7 days from now
   );
   const [usageLimit, setUsageLimit] = useState<string>('');
+  const [customToken, setCustomToken] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,6 +66,11 @@ const CreateUploadLinkForm: React.FC<CreateUploadLinkFormProps> = ({
       expiresAt: expiresAt!.toISOString(),
       usageLimit: usageLimit ? parseInt(usageLimit, 10) : undefined,
     };
+
+    // Add custom token if provided
+    if (customToken.trim()) {
+      formData.token = customToken.trim();
+    }
 
     setLoading(true);
     try {
@@ -116,6 +126,31 @@ const CreateUploadLinkForm: React.FC<CreateUploadLinkFormProps> = ({
           helperText="Leave empty for unlimited uses"
           inputProps={{ min: 1 }}
         />
+
+        <Accordion sx={{ mt: 2, mb: 2, boxShadow: 'none', '&:before': { display: 'none' } }}>
+          <AccordionSummary
+            expandIcon={<ExpandMoreIcon />}
+            aria-controls="advanced-settings-content"
+            id="advanced-settings-header"
+            sx={{ 
+              bgcolor: 'background.default',
+              borderRadius: 1,
+              pl: 1
+            }}
+          >
+            <Typography>Advanced Settings</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <TextField
+              fullWidth
+              label="Custom Token (Optional)"
+              value={customToken}
+              onChange={(e) => setCustomToken(e.target.value)}
+              margin="normal"
+              helperText="Specify a custom token for this upload link"
+            />
+          </AccordionDetails>
+        </Accordion>
 
         <Stack direction="row" spacing={2} mt={2}>
           <Button

@@ -239,14 +239,17 @@ router.get('/clients/:clientId/projects', authenticateToken, async (req: Request
 router.post('/projects/:projectId/upload-links', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { projectId } = req.params;
-    const { expiresAt, usageLimit } = req.body;
+    const { expiresAt, usageLimit, token } = req.body;
     
     // If usageLimit is undefined or null, explicitly set maxUses to null to override the default
     const maxUses = usageLimit === undefined || usageLimit === null ? null : usageLimit;
     
+    // Use provided token or generate a new one
+    const uploadToken = token || generateUploadToken();
+    
     const uploadLink = await prisma.uploadLink.create({
       data: {
-        token: generateUploadToken(),
+        token: uploadToken,
         projectId,
         expiresAt: new Date(expiresAt),
         maxUses,
