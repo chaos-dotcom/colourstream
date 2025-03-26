@@ -27,6 +27,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Get git tag
+      - name: Get git tag
+        id: get_tag
+        run: |
+          if [ ${{ github.ref }} = refs/heads/main ]; then
+            echo "tag=$(git describe --tags --abbrev=0 2>/dev/null || echo 'dev')" >> $GITHUB_OUTPUT
+          else
+            echo "tag=$(git describe --tags --abbrev=0 2>/dev/null || echo 'dev')" >> $GITHUB_OUTPUT
+          fi
+
       # Set up QEMU for multi-architecture builds
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -77,6 +87,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta-frontend.outputs.tags }}
           labels: ${{ steps.meta-frontend.outputs.labels }}
+          build-args: |
+            REACT_APP_GIT_TAG=${{ steps.get_tag.outputs.tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

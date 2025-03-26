@@ -20,6 +20,8 @@ COPY . .
 
 # Set environment variables for build
 ENV NODE_ENV=production
+ARG REACT_APP_GIT_TAG
+ENV REACT_APP_GIT_TAG=$REACT_APP_GIT_TAG
 
 # Build the app with default/placeholder values
 RUN npm run build

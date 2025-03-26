@@ -41,11 +41,16 @@ interface GovUkLayoutProps {
 
 const GovUkLayout: React.FC<GovUkLayoutProps> = ({ children, serviceName = 'ColourStream', isAdminPage = false }) => {
   const [accentColor, setAccentColor] = useState('#1d70b8');
+  const [gitTag, setGitTag] = useState<string>('');
 
   useEffect(() => {
     // Select a random accent color on component mount
     const randomColor = accentColors[Math.floor(Math.random() * accentColors.length)];
     setAccentColor(randomColor);
+
+    // Fetch git tag from environment variable
+    const tag = process.env.REACT_APP_GIT_TAG || 'dev';
+    setGitTag(tag);
   }, []);
 
   return (
@@ -66,7 +71,12 @@ const GovUkLayout: React.FC<GovUkLayoutProps> = ({ children, serviceName = 'Colo
         </Box>
         <Toolbar>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Link href="/" color="inherit" underline="none" sx={{ display: 'flex', alignItems: 'center' }}>
+            <Link 
+              href={isAdminPage ? "/admin/dashboard" : "/"} 
+              color="inherit" 
+              underline="none" 
+              sx={{ display: 'flex', alignItems: 'center' }}
+            >
               <RainbowFlag />
               <Typography variant="h6" component="span" sx={{ fontWeight: 700, fontSize: '1.125rem' }}>
                 {serviceName}
@@ -107,7 +117,10 @@ const GovUkLayout: React.FC<GovUkLayoutProps> = ({ children, serviceName = 'Colo
           <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between' }}>
             <Box sx={{ mb: { xs: 2, md: 0 } }}>
               <Typography variant="body2" color="text.secondary" gutterBottom>
-                © Pride copyright
+                © ColourStream copyright
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                Version: {gitTag}
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                 All content is licensed under the{' '}
