@@ -427,6 +427,7 @@ services:
       - "traefik.http.routers.minio-api.rule=Host(`s3.colourstream.${DOMAIN}`)"
       - "traefik.http.routers.minio-api.entrypoints=websecure"
       - "traefik.http.routers.minio-api.tls=true"
+      - "traefik.http.routers.minio-api.tls.certresolver=myresolver" # Add cert resolver
       - "traefik.http.routers.minio-api.service=minio-api"
       - "traefik.http.services.minio-api.loadbalancer.server.port=9000"
       - "traefik.http.middlewares.minio-cors-headers.headers.accesscontrolallowheaders=*"
