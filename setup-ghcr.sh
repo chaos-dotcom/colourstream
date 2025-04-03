@@ -183,51 +183,51 @@ process_template() {
   cp "$template_file" "$output_file"
   
   # Replace placeholders with values - Ubuntu compatible sed
-  sed -i "s|\${DOMAIN}|${domain_name}|g" "$output_file"
-  sed -i "s|example.com|${domain_name}|g" "$output_file"
-  sed -i "s|\${ADMIN_EMAIL}|${admin_email}|g" "$output_file"
-  sed -i "s|your_secure_password_here|${db_password}|g" "$output_file"
-  sed -i "s|DB_PASSWORD=your_secure_password_here|DB_PASSWORD=${db_password}|g" "$output_file"
-  sed -i "s|POSTGRES_PASSWORD=your_secure_password_here|POSTGRES_PASSWORD=${db_password}|g" "$output_file"
-  sed -i "s|your_jwt_key_here|${jwt_key}|g" "$output_file"
-  sed -i "s|your_jwt_secret_here|${jwt_secret}|g" "$output_file"
-  sed -i "s|your_admin_password_here|${admin_password}|g" "$output_file"
-  sed -i "s|your_admin_auth_secret_here|${admin_auth_secret}|g" "$output_file"
-  sed -i "s|your_mirotalk_api_key_here|${mirotalk_api_key}|g" "$output_file"
-  sed -i "s|your_mirotalk_api_key_secret_here|${mirotalk_api_key}|g" "$output_file"
-  sed -i "s|your_mirotalk_password_here|${admin_password}|g" "$output_file"  
-  sed -i "s|your_turn_server_credential_here|${turn_password}|g" "$output_file"
-  sed -i "s|your_turn_credential_here|${turn_password}|g" "$output_file"
-  sed -i "s|your_ome_api_token_here|${ome_api_token}|g" "$output_file"
-  sed -i "s|your_ome_webhook_secret_here|${ome_webhook_secret}|g" "$output_file"
-  sed -i "s|your_minio_root_user_here|${minio_root_user}|g" "$output_file"
-  sed -i "s|your_minio_root_password_here|${minio_root_password}|g" "$output_file"
+  sed -i.bak "s|\${DOMAIN}|${domain_name}|g" "$output_file" && rm "${output_file}.bak"
+  sed -i.bak "s|example.com|${domain_name}|g" "$output_file" && rm "${output_file}.bak"
+  sed -i.bak "s|\${ADMIN_EMAIL}|${admin_email}|g" "$output_file" && rm "${output_file}.bak"
+  sed -i.bak "s|your_secure_password_here|${db_password}|g" "$output_file" && rm "${output_file}.bak"
+  sed -i.bak "s|DB_PASSWORD=your_secure_password_here|DB_PASSWORD=${db_password}|g" "$output_file" && rm "${output_file}.bak"
+  sed -i.bak "s|POSTGRES_PASSWORD=your_secure_password_here|POSTGRES_PASSWORD=${db_password}|g" "$output_file" && rm "${output_file}.bak"
+  sed -i.bak "s|your_jwt_key_here|${jwt_key}|g" "$output_file" && rm "${output_file}.bak"
+  sed -i.bak "s|your_jwt_secret_here|${jwt_secret}|g" "$output_file" && rm "${output_file}.bak"
+  sed -i.bak "s|your_admin_password_here|${admin_password}|g" "$output_file" && rm "${output_file}.bak"
+  sed -i.bak "s|your_admin_auth_secret_here|${admin_auth_secret}|g" "$output_file" && rm "${output_file}.bak"
+  sed -i.bak "s|your_mirotalk_api_key_here|${mirotalk_api_key}|g" "$output_file" && rm "${output_file}.bak"
+  sed -i.bak "s|your_mirotalk_api_key_secret_here|${mirotalk_api_key}|g" "$output_file" && rm "${output_file}.bak"
+  sed -i.bak "s|your_mirotalk_password_here|${admin_password}|g" "$output_file" && rm "${output_file}.bak"
+  sed -i.bak "s|your_turn_server_credential_here|${turn_password}|g" "$output_file" && rm "${output_file}.bak"
+  sed -i.bak "s|your_turn_credential_here|${turn_password}|g" "$output_file" && rm "${output_file}.bak"
+  sed -i.bak "s|your_ome_api_token_here|${ome_api_token}|g" "$output_file" && rm "${output_file}.bak"
+  sed -i.bak "s|your_ome_webhook_secret_here|${ome_webhook_secret}|g" "$output_file" && rm "${output_file}.bak"
+  sed -i.bak "s|your_minio_root_user_here|${minio_root_user}|g" "$output_file" && rm "${output_file}.bak"
+  sed -i.bak "s|your_minio_root_password_here|${minio_root_password}|g" "$output_file" && rm "${output_file}.bak"
   
   # Replace values in HOST_USERS JSON object
-  sed -i "s|\"password\":\"your_admin_password_here\"|\"password\":\"${admin_password}\"|g" "$output_file"
+  sed -i.bak "s|\"password\":\"your_admin_password_here\"|\"password\":\"${admin_password}\"|g" "$output_file" && rm "${output_file}.bak"
 
   # Ensure DATABASE_URL is correctly set with the proper password
   if [[ "$output_file" == *"backend/.env"* ]]; then
     # Create a properly formatted DATABASE_URL with the correct password
     local db_url="postgresql://colourstream:${db_password}@colourstream-postgres:5432/colourstream"
-    sed -i "s|DATABASE_URL=.*|DATABASE_URL=${db_url}|g" "$output_file"
+    sed -i.bak "s|DATABASE_URL=.*|DATABASE_URL=${db_url}|g" "$output_file" && rm "${output_file}.bak"
     echo "✅ Set correct DATABASE_URL in backend/.env"
   fi
 
   # Replace any remaining ${VARIABLES} with their values
-  sed -i "s|\${DB_PASSWORD}|${db_password}|g" "$output_file"
-  sed -i "s|\${JWT_KEY}|${jwt_key}|g" "$output_file"
-  sed -i "s|\${JWT_SECRET}|${jwt_secret}|g" "$output_file"
-  sed -i "s|\${ADMIN_PASSWORD}|${admin_password}|g" "$output_file"
-  sed -i "s|\${ADMIN_AUTH_SECRET}|${admin_auth_secret}|g" "$output_file"
-  sed -i "s|\${MIROTALK_API_KEY}|${mirotalk_api_key}|g" "$output_file"
-  sed -i "s|\${MIROTALK_API_KEY_SECRET}|${mirotalk_api_key}|g" "$output_file"
-  sed -i "s|\${TURN_SERVER_CREDENTIAL}|${turn_password}|g" "$output_file"
-  sed -i "s|\${OME_API_ACCESS_TOKEN}|${ome_api_token}|g" "$output_file"
-  sed -i "s|\${OME_WEBHOOK_SECRET}|${ome_webhook_secret}|g" "$output_file"
-  sed -i "s|\${MINIO_ROOT_USER}|${minio_root_user}|g" "$output_file"
-  sed -i "s|\${MINIO_ROOT_PASSWORD}|${minio_root_password}|g" "$output_file"
-  sed -i "s|\${NAMEFORUPLOADCOMPLETION}|User|g" "$output_file"
+  sed -i.bak "s|\${DB_PASSWORD}|${db_password}|g" "$output_file" && rm "${output_file}.bak"
+  sed -i.bak "s|\${JWT_KEY}|${jwt_key}|g" "$output_file" && rm "${output_file}.bak"
+  sed -i.bak "s|\${JWT_SECRET}|${jwt_secret}|g" "$output_file" && rm "${output_file}.bak"
+  sed -i.bak "s|\${ADMIN_PASSWORD}|${admin_password}|g" "$output_file" && rm "${output_file}.bak"
+  sed -i.bak "s|\${ADMIN_AUTH_SECRET}|${admin_auth_secret}|g" "$output_file" && rm "${output_file}.bak"
+  sed -i.bak "s|\${MIROTALK_API_KEY}|${mirotalk_api_key}|g" "$output_file" && rm "${output_file}.bak"
+  sed -i.bak "s|\${MIROTALK_API_KEY_SECRET}|${mirotalk_api_key}|g" "$output_file" && rm "${output_file}.bak"
+  sed -i.bak "s|\${TURN_SERVER_CREDENTIAL}|${turn_password}|g" "$output_file" && rm "${output_file}.bak"
+  sed -i.bak "s|\${OME_API_ACCESS_TOKEN}|${ome_api_token}|g" "$output_file" && rm "${output_file}.bak"
+  sed -i.bak "s|\${OME_WEBHOOK_SECRET}|${ome_webhook_secret}|g" "$output_file" && rm "${output_file}.bak"
+  sed -i.bak "s|\${MINIO_ROOT_USER}|${minio_root_user}|g" "$output_file" && rm "${output_file}.bak"
+  sed -i.bak "s|\${MINIO_ROOT_PASSWORD}|${minio_root_password}|g" "$output_file" && rm "${output_file}.bak"
+  sed -i.bak "s|\${NAMEFORUPLOADCOMPLETION}|User|g" "$output_file" && rm "${output_file}.bak"
   
   # Set proper permissions
   chmod 600 "$output_file"
@@ -275,8 +275,10 @@ verify_configs() {
     echo "Fixing DATABASE_URL in backend/.env..."
     
     # Create a properly formatted DATABASE_URL with the correct password
-    local db_url="postgresql://colourstream:${main_db_password}@colourstream-postgres:5432/colourstream"
-    sed -i "s|DATABASE_URL=.*|DATABASE_URL=${db_url}|g" "backend/.env"
+    local db_url_raw="postgresql://colourstream:${main_db_password}@colourstream-postgres:5432/colourstream"
+    # Escape characters that might interfere with sed: / & |
+    local db_url_escaped=$(echo "$db_url_raw" | sed -e 's/[\/&|]/\\&/g')
+    sed -i.bak "s|DATABASE_URL=.*|DATABASE_URL=${db_url_escaped}|g" "backend/.env" && rm "backend/.env.bak"
     
     echo "✅ Fixed DATABASE_URL in backend/.env"
   else

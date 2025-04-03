@@ -330,16 +330,65 @@ const UploadPortal: React.FC = () => {
               setError(`Error uploading ${file?.name || 'unknown file'}: ${error?.message || 'Unknown error'}`);
             });
             
-            // Add specific logging for chunk uploads to debug performance
+            // --- Telegram Progress Reporting ---
+            // Store last reported percentage for throttling
+            const lastReportedPercent: { [key: string]: number } = {};
+            const PERCENTAGE_THROTTLE_THRESHOLD = 2; // Send update every 2% increase
+
             uppyInstance.on('upload-progress', (file, progress) => {
-              if (!file || !file.name) return;
-              if (progress.bytesTotal === null || progress.bytesUploaded === null) {
-                console.log(`Progress for ${file.name}: bytes information unavailable`);
+              // Ensure we have necessary data and avoid division by zero
+              if (!file || !file.id || !file.name || progress.bytesTotal === null || progress.bytesUploaded === null || progress.bytesTotal === 0) {
+                // console.log(`Progress for ${file?.name || 'unknown file'}: insufficient data`);
                 return;
               }
-              const percent = progress.bytesUploaded / progress.bytesTotal * 100;
-              console.log(`Progress for ${file.name}: ${percent.toFixed(2)}% (${progress.bytesUploaded}/${progress.bytesTotal})`);
+
+              const currentPercent = (progress.bytesUploaded / progress.bytesTotal * 100);
+              const lastPercent = lastReportedPercent[file.id] || 0;
+
+              // Throttle updates based on percentage increase
+              // Also send update if it's the first one (lastPercent === 0 and current > 0) or if it reaches 100%
+              const shouldUpdate = (currentPercent >= lastPercent + PERCENTAGE_THROTTLE_THRESHOLD) || (lastPercent === 0 && currentPercent > 0) || (currentPercent === 100 && lastPercent < 100);
+
+              if (!shouldUpdate) {
+                return;
+              }
+
+              // Update last reported percentage *before* sending async request
+              // This prevents rapid retries if the backend call fails immediately
+              lastReportedPercent[file.id] = currentPercent;
+
+              console.log(`Progress for ${file.name}: ${currentPercent.toFixed(2)}% (${progress.bytesUploaded}/${progress.bytesTotal}) - Sending update.`);
+
+              // Send progress update to backend
+              fetch(`${API_URL}/upload/progress/${token}`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  fileId: file.id,
+                  fileName: file.name,
+                  bytesUploaded: progress.bytesUploaded,
+                  bytesTotal: progress.bytesTotal,
+                  percentage: currentPercent, // Send the calculated percentage
+                  clientName: file.meta?.client || 'Unknown Client',
+                  projectName: file.meta?.project || 'Unknown Project',
+                })
+              })
+              .then(response => {
+                if (!response.ok) {
+                  console.warn(`Failed to send progress update for ${file.name}: ${response.status}`);
+                  // If sending failed, reset the last reported percent to allow retry on next significant progress event
+                  lastReportedPercent[file.id] = lastPercent;
+                }
+              })
+              .catch(error => {
+                console.error(`Error sending progress update for ${file.name}:`, error);
+                 // If sending failed, reset the last reported percent to allow retry on next significant progress event
+                lastReportedPercent[file.id] = lastPercent;
+              });
             });
+            // --- End Telegram Progress Reporting ---
             
             // Add error logging for debugging upload issues
             uppyInstance.on('error', (error: any) => {

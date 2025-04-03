@@ -129,7 +129,13 @@ export class TelegramBot {
       
       console.log(`[TELEGRAM-DEBUG] Deleted message ID for upload ${uploadId} from database`);
       return true;
-    } catch (error) {
+    } catch (error: any) { // Added :any type annotation
+      // Check if the error is the specific "Record to delete does not exist" error
+      if (error.code === 'P2025') {
+        console.log(`[TELEGRAM-DEBUG] Message ID for upload ${uploadId} already deleted or never existed.`);
+        return true; // Consider this a success as the record is gone
+      }
+      // Log other errors
       console.error(`[TELEGRAM-DEBUG] Error deleting message ID for upload ${uploadId}:`, error);
       return false;
     }

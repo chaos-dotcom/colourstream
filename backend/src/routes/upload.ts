@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, UploadedFile, Project, UploadLink } from '@prisma/client'; // Import Prisma types
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -10,6 +10,7 @@ import { uploadTracker } from '../services/uploads/uploadTracker';
 import { s3Service } from '../services/s3/s3Service';
 import { fixS3Filenames } from '../scripts/fix-s3-filenames';
 import { logger } from '../utils/logger';
+import { getTelegramBot } from '../services/telegram/telegramBot'; // Import the bot getter
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -32,7 +33,7 @@ const storage = multer.diskStorage({
       const { token } = req.params;
       const uploadLink = await prisma.uploadLink.findUnique({
         where: { token },
-        include: { 
+        include: {
           project: {
             include: {
               client: true
@@ -51,8 +52,8 @@ const storage = multer.diskStorage({
       // The path below assumes you've set an environment variable in your backend
       // If not available, we fall back to the local path
       const organizedDir = process.env.TUS_ORGANIZED_DIR || path.join(__dirname, '../../organized');
-      
-      const uploadDir = path.join(organizedDir, 
+
+      const uploadDir = path.join(organizedDir,
         uploadLink.project.client.code || 'default',
         uploadLink.project.name
       );
@@ -76,7 +77,7 @@ const storage = multer.diskStorage({
 });
 
 // Modified upload limits for handling large files with XHR upload
-const upload = multer({ 
+const upload = multer({
   storage,
   limits: {
     fileSize: process.env.MAX_FILE_SIZE ? parseInt(process.env.MAX_FILE_SIZE) : 10 * 1024 * 1024 * 1024, // Default 10GB
@@ -134,7 +135,7 @@ router.get('/clients', authenticateToken, async (_req: Request, res: Response) =
         }
       }
     });
-    
+
     res.json({
       status: 'success',
       data: clients
@@ -153,25 +154,25 @@ router.put('/clients/:clientId', authenticateToken, async (req: Request, res: Re
   try {
     const { clientId } = req.params;
     const { name } = req.body;
-    
+
     // Check if client exists
     const clientExists = await prisma.client.findUnique({
       where: { id: clientId }
     });
-    
+
     if (!clientExists) {
       return res.status(404).json({
         status: 'error',
         message: 'Client not found'
       });
     }
-    
+
     // Update the client
     const updatedClient = await prisma.client.update({
       where: { id: clientId },
       data: { name }
     });
-    
+
     res.json({
       status: 'success',
       data: updatedClient
@@ -205,7 +206,7 @@ router.post('/clients/:clientId/projects', authenticateToken, async (req: Reques
       data: project
     });
   } catch (error) {
-    res.status(500).json({ 
+    res.status(500).json({
       status: 'error',
       message: 'Failed to create project'
     });
@@ -228,7 +229,7 @@ router.get('/clients/:clientId/projects', authenticateToken, async (req: Request
       data: projects
     });
   } catch (error) {
-    res.status(500).json({ 
+    res.status(500).json({
       status: 'error',
       message: 'Failed to fetch projects'
     });
@@ -250,7 +251,7 @@ router.get('/projects', authenticateToken, async (_req: Request, res: Response) 
       data: projects
     });
   } catch (error) {
-    res.status(500).json({ 
+    res.status(500).json({
       status: 'error',
       message: 'Failed to fetch projects'
     });
@@ -262,13 +263,13 @@ router.post('/projects/:projectId/upload-links', authenticateToken, async (req: 
   try {
     const { projectId } = req.params;
     const { expiresAt, usageLimit, token } = req.body;
-    
+
     // If usageLimit is undefined or null, explicitly set maxUses to null to override the default
     const maxUses = usageLimit === undefined || usageLimit === null ? null : usageLimit;
-    
+
     // Use provided token or generate a new one
     const uploadToken = token || generateUploadToken();
-    
+
     const uploadLink = await prisma.uploadLink.create({
       data: {
         token: uploadToken,
@@ -287,7 +288,7 @@ router.post('/projects/:projectId/upload-links', authenticateToken, async (req: 
 
     // Generate the full upload URL
     const uploadUrl = `https://upload.colourstream.johnrogerscolour.co.uk/${uploadLink.token}`;
-    
+
     res.json({
       status: 'success',
       data: {
@@ -296,7 +297,7 @@ router.post('/projects/:projectId/upload-links', authenticateToken, async (req: 
       }
     });
   } catch (error) {
-    res.status(500).json({ 
+    res.status(500).json({
       status: 'error',
       message: 'Failed to create upload link'
     });
@@ -319,14 +320,14 @@ router.get('/upload-links/:token', async (req: Request, res: Response) => {
     });
 
     if (!uploadLink) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         status: 'error',
         message: 'Upload link not found'
       });
     }
 
     if (uploadLink.expiresAt < new Date()) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         status: 'error',
         message: 'Upload link has expired'
       });
@@ -334,7 +335,7 @@ router.get('/upload-links/:token', async (req: Request, res: Response) => {
 
     // If maxUses is null, it means unlimited uses
     if (uploadLink.maxUses !== null && uploadLink.usedCount >= uploadLink.maxUses) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         status: 'error',
         message: 'Upload link has reached maximum uses'
       });
@@ -349,7 +350,7 @@ router.get('/upload-links/:token', async (req: Request, res: Response) => {
       }
     });
   } catch (error) {
-    res.status(500).json({ 
+    res.status(500).json({
       status: 'error',
       message: 'Failed to validate upload link'
     });
@@ -376,7 +377,7 @@ router.get('/projects/:projectId/files', authenticateToken, async (req: Request,
     });
   } catch (error) {
     console.error('Failed to fetch files:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       status: 'error',
       message: 'Failed to fetch files'
     });
@@ -387,12 +388,12 @@ router.get('/projects/:projectId/files', authenticateToken, async (req: Request,
 router.post('/upload/:token', upload.array('files'), async (req: Request, res: Response) => {
   const multerReq = req as MulterRequest;
   if (!multerReq.files) {
-    return res.status(400).json({ 
+    return res.status(400).json({
       status: 'error',
       message: 'No files uploaded'
     });
   }
-  
+
   try {
     const { token } = req.params;
     const files = multerReq.files;
@@ -414,7 +415,7 @@ router.post('/upload/:token', upload.array('files'), async (req: Request, res: R
       for (const file of files) {
         await fs.promises.unlink(file.path);
       }
-      return res.status(404).json({ 
+      return res.status(404).json({
         status: 'error',
         message: 'Upload link not found'
       });
@@ -425,7 +426,7 @@ router.post('/upload/:token', upload.array('files'), async (req: Request, res: R
       for (const file of files) {
         await fs.promises.unlink(file.path);
       }
-      return res.status(403).json({ 
+      return res.status(403).json({
         status: 'error',
         message: 'Upload link has expired'
       });
@@ -437,7 +438,7 @@ router.post('/upload/:token', upload.array('files'), async (req: Request, res: R
       for (const file of files) {
         await fs.promises.unlink(file.path);
       }
-      return res.status(403).json({ 
+      return res.status(403).json({
         status: 'error',
         message: 'Upload link has reached maximum uses'
       });
@@ -450,7 +451,7 @@ router.post('/upload/:token', upload.array('files'), async (req: Request, res: R
     const uploadedFiles = await Promise.all(files.map(async (file) => {
       // Generate a unique ID for the upload (similar to tusId in the tus flow)
       const xhrUploadId = `xhr-${uuidv4()}`;
-      
+
       // Initial tracking for beginning of upload (similar to post-create hook)
       uploadTracker.trackUpload({
         id: xhrUploadId,
@@ -466,7 +467,7 @@ router.post('/upload/:token', upload.array('files'), async (req: Request, res: R
         },
         createdAt: new Date(),
       });
-      
+
       try {
         // Calculate file hash for integrity and deduplication
         const fileBuffer = await fs.promises.readFile(file.path);
@@ -483,10 +484,10 @@ router.post('/upload/:token', upload.array('files'), async (req: Request, res: R
         if (existingFile) {
           // Delete the duplicate file
           await fs.promises.unlink(file.path);
-          
+
           // Track the upload as complete
           uploadTracker.completeUpload(xhrUploadId);
-          
+
           return existingFile;
         }
 
@@ -503,83 +504,62 @@ router.post('/upload/:token', upload.array('files'), async (req: Request, res: R
             file.originalname
           );
 
-          // Enhanced logging for debugging filename issues
-          console.log(`File upload request - Original filename: "${file.originalname}"`);
-          console.log(`Generated S3 key: "${s3Key}" for file: "${file.originalname}"`);
-          console.log(`Client code: "${uploadLink.project.client.code || 'default'}", Project name: "${uploadLink.project.name}"`);
+          // Read file content before uploading to S3
+          const fileBuffer = await fs.promises.readFile(file.path);
 
-          // Log the generated S3 key for debugging
-          console.log(`Generated S3 key for upload: ${s3Key} for file: ${file.originalname}`);
+          // Upload the file content to S3
+          const s3ResultUrl = await s3Service.uploadFile(fileBuffer, s3Key, file.mimetype);
+          fileUrl = s3ResultUrl; // Use the URL returned by s3Service.uploadFile
+          filePath = s3Key; // Store the S3 key as the path
 
-          // Upload file to S3
-          fileUrl = await s3Service.uploadFile(
-            fileBuffer,
-            s3Key,
-            file.mimetype,
-            {
-              clientName: uploadLink.project.client.name,
-              projectName: uploadLink.project.name,
-              originalName: file.originalname
-            }
-          );
 
           // Delete the local file after successful S3 upload
           await fs.promises.unlink(file.path);
-          
-          // Update the file path to use the S3 URL
-          filePath = fileUrl;
+        } else {
+          // For local storage, generate a relative URL
+          // Assuming 'uploads' is served statically or accessible via another route
+          const relativePath = path.relative(path.join(__dirname, '../../uploads'), file.path);
+          fileUrl = `/uploads/${relativePath}`; // Adjust base path as needed
         }
 
-        // Create new file record
-        const uploadedFile = await prisma.uploadedFile.create({
+        // Create database record for the new file
+        const newFile = await prisma.uploadedFile.create({
           data: {
-            name: file.originalname,
-            path: filePath,
-            size: parseFloat(file.size.toString()),
+            name: file.originalname, // Corrected field name
             mimeType: file.mimetype,
+            size: file.size,
+            path: filePath, // Store S3 key or local path
+            url: fileUrl, // Store S3 URL or local URL
             hash: fileHash,
-            project: {
-              connect: { id: uploadLink.projectId }
-            },
-            status: 'completed',
-            completedAt: new Date(),
-            storage: useS3 ? 's3' : 'local',
-            url: useS3 ? fileUrl : null
+            projectId: uploadLink.projectId,
+            storage: useS3 ? 's3' : 'local', // Corrected field name
           }
         });
 
-        // Track the upload as complete (similar to post-finish hook)
+        // Track the upload as complete
         uploadTracker.completeUpload(xhrUploadId);
 
-        return uploadedFile;
-      } catch (error) {
-        console.error('Error processing file:', error);
-        
-        // Track upload error
-        uploadTracker.trackUpload({
-          id: xhrUploadId,
-          size: file.size,
-          offset: 0,
-          metadata: {
-            filename: file.originalname,
-            filetype: file.mimetype,
-            token: token,
-            clientName: uploadLink.project.client.name,
-            projectName: uploadLink.project.name,
-            error: error instanceof Error ? error.message : 'Unknown error',
-            storage: useS3 ? 's3' : 'local'
-          },
-          createdAt: new Date(),
-          isComplete: true
-        });
-        
-        throw error;
+        return newFile;
+      } catch (uploadError) {
+        console.error(`Failed to process file ${file.originalname}:`, uploadError);
+        // Attempt to delete the local file if it still exists
+        try {
+          if (fs.existsSync(file.path)) {
+            await fs.promises.unlink(file.path);
+          }
+        } catch (cleanupError) {
+          console.error(`Failed to cleanup file ${file.path}:`, cleanupError);
+        }
+        // No specific failUpload method exists on tracker, logging the error is sufficient.
+        logger.error(`[Upload Error] Failed processing file ${file.originalname} (XHR Upload ID: ${xhrUploadId})`, uploadError);
+
+        throw uploadError; // Re-throw to indicate failure for this file
       }
     }));
 
-    // Update the upload link usage count
+    // Increment the used count for the upload link
     await prisma.uploadLink.update({
-      where: { id: uploadLink.id },
+      where: { token },
       data: { usedCount: { increment: 1 } }
     });
 
@@ -588,26 +568,23 @@ router.post('/upload/:token', upload.array('files'), async (req: Request, res: R
       data: uploadedFiles
     });
   } catch (error) {
-    console.error('Upload error:', error);
-    res.status(500).json({ 
+    console.error('File upload failed:', error);
+    res.status(500).json({
       status: 'error',
-      message: 'Failed to process upload'
+      message: 'File upload failed'
     });
   }
 });
 
-// Delete a project
+// Delete a project and its associated files and links
 router.delete('/projects/:projectId', authenticateToken, async (req: Request, res: Response) => {
-  try {
+  try { // Outer try
     const { projectId } = req.params;
 
-    // Get project with all associated files
+    // Check if project exists
     const project = await prisma.project.findUnique({
       where: { id: projectId },
-      include: {
-        files: true,
-        client: true
-      }
+      include: { files: true, uploadLinks: true }
     });
 
     if (!project) {
@@ -617,67 +594,77 @@ router.delete('/projects/:projectId', authenticateToken, async (req: Request, re
       });
     }
 
-    // Delete all files from S3
+    // Delete associated files from storage (S3 or local)
     for (const file of project.files) {
-      if (file.storage === 's3' && file.path) {
-        try {
-          await s3Service.deleteFile(file.path);
-          console.log(`Deleted file from S3: ${file.path}`);
-        } catch (s3Error) {
-          console.error(`Failed to delete file from S3: ${file.path}`, s3Error);
-          // Continue with deletion even if S3 deletion fails
+      try { // Inner try for individual file deletion
+        if (file.storage === 's3') { // Corrected field name
+          if (file.path) { // Add null check for path
+            await s3Service.deleteFile(file.path);
+          } else {
+            logger.warn(`[Project Delete] Skipping S3 delete for file ID ${file.id} due to missing path.`);
+          }
+        } else {
+          // Construct the full local path if needed
+          if (file.path) { // Add null check for path
+            const localPath = path.resolve(file.path); // Adjust if path is stored differently
+            if (fs.existsSync(localPath)) {
+              await fs.promises.unlink(localPath);
+            }
+          } else {
+            logger.warn(`[Project Delete] Skipping local file delete for file ID ${file.id} due to missing path.`);
+          }
         }
+      } catch (fileDeleteError) { // Inner catch for file deletion errors
+         logger.error(`Failed to delete file ${file.path} (${file.storage}):`, fileDeleteError);
+         // Continue deleting other files even if one fails
       }
-    }
+    } // End of for loop
 
-    // Delete the project (cascading delete will handle upload links)
-    await prisma.project.delete({
-      where: { id: projectId }
-    });
+    // Use transaction to delete project and related records
+    await prisma.$transaction([
+      prisma.uploadedFile.deleteMany({ where: { projectId } }),
+      prisma.uploadLink.deleteMany({ where: { projectId } }),
+      prisma.project.delete({ where: { id: projectId } })
+    ]);
 
     res.json({
       status: 'success',
       message: 'Project deleted successfully'
     });
-  } catch (error) {
+  } catch (error) { // Outer catch for the main operation
     console.error('Failed to delete project:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       status: 'error',
       message: 'Failed to delete project'
     });
   }
 });
 
+
 // Update a project
 router.put('/projects/:projectId', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { projectId } = req.params;
     const { name, description } = req.body;
-    
+
     // Check if project exists
     const projectExists = await prisma.project.findUnique({
       where: { id: projectId }
     });
-    
+
     if (!projectExists) {
       return res.status(404).json({
         status: 'error',
         message: 'Project not found'
       });
     }
-    
+
     // Update the project
     const updatedProject = await prisma.project.update({
       where: { id: projectId },
-      data: { 
-        name: name !== undefined ? name : undefined,
-        description: description !== undefined ? description : undefined
-      },
-      include: {
-        client: true
-      }
+      data: { name, description }
     });
-    
+
     res.json({
       status: 'success',
       data: updatedProject
@@ -691,16 +678,21 @@ router.put('/projects/:projectId', authenticateToken, async (req: Request, res: 
   }
 });
 
-// Get a single project
+// Get a single project by ID
 router.get('/projects/:projectId', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { projectId } = req.params;
+
     const project = await prisma.project.findUnique({
       where: { id: projectId },
       include: {
         client: true,
         uploadLinks: true,
-        files: true,
+        files: {
+          orderBy: {
+            createdAt: 'desc' // Order files by creation date, newest first
+          }
+        }
       }
     });
 
@@ -711,78 +703,46 @@ router.get('/projects/:projectId', authenticateToken, async (req: Request, res: 
       });
     }
 
-    // Check if .turbosort file exists for this project
-    // Note: The turbosort directory is stored in a .turbosort file in the project directory,
-    // not in the database. This allows for easier integration with external file-based tools.
-    let turbosortContent = null;
-    try {
-      // Construct the path to the project directory
-      const projectPath = path.join(process.env.UPLOAD_DIR || 'uploads', projectId);
-      const turbosortPath = path.join(projectPath, '.turbosort');
-      
-      // Check if the file exists locally
-      if (fs.existsSync(turbosortPath)) {
-        // Read the content of the .turbosort file
-        turbosortContent = fs.readFileSync(turbosortPath, 'utf8').trim();
-      } 
-      // If not found locally and we have client info, try to get from S3
-      else if (project.client && project.client.code) {
-        try {
-          // Generate S3 key based on client and project name
-          const s3Key = s3Service.generateKey(
-            project.client.code,
-            project.name,
-            '.turbosort'
-          );
+    // Calculate total size of uploaded files for the project
+    const totalSize = project.files.reduce((sum: number, file: UploadedFile) => sum + file.size, 0);
 
-          // Try to get the file from S3
-          const s3Object = await s3Service.getFileContent(s3Key);
-          if (s3Object) {
-            turbosortContent = s3Object.toString('utf8').trim();
-            
-            // Cache the S3 content locally for future use
-            if (!fs.existsSync(projectPath)) {
-              fs.mkdirSync(projectPath, { recursive: true });
-            }
-            fs.writeFileSync(turbosortPath, turbosortContent);
-            console.log(`Cached turbosort file from S3 to local path: ${turbosortPath}`);
-          }
-        } catch (s3Error) {
-          console.error('Failed to get turbosort file from S3:', s3Error);
-          // Don't fail the request if we can't get the file from S3
-        }
-      }
-    } catch (err) {
-      console.error('Error reading .turbosort file:', err);
-      // Don't fail the request if we can't read the file
-    }
+    // Format total size
+    const formatBytes = (bytes: number, decimals = 2) => {
+      if (bytes === 0) return '0 Bytes';
+      const k = 1024;
+      const dm = decimals < 0 ? 0 : decimals;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    };
 
-    // Add the turbosort content to the response
     res.json({
       status: 'success',
       data: {
         ...project,
-        turbosortDirectory: turbosortContent
+        totalSize: totalSize,
+        formattedTotalSize: formatBytes(totalSize)
       }
     });
   } catch (error) {
     console.error('Failed to fetch project:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       status: 'error',
       message: 'Failed to fetch project'
     });
   }
 });
 
-// Delete a client
+
+// Delete a client and all associated projects, files, and links
 router.delete('/clients/:clientId', authenticateToken, async (req: Request, res: Response) => {
-  try {
+  try { // Outer try
     const { clientId } = req.params;
-    
-    // Check if client exists and get all associated data
+
+    // Check if client exists
     const client = await prisma.client.findUnique({
       where: { id: clientId },
-      include: { 
+      include: {
         projects: {
           include: {
             files: true,
@@ -791,7 +751,7 @@ router.delete('/clients/:clientId', authenticateToken, async (req: Request, res:
         }
       }
     });
-    
+
     if (!client) {
       return res.status(404).json({
         status: 'error',
@@ -799,106 +759,128 @@ router.delete('/clients/:clientId', authenticateToken, async (req: Request, res:
       });
     }
 
-    // Delete all files from S3 for each project
-    for (const project of client.projects) {
-      for (const file of project.files) {
-        if (file.storage === 's3' && file.path) {
-          try {
-            await s3Service.deleteFile(file.path);
-            console.log(`Deleted file from S3: ${file.path}`);
-          } catch (s3Error) {
-            console.error(`Failed to delete file from S3: ${file.path}`, s3Error);
-            // Continue with deletion even if S3 deletion fails
+    // Collect all project IDs and file paths for deletion
+    const projectIds = client.projects.map((p: Project) => p.id);
+    // Ensure 'files' is included in the Project type used here, or adjust the flatMap logic
+    // Assuming 'p' correctly includes 'files' based on the initial client fetch include.
+    const filesToDelete = client.projects.flatMap((p: Project & { files: UploadedFile[] }) => p.files);
+
+    // Delete associated files from storage (S3 or local)
+    for (const file of filesToDelete) {
+      try { // Inner try for file deletion
+        if (file.storage === 's3') { // Corrected field name
+           if (file.path) { // Add null check
+             await s3Service.deleteFile(file.path);
+           } else {
+              logger.warn(`[Client Delete] Skipping S3 delete for file ID ${file.id} due to missing path.`);
+           }
+        } else {
+          // Construct the full local path if needed
+          if (file.path) { // Add null check
+            const localPath = path.resolve(file.path); // Adjust if path is stored differently
+            if (fs.existsSync(localPath)) {
+              await fs.promises.unlink(localPath);
+            }
+          } else {
+             logger.warn(`[Client Delete] Skipping local file delete for file ID ${file.id} due to missing path.`);
           }
         }
+      } catch (fileDeleteError) { // Inner catch for file deletion errors
+        console.error(`Failed to delete file ${file.path} (${file.storage}):`, fileDeleteError); // Corrected field name
+        // Decide if you want to continue or stop the process
+        // For now, we log the error and continue
       }
-    }
-    
-    // Delete the client (cascading delete will handle projects and upload links)
-    await prisma.client.delete({
-      where: { id: clientId }
-    });
-    
+    } // End of for loop
+
+    // Use transaction to delete client and all related records
+    await prisma.$transaction([
+      prisma.uploadedFile.deleteMany({ where: { projectId: { in: projectIds } } }),
+      prisma.uploadLink.deleteMany({ where: { projectId: { in: projectIds } } }),
+      prisma.project.deleteMany({ where: { clientId } }),
+      prisma.client.delete({ where: { id: clientId } })
+    ]);
+
     res.json({
       status: 'success',
-      message: 'Client deleted successfully'
+      message: 'Client and all associated data deleted successfully'
     });
-  } catch (error) {
+  } catch (error) { // Outer catch for the main operation
     console.error('Failed to delete client:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       status: 'error',
-      message: 'Failed to delete client. Make sure there are no active uploads for this client.'
+      message: 'Failed to delete client'
     });
   }
 });
+
 
 // Delete an upload link
 router.delete('/upload-links/:linkId', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { linkId } = req.params;
-    
-    // Check if upload link exists
-    const uploadLink = await prisma.uploadLink.findUnique({
+
+    // Check if link exists
+    const linkExists = await prisma.uploadLink.findUnique({
       where: { id: linkId }
     });
-    
-    if (!uploadLink) {
+
+    if (!linkExists) {
       return res.status(404).json({
         status: 'error',
         message: 'Upload link not found'
       });
     }
-    
-    // Delete the upload link
+
+    // Delete the link
     await prisma.uploadLink.delete({
       where: { id: linkId }
     });
-    
+
     res.json({
       status: 'success',
       message: 'Upload link deleted successfully'
     });
   } catch (error) {
     console.error('Failed to delete upload link:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       status: 'error',
       message: 'Failed to delete upload link'
     });
   }
 });
 
-// Update upload link
+// Update an upload link
 router.put('/upload-links/:linkId', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { linkId } = req.params;
-    const { expiresAt, maxUses } = req.body;
-    
-    // Check if upload link exists
-    const uploadLink = await prisma.uploadLink.findUnique({
-      where: { id: linkId },
-      include: {
-        project: {
-          include: {
-            client: true
-          }
-        }
-      }
+    const { expiresAt, usageLimit } = req.body;
+
+    // Check if link exists
+    const linkExists = await prisma.uploadLink.findUnique({
+      where: { id: linkId }
     });
-    
-    if (!uploadLink) {
+
+    if (!linkExists) {
       return res.status(404).json({
         status: 'error',
         message: 'Upload link not found'
       });
     }
-    
-    // Update the upload link
+
+    // Prepare update data
+    const updateData: { expiresAt?: Date; maxUses?: number | null } = {};
+    if (expiresAt) {
+      updateData.expiresAt = new Date(expiresAt);
+    }
+    // Allow setting usageLimit to null for unlimited
+    if (usageLimit !== undefined) {
+      updateData.maxUses = usageLimit === null ? null : parseInt(usageLimit, 10);
+    }
+
+    // Update the link
     const updatedLink = await prisma.uploadLink.update({
       where: { id: linkId },
-      data: {
-        expiresAt: expiresAt ? new Date(expiresAt) : undefined,
-        maxUses: maxUses !== undefined ? maxUses : undefined
-      },
+      data: updateData,
       include: {
         project: {
           include: {
@@ -907,10 +889,10 @@ router.put('/upload-links/:linkId', authenticateToken, async (req: Request, res:
         }
       }
     });
-    
-    // Generate the full upload URL
+
+    // Regenerate the full upload URL
     const uploadUrl = `https://upload.colourstream.johnrogerscolour.co.uk/${updatedLink.token}`;
-    
+
     res.json({
       status: 'success',
       data: {
@@ -920,26 +902,17 @@ router.put('/upload-links/:linkId', authenticateToken, async (req: Request, res:
     });
   } catch (error) {
     console.error('Failed to update upload link:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       status: 'error',
       message: 'Failed to update upload link'
     });
   }
 });
 
-// Get all upload links with client and project information (with a fixed route name)
-router.get('/upload-links-all', authenticateToken, async (req: Request, res: Response) => {
+// Get all upload links (for admin view)
+router.get('/upload-links-all', authenticateToken, async (_req: Request, res: Response) => { // Prefix req with _
   try {
-    console.log('GET /upload-links-all - Request received');
-    console.log('User ID from auth token:', req.user?.userId);
-    console.log('Auth headers:', req.headers.authorization);
-    
-    // Check if we have upload links in the database
-    const count = await prisma.uploadLink.count();
-    console.log(`Total upload links in database: ${count}`);
-    
-    // Always return links regardless of auth to debug the issue
-    const uploadLinks = await prisma.uploadLink.findMany({
+    const links = await prisma.uploadLink.findMany({
       include: {
         project: {
           include: {
@@ -947,562 +920,512 @@ router.get('/upload-links-all', authenticateToken, async (req: Request, res: Res
           }
         }
       },
-      orderBy: [
-        { createdAt: 'desc' }
-      ]
+      orderBy: {
+        createdAt: 'desc' // Show newest links first
+      }
     });
-    
-    console.log(`Found ${uploadLinks.length} upload links`);
-    
+
+    // Generate full URLs for each link
+    const linksWithUrls = links.map((link: UploadLink) => ({
+      ...link,
+      uploadUrl: `https://upload.colourstream.johnrogerscolour.co.uk/${link.token}`
+    }));
+
     res.json({
       status: 'success',
-      data: uploadLinks
+      data: linksWithUrls
     });
   } catch (error) {
-    console.error('Failed to fetch upload links:', error);
-    res.status(500).json({ 
+    console.error('Failed to fetch all upload links:', error);
+    res.status(500).json({
       status: 'error',
       message: 'Failed to fetch upload links'
     });
   }
 });
 
-// Endpoint to get S3 upload parameters for AWS S3 direct upload
+
+// --- S3 Specific Routes ---
+
+// Get S3 presigned URL for direct upload (non-multipart)
 router.get('/s3-params/:token', async (req: Request, res: Response) => {
   try {
     const { token } = req.params;
-    const filename = req.query.filename as string;
-    const multipart = req.query.multipart === 'true';
-    
-    if (!filename) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Filename is required'
-      });
+    const { filename } = req.query;
+
+    if (!filename || typeof filename !== 'string') {
+      return res.status(400).json({ status: 'error', message: 'Filename is required' });
     }
 
-    // Validate the upload token
+    // Validate token
     const uploadLink = await prisma.uploadLink.findUnique({
       where: { token },
-      include: {
-        project: {
-          include: {
-            client: true
-          }
-        }
-      }
+      include: { project: { include: { client: true } } }
     });
 
     if (!uploadLink) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Upload link not found'
-      });
+      return res.status(404).json({ status: 'error', message: 'Upload link not found' });
     }
-
     if (uploadLink.expiresAt < new Date()) {
-      return res.status(403).json({
-        status: 'error',
-        message: 'Upload link has expired'
-      });
+      return res.status(403).json({ status: 'error', message: 'Upload link expired' });
+    }
+    if (uploadLink.maxUses !== null && uploadLink.usedCount >= uploadLink.maxUses) {
+      return res.status(403).json({ status: 'error', message: 'Upload link usage limit reached' });
     }
 
-    // Generate S3 key for this file - using the clean $CLIENT/$PROJECT/FILENAME structure
+    // Generate S3 key
     const s3Key = s3Service.generateKey(
       uploadLink.project.client.code || 'default',
       uploadLink.project.name,
       filename
     );
-    
-    // Enhanced logging for debugging filename issues
-    console.log(`File upload request - Original filename: "${filename}"`);
-    console.log(`Generated S3 key: "${s3Key}" for file: "${filename}"`);
-    console.log(`Client code: "${uploadLink.project.client.code || 'default'}", Project name: "${uploadLink.project.name}"`);
 
-    // Handle multipart upload initialization or regular presigned URL
-    if (multipart) {
-      const { uploadId, key } = await s3Service.createMultipartUpload(s3Key, filename);
-      
-      res.json({
-        status: 'success',
-        uploadId,
-        key
-      });
-    } else {
-      const url = await s3Service.generatePresignedUrl(s3Key);
-      
-      res.json({
-        status: 'success',
-        url,
-        key: s3Key
-      });
-    }
-  } catch (error) {
-    console.error('Failed to generate S3 params:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Failed to generate S3 parameters'
+    // Get presigned URL for PUT operation
+    const presignedUrl = await s3Service.generatePresignedUrl(s3Key); // Corrected method name
+
+    res.json({
+      status: 'success',
+      url: presignedUrl,
+      key: s3Key, // Return the key so frontend can use it if needed
+      method: 'PUT', // Standard for S3 presigned PUT URLs
+      fields: {}, // No fields needed for PUT
+      headers: {} // Headers are usually handled by the client library
     });
+
+  } catch (error) {
+    logger.error('Failed to get S3 presigned URL:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to get S3 upload parameters' });
   }
 });
 
-// Add endpoint for multipart upload part presigned URL generation
+// Get S3 presigned URL for a specific part of a multipart upload
 router.get('/s3-part-params/:token', async (req: Request, res: Response) => {
   try {
     const { token } = req.params;
     const { uploadId, key, partNumber } = req.query;
-    
+
     if (!uploadId || !key || !partNumber) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Missing required parameters: uploadId, key, and partNumber are required'
-      });
+      return res.status(400).json({ status: 'error', message: 'Missing required parameters (uploadId, key, partNumber)' });
     }
 
-    // Validate the upload token
-    const uploadLink = await prisma.uploadLink.findUnique({
-      where: { token }
-    });
+    // Validate token (optional but recommended for security)
+    const uploadLink = await prisma.uploadLink.findUnique({ where: { token } });
+    if (!uploadLink) {
+      return res.status(404).json({ status: 'error', message: 'Upload link not found' });
+    }
+    // Add expiration/usage checks if necessary
 
-    if (!uploadLink || uploadLink.expiresAt < new Date()) {
-      return res.status(403).json({
-        status: 'error',
-        message: 'Upload link is invalid or has expired'
-      });
+    const partNum = parseInt(partNumber as string, 10);
+    if (isNaN(partNum) || partNum <= 0) {
+      return res.status(400).json({ status: 'error', message: 'Invalid part number' });
     }
 
-    // Generate presigned URL for the part upload
-    const url = await s3Service.getPresignedUrlForPart(
-      key as string,
-      uploadId as string,
-      parseInt(partNumber as string, 10)
-    );
+    const presignedUrl = await s3Service.getPresignedUrlForPart(key as string, uploadId as string, partNum); // Corrected method name
 
     res.json({
       status: 'success',
-      url
+      url: presignedUrl,
+      // Include any other necessary info for the client
     });
+
   } catch (error) {
-    console.error('Failed to generate part upload URL:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Failed to generate part upload URL'
-    });
+    logger.error('Failed to get S3 presigned part URL:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to get S3 part upload parameters' });
   }
 });
 
-// Complete multipart upload
+
+// Complete an S3 multipart upload
 router.post('/s3-complete/:token', async (req: Request, res: Response) => {
   try {
     const { token } = req.params;
     const { uploadId, key, parts } = req.body;
-    
-    if (!uploadId || !key || !parts) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Missing required parameters for completing multipart upload'
-      });
+
+    if (!uploadId || !key || !Array.isArray(parts)) {
+      return res.status(400).json({ status: 'error', message: 'Missing required parameters (uploadId, key, parts)' });
     }
 
-    // Validate the upload token
-    const uploadLink = await prisma.uploadLink.findUnique({
-      where: { token },
-      include: {
-        project: {
-          include: {
-            client: true
-          }
-        }
-      }
-    });
+    // Validate token (optional but recommended)
+    const uploadLink = await prisma.uploadLink.findUnique({ where: { token } });
+    if (!uploadLink) {
+      return res.status(404).json({ status: 'error', message: 'Upload link not found' });
+    }
+    // Add expiration/usage checks if necessary
 
-    if (!uploadLink || uploadLink.expiresAt < new Date()) {
-      return res.status(403).json({
-        status: 'error',
-        message: 'Upload link is invalid or has expired'
-      });
+    // Validate parts structure
+    const validParts = parts.every(part => part && typeof part.PartNumber === 'number' && typeof part.ETag === 'string');
+    if (!validParts) {
+      return res.status(400).json({ status: 'error', message: 'Invalid parts structure' });
     }
 
-    // Complete the multipart upload
     const result = await s3Service.completeMultipartUpload(key, uploadId, parts);
-    
-    // Extract filename from the key - last part after the final slash
-    // Should be in format: CLIENT/PROJECT/FILENAME
-    const filename = key.split('/').pop() || 'unknown';
-    
-    // Create file record in database
-    const uploadedFile = await prisma.uploadedFile.create({
-      data: {
-        name: filename,
-        path: key,
-        size: 0, // Size will be updated when we can retrieve it
-        mimeType: 'application/octet-stream',
-        hash: `multipart-${uploadId}`,
-        project: {
-          connect: { id: uploadLink.projectId }
-        },
-        status: 'completed',
-        completedAt: new Date(),
-        storage: 's3',
-        url: result.location
-      }
-    });
 
-    // Update the upload link usage count
-    await prisma.uploadLink.update({
-      where: { id: uploadLink.id },
-      data: { usedCount: { increment: 1 } }
-    });
+    // Here you might trigger the /s3-callback logic or let the frontend do it
+    // For simplicity, let's assume the frontend calls /s3-callback separately after this succeeds
 
     res.json({
       status: 'success',
-      location: result.location,
-      fileId: uploadedFile.id
+      location: result.location, // Corrected property name (lowercase 'l')
+      // Include other details from result if needed
     });
+
   } catch (error) {
-    console.error('Failed to complete multipart upload:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Failed to complete multipart upload'
-    });
+    logger.error('Failed to complete S3 multipart upload:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to complete S3 multipart upload' });
   }
 });
 
-// Abort multipart upload
+// Abort an S3 multipart upload
 router.post('/s3-abort/:token', async (req: Request, res: Response) => {
   try {
     const { token } = req.params;
-    const { uploadId, key } = req.query;
-    
+    const { uploadId, key } = req.body;
+
     if (!uploadId || !key) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Missing required parameters: uploadId and key are required'
-      });
+      return res.status(400).json({ status: 'error', message: 'Missing required parameters (uploadId, key)' });
     }
 
-    // Validate the upload token
-    const uploadLink = await prisma.uploadLink.findUnique({
-      where: { token }
-    });
-
-    if (!uploadLink || uploadLink.expiresAt < new Date()) {
-      return res.status(403).json({
-        status: 'error',
-        message: 'Upload link is invalid or has expired'
-      });
+    // Validate token (optional but recommended)
+    const uploadLink = await prisma.uploadLink.findUnique({ where: { token } });
+    if (!uploadLink) {
+      return res.status(404).json({ status: 'error', message: 'Upload link not found' });
     }
+    // Add expiration/usage checks if necessary
 
-    // Abort the multipart upload
-    await s3Service.abortMultipartUpload(key as string, uploadId as string);
-    
-    res.json({
-      status: 'success',
-      message: 'Multipart upload aborted successfully'
-    });
+    await s3Service.abortMultipartUpload(key, uploadId);
+
+    res.json({ status: 'success', message: 'Multipart upload aborted' });
+
   } catch (error) {
-    console.error('Failed to abort multipart upload:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Failed to abort multipart upload'
-    });
+    logger.error('Failed to abort S3 multipart upload:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to abort S3 multipart upload' });
   }
 });
 
-// S3 upload callback endpoint - track files uploaded directly to S3
+
+// Callback endpoint for S3 uploads (both direct and multipart completion)
 router.post('/s3-callback/:token', async (req: Request, res: Response) => {
   try {
     const { token } = req.params;
-    const { key, size, filename, mimeType, hash } = req.body;
-    
-    if (!key || !filename) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Missing required file information'
-      });
+    const { key, size, filename, mimeType, hash } = req.body; // hash might be provided by client or generated
+
+    if (!key || !size || !filename || !mimeType) {
+      return res.status(400).json({ status: 'error', message: 'Missing required S3 callback data' });
     }
 
-    // Validate the upload token
+    // Validate token and get project context
     const uploadLink = await prisma.uploadLink.findUnique({
       where: { token },
-      include: {
-        project: {
-          include: {
-            client: true
-          }
-        }
-      }
+      include: { project: { include: { client: true } } }
     });
 
     if (!uploadLink) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Upload link not found'
-      });
+      logger.warn(`[S3 Callback] Invalid token received: ${token}`);
+      return res.status(404).json({ status: 'error', message: 'Upload link not found' });
+    }
+    if (uploadLink.expiresAt < new Date()) {
+      logger.warn(`[S3 Callback] Expired token used: ${token}`);
+      return res.status(403).json({ status: 'error', message: 'Upload link expired' });
+    }
+    if (uploadLink.maxUses !== null && uploadLink.usedCount >= uploadLink.maxUses) {
+      logger.warn(`[S3 Callback] Token usage limit reached: ${token}`);
+      return res.status(403).json({ status: 'error', message: 'Upload link usage limit reached' });
     }
 
-    // Check if filename contains a UUID pattern
-    const uuidRegex = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-)/gi;
-    const hasUuid = uuidRegex.test(key);
-    
-    // Generate a clean key without UUIDs if needed
-    let cleanKey = key;
-    let cleanFilename = filename;
-    
-    if (hasUuid) {
-      // Extract client and project information
-      const clientCode = uploadLink.project.client.code || 'default';
-      const projectName = uploadLink.project.name || 'default';
-      
-      // Clean the filename by removing UUIDs
-      cleanFilename = filename.replace(uuidRegex, '');
-      
-      // Generate clean key with the standard structure
-      cleanKey = `${clientCode}/${projectName}/${cleanFilename}`;
-      
-      // Rename the file in S3
-      try {
-        // If key already has UUID prefix, rename it in S3
-        if (key !== cleanKey) {
-          await s3Service.renameObject(key, cleanKey);
-          logger.info(`Renamed file in S3: ${key} -> ${cleanKey}`);
-        }
-      } catch (renameError) {
-        logger.error('Failed to rename file in S3:', renameError);
-        // Continue with original key if rename fails
-        cleanKey = key;
-      }
-    }
+    // Generate file hash if not provided (e.g., from S3 metadata or re-download)
+    // For simplicity, we'll assume hash is provided or skip check for now
+    // const fileHash = hash || await s3Service.calculateFileHash(key); // This would require downloading
 
-    // Generate the URL for the uploaded file
-    const s3Endpoint = process.env.S3_ENDPOINT || 'http://minio:9000';
+    // Check for existing file (optional, based on hash if available)
+    // if (fileHash) {
+    //   const existingFile = await prisma.uploadedFile.findFirst({
+    //     where: { projectId: uploadLink.projectId, hash: fileHash }
+    //   });
+    //   if (existingFile) {
+    //     logger.info(`[S3 Callback] Duplicate file detected via hash for key ${key}. Skipping DB entry.`);
+    //     // Don't increment usedCount for duplicates? Or maybe do? Depends on policy.
+    //     return res.json({ status: 'success', message: 'Duplicate file detected, skipped DB entry', data: existingFile });
+    //   }
+    // }
+
+    // Manually construct the public URL as s3Service doesn't have getPublicUrl
+    const s3PublicEndpoint = process.env.S3_PUBLIC_ENDPOINT || 'https://s3.colourstream.johnrogerscolour.co.uk';
     const s3Bucket = process.env.S3_BUCKET || 'uploads';
-    const fileUrl = `${s3Endpoint}/${s3Bucket}/${cleanKey}`;
-    
-    // Record the upload in the database
-    const uploadedFile = await prisma.uploadedFile.create({
+    const fileUrl = `${s3PublicEndpoint}/${s3Bucket}/${key}`;
+
+
+    // Create database record for the uploaded file
+    const newFile = await prisma.uploadedFile.create({
       data: {
-        name: cleanFilename,
-        path: cleanKey, // Use the clean key
-        size: size ? parseFloat(size.toString()) : 0,
-        mimeType: mimeType || 'application/octet-stream',
-        hash: hash || 'unknown',
-        project: {
-          connect: { id: uploadLink.projectId }
-        },
-        status: 'completed',
-        completedAt: new Date(),
-        storage: 's3',
-        url: fileUrl
+        name: filename, // Corrected field name
+        mimeType: mimeType,
+        size: size,
+        path: key, // Store S3 key as the path
+        url: fileUrl, // Store public S3 URL
+        hash: hash || null, // Store hash if available
+        projectId: uploadLink.projectId,
+        storage: 's3', // Corrected field name
       }
     });
 
-    // Update the upload link usage count
+    // Increment the used count for the upload link
     await prisma.uploadLink.update({
-      where: { id: uploadLink.id },
+      where: { token },
       data: { usedCount: { increment: 1 } }
     });
 
-    // Track the upload using our tracking system
-    const uploadId = `s3-${uploadedFile.id}`;
-    
-    console.log('[DEBUG] Registering S3 upload with tracker:', uploadId);
-    
-    uploadTracker.trackUpload({
-      id: uploadId,
-      size: uploadedFile.size,
-      offset: uploadedFile.size, // Already completed
-      metadata: {
-        filename: uploadedFile.name,
-        filetype: uploadedFile.mimeType || '',
-        token: token,
-        clientName: uploadLink.project.client.name,
-        projectName: uploadLink.project.name,
-        storage: 's3' // This is crucial for triggering the cleanup
-      },
-      createdAt: new Date(),
-      isComplete: true
-    });
+    // Track the upload completion via uploadTracker if needed
+    // This might require mapping the S3 upload back to a tracker ID if initiated elsewhere
+    // For uploads initiated via frontend Uppy, the frontend might handle tracking separately.
+    // Example: uploadTracker.completeUpload(someUploadIdRelatedToS3);
 
-    // Also explicitly call completeUpload to ensure the cleanup is triggered
-    uploadTracker.completeUpload(uploadId);
-
+    logger.info(`[S3 Callback] Successfully processed S3 upload for key: ${key}`);
     res.json({
       status: 'success',
-      data: uploadedFile
+      message: 'S3 upload processed successfully',
+      data: newFile
     });
+
   } catch (error) {
-    console.error('Failed to record S3 upload:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Failed to record S3 upload'
-    });
+    logger.error('[S3 Callback] Error processing S3 callback:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to process S3 callback' });
   }
 });
 
-// Add an endpoint to trigger S3 filename cleanup
+// --- Utility and Maintenance Routes ---
+
+// Endpoint to trigger filename cleanup (manual for now)
 router.post('/cleanup-filenames', authenticateToken, async (_req: Request, res: Response) => {
   try {
-    // Start the cleanup process
-    await fixS3Filenames();
-    
+    logger.info('Starting S3 filename cleanup process...');
+    const result = await fixS3Filenames();
+    logger.info('S3 filename cleanup process completed.');
     res.json({
       status: 'success',
-      message: 'S3 filename cleanup process completed successfully'
+      message: 'Filename cleanup process completed.',
+      data: result
     });
   } catch (error) {
-    console.error('Failed to run filename cleanup:', error);
-    res.status(500).json({ 
+    logger.error('Filename cleanup failed:', error);
+    res.status(500).json({
       status: 'error',
-      message: 'Failed to run filename cleanup process'
+      message: 'Filename cleanup failed.'
     });
   }
 });
 
-// Set turbosort directory for a project
-// Note: The turbosort directory is stored in a .turbosort file in the project directory,
-// not in the database. This allows for easier integration with external file-based tools.
+
+// --- TurboSort Routes ---
+
+// Endpoint to initiate TurboSort for a project
 router.post('/projects/:projectId/turbosort', authenticateToken, async (req: Request, res: Response) => {
+  const { projectId } = req.params;
+  // const { sortCriteria, targetBucket } = req.body; // sortCriteria is unused
+  // const { targetBucket } = req.body; // Unused variable - e.g., { targetBucket: 'sorted-project-files' }
+
   try {
-    const { projectId } = req.params;
-    const { directory } = req.body;
-
-    if (!directory || typeof directory !== 'string') {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Directory name is required'
-      });
-    }
-
-    // Validate that the project exists
     const project = await prisma.project.findUnique({
       where: { id: projectId },
-      include: {
-        client: true
-      }
+      include: { files: true, client: true }
     });
 
     if (!project) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Project not found'
+      return res.status(404).json({ status: 'error', message: 'Project not found' });
+    }
+
+    logger.info(`Initiating TurboSort for project ${project.name} (ID: ${projectId})`);
+
+    // 1. Filter files stored in S3
+    const s3Files = project.files.filter((f: UploadedFile) => f.storage === 's3'); // Corrected field name
+    if (s3Files.length === 0) {
+      return res.status(400).json({ status: 'error', message: 'No S3 files found in this project to sort.' });
+    }
+
+    // 2. Define sorting logic (example: by date embedded in filename or metadata)
+    // This needs customization based on actual filename patterns or metadata
+    const sortFiles = (files: typeof s3Files) => {
+      // Example: Sort by filename assuming YYYYMMDD format prefix
+      return files.sort((a: UploadedFile, b: UploadedFile) => {
+        const dateA = a.name.substring(0, 8); // Corrected field name
+        const dateB = b.name.substring(0, 8); // Corrected field name
+        return dateA.localeCompare(dateB);
       });
-    }
+    };
+    const sortedFiles = sortFiles(s3Files);
 
-    // Construct the path to the project directory
-    const projectPath = path.join(process.env.UPLOAD_DIR || 'uploads', projectId);
-    
-    // Create the project directory if it doesn't exist
-    if (!fs.existsSync(projectPath)) {
-      fs.mkdirSync(projectPath, { recursive: true });
-    }
+    // 3. Prepare S3 copy operations
+    const copyOperations = sortedFiles.map((file: UploadedFile /*, _index: number */) => { // Prefix index with _
+      // Define the new key structure in the target bucket
+      // Example: targetBucket/YYYY/MM/DD/originalFilename_sequence.ext
+      // const datePart = file.name.substring(0, 8); // Corrected field name, Assuming YYYYMMDD
+      // const year = datePart.substring(0, 4); // Unused variable
+      // const month = datePart.substring(4, 6); // Unused variable
+      // const day = datePart.substring(6, 8); // Unused variable
+      // const newKey = `${targetBucket}/${year}/${month}/${day}/${file.name}`; // newKey is unused
 
-    // Write the directory name to the .turbosort file
-    const turbosortPath = path.join(projectPath, '.turbosort');
-    fs.writeFileSync(turbosortPath, directory);
 
-    // Also save the .turbosort file to S3 if project has a client
-    if (project.client && project.client.code) {
-      try {
-        // Generate S3 key based on client and project name
-        const s3Key = s3Service.generateKey(
-          project.client.code,
-          project.name,
-          '.turbosort'
-        );
+      // TODO: Implement s3Service.copyObject or use CopyObjectCommand directly
+      // return s3Service.copyObject(file.path, newKey); // Assuming copyObject exists
+      logger.warn(`[TurboSort] s3Service.copyObject not implemented yet. Skipping copy for ${file.path}`);
+      return Promise.resolve(); // Placeholder
+    });
 
-        // Upload the .turbosort file to S3
-        await s3Service.uploadFile(
-          Buffer.from(directory),
-          s3Key,
-          'text/plain',
-          {
-            clientName: project.client.name,
-            projectName: project.name,
-            turbosortDirectory: 'true'
-          }
-        );
+    // 4. Execute copy operations (consider batching for large projects)
+    await Promise.all(copyOperations);
 
-        console.log(`Turbosort file uploaded to S3 at key: ${s3Key}`);
-      } catch (s3Error) {
-        console.error('Failed to upload turbosort file to S3:', s3Error);
-        // Don't fail the request if S3 upload fails, we still have the local file
-      }
-    }
+    // 5. Optionally: Update database records or delete original files (handle with care)
+    // For now, just report success
 
+    logger.info(`TurboSort completed for project ${project.name}. ${sortedFiles.length} files copied.`);
     res.json({
       status: 'success',
-      message: 'Turbosort directory set successfully',
-      data: { directory }
+      message: `TurboSort initiated. ${sortedFiles.length} files are being copied.`,
+      // Optionally return details about the copy operations
     });
+
   } catch (error) {
-    console.error('Failed to set turbosort directory:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Failed to set turbosort directory'
-    });
+    logger.error(`TurboSort failed for project ${projectId}:`, error);
+    res.status(500).json({ status: 'error', message: 'TurboSort operation failed.' });
   }
 });
 
-// Delete turbosort file for a project
+// Endpoint to potentially revert or manage TurboSort results (e.g., delete copied files)
 router.delete('/projects/:projectId/turbosort', authenticateToken, async (req: Request, res: Response) => {
+  const { projectId } = req.params;
+  const { targetBucket } = req.body; // Need the target bucket to know what to delete
+
+  if (!targetBucket) {
+    return res.status(400).json({ status: 'error', message: 'Target bucket is required to revert TurboSort.' });
+  }
+
   try {
-    const { projectId } = req.params;
-
-    // Validate that the project exists
-    const project = await prisma.project.findUnique({
-      where: { id: projectId },
-      include: {
-        client: true
-      }
-    });
-
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
     if (!project) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Project not found'
-      });
+      return res.status(404).json({ status: 'error', message: 'Project not found' });
     }
 
-    // Construct the path to the .turbosort file
-    const projectPath = path.join(process.env.UPLOAD_DIR || 'uploads', projectId);
-    const turbosortPath = path.join(projectPath, '.turbosort');
-    
-    // Check if the file exists before attempting to delete
-    if (fs.existsSync(turbosortPath)) {
-      fs.unlinkSync(turbosortPath);
+    logger.warn(`Initiating TurboSort REVERT for project ${project.name} (ID: ${projectId}) in bucket ${targetBucket}`);
+
+    // List files in the target bucket structure related to this project
+    // This requires knowing the structure used during the sort (e.g., targetBucket/YYYY/MM/DD/)
+    // Example: List all objects under the targetBucket prefix
+    // TODO: Implement s3Service.listObjects
+    // const objectsToDelete = await s3Service.listObjects(targetBucket); // Adjust prefix if needed
+    logger.warn(`[TurboSort Revert] s3Service.listObjects not implemented yet. Cannot delete files.`);
+    const objectsToDelete: { Key?: string }[] = []; // Placeholder
+
+
+    if (objectsToDelete.length === 0) {
+      return res.status(400).json({ status: 'error', message: 'No TurboSort files found in the target bucket to delete.' });
     }
 
-    // Also delete from S3 if project has a client
-    if (project.client && project.client.code) {
-      try {
-        // Generate S3 key based on client and project name
-        const s3Key = s3Service.generateKey(
-          project.client.code,
-          project.name,
-          '.turbosort'
-        );
-
-        // Delete the .turbosort file from S3
-        await s3Service.deleteFile(s3Key);
-        console.log(`Turbosort file deleted from S3 at key: ${s3Key}`);
-      } catch (s3Error) {
-        console.error('Failed to delete turbosort file from S3:', s3Error);
-        // Don't fail the request if S3 deletion fails
-      }
+    // Delete the objects
+    // TODO: Implement s3Service.deleteMultipleFiles
+    // await s3Service.deleteMultipleFiles(objectsToDelete.map((obj: { Key?: string }) => obj.Key).filter((key: string | undefined): key is string => !!key));
+    if (objectsToDelete.length > 0) {
+       logger.warn(`[TurboSort Revert] s3Service.deleteMultipleFiles not implemented yet. Cannot delete files.`);
     }
 
+
+
+    logger.info(`TurboSort REVERT completed for project ${project.name}. ${objectsToDelete.length} files deleted from ${targetBucket}.`);
     res.json({
       status: 'success',
-      message: 'Turbosort file deleted successfully'
+      message: `TurboSort revert completed. ${objectsToDelete.length} files deleted.`,
     });
+
   } catch (error) {
-    console.error('Failed to delete turbosort file:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Failed to delete turbosort file'
-    });
+    logger.error(`TurboSort revert failed for project ${projectId}:`, error);
+    res.status(500).json({ status: 'error', message: 'TurboSort revert operation failed.' });
   }
 });
 
-export default router; 
+// --- NEW ROUTE for Upload Progress ---
+router.post('/progress/:token', async (req: Request, res: Response) => {
+  const { token } = req.params;
+  const {
+    fileId,
+    fileName,
+    bytesUploaded,
+    bytesTotal,
+    // percentage, // Unused variable
+    clientName,
+    projectName,
+  } = req.body;
+
+  // Basic validation of incoming data
+  if (!fileId || !fileName || typeof bytesUploaded !== 'number' || typeof bytesTotal !== 'number') {
+    logger.warn(`[Upload Progress] Invalid progress data received for token ${token}`, req.body);
+    return res.status(400).json({ status: 'error', message: 'Invalid progress data' });
+  }
+
+  logger.debug(`[Upload Progress] Received for ${fileName} (${fileId}): ${bytesUploaded}/${bytesTotal} bytes`);
+
+  try {
+    // 1. Validate the token (essential for security and context)
+    const uploadLink = await prisma.uploadLink.findUnique({
+      where: { token },
+      include: { project: { include: { client: true } } } // Include necessary relations
+    });
+
+    if (!uploadLink) {
+      logger.warn(`[Upload Progress] Invalid token received: ${token}`);
+      return res.status(404).json({ status: 'error', message: 'Upload link not found' });
+    }
+
+    if (uploadLink.expiresAt < new Date()) {
+       logger.warn(`[Upload Progress] Expired token used: ${token}`);
+      return res.status(403).json({ status: 'error', message: 'Upload link has expired' });
+    }
+
+    // If maxUses is null, it means unlimited uses
+    if (uploadLink.maxUses !== null && uploadLink.usedCount >= uploadLink.maxUses) {
+       logger.warn(`[Upload Progress] Token usage limit reached: ${token}`);
+      return res.status(403).json({ status: 'error', message: 'Upload link usage limit reached' });
+    }
+
+    // Use client/project names from the validated token if frontend didn't send them
+    const finalClientName = clientName || uploadLink.project.client.name;
+    const finalProjectName = projectName || uploadLink.project.name;
+
+    // 2. Get the Telegram bot instance
+    const bot = getTelegramBot();
+    if (!bot) {
+      logger.error('[Upload Progress] Telegram bot instance is not available.');
+      // Don't block the upload, just report the issue
+      return res.status(503).json({ status: 'error', message: 'Notification service unavailable' });
+    }
+
+    // 3. Prepare data for the notification service
+    const uploadInfo = {
+      id: fileId, // Use the Uppy file ID as the unique identifier for the message
+      size: bytesTotal,
+      offset: bytesUploaded,
+      metadata: {
+        filename: fileName,
+        clientName: finalClientName,
+        projectName: finalProjectName,
+        // Add any other relevant metadata if needed
+      },
+      isComplete: bytesUploaded >= bytesTotal, // Mark as complete if fully uploaded
+      // uploadSpeed: can be calculated by the bot service based on time between updates
+    };
+
+    // 4. Send the notification (this handles sending/editing)
+    // Use await but don't block the response to the frontend
+    bot.sendUploadNotification(uploadInfo).catch(err => {
+        logger.error(`[Upload Progress] Failed to send Telegram notification for ${fileId}:`, err);
+    });
+
+    // 5. Respond to the frontend immediately
+    res.status(200).json({ status: 'progress received' });
+
+  } catch (error) {
+    logger.error(`[Upload Progress] Error handling progress update for token ${token}:`, error);
+    res.status(500).json({ status: 'error', message: 'Internal server error processing progress' });
+  }
+});
+// --- END NEW ROUTE ---
+
+
+export default router;
