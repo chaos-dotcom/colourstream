@@ -15,7 +15,7 @@
  * @license For commercial use or closed source, contact us at license.mirotalk@gmail.com or purchase directly from CodeCanyon
  * @license CodeCanyon: https://codecanyon.net/item/mirotalk-p2p-webrtc-realtime-video-conferences/38376661
  * @author  Miroslav Pejic - miroslav.pejic.85@gmail.com
- * @version 1.4.80
+ * @version 1.4.98
  *
  */
 
@@ -157,6 +157,9 @@ const videoMediaContainer = getId('videoMediaContainer');
 const videoPinMediaContainer = getId('videoPinMediaContainer');
 const audioMediaContainer = getId('audioMediaContainer');
 
+// Share Room QR popup
+const qrRoomPopupContainer = getId('qrRoomPopupContainer');
+
 // Init audio-video
 const initUser = getId('initUser');
 const initVideoContainer = getQs('.init-video-container');
@@ -164,6 +167,7 @@ const initVideo = getId('initVideo');
 const initVideoBtn = getId('initVideoBtn');
 const initAudioBtn = getId('initAudioBtn');
 const initScreenShareBtn = getId('initScreenShareBtn');
+const initVideoMirrorBtn = getId('initVideoMirrorBtn');
 const initUsernameEmojiButton = getId('initUsernameEmojiButton');
 const initVideoSelect = getId('initVideoSelect');
 const initMicrophoneSelect = getId('initMicrophoneSelect');
@@ -194,6 +198,7 @@ const swapCameraBtn = getId('swapCameraBtn');
 const hideMeBtn = getId('hideMeBtn');
 const screenShareBtn = getId('screenShareBtn');
 const myHandBtn = getId('myHandBtn');
+const leaveRoomBtn = getId('leaveRoomBtn');
 
 // Room Emoji Picker
 const closeEmojiPickerContainer = getId('closeEmojiPickerContainer');
@@ -580,7 +585,7 @@ let myAudio;
 let myVideoWrap;
 let myVideoAvatarImage;
 let myPrivacyBtn;
-//let myVideoPinBtn;
+let myVideoPinBtn;
 let myPitchBar;
 let myVideoParagraph;
 let myHandStatusIcon;
@@ -588,7 +593,7 @@ let myVideoStatusIcon;
 let myAudioStatusIcon;
 let isVideoPrivacyActive = false; // Video circle for privacy
 let isVideoPinned = false;
-let isVideoFullScreenSupported = false;
+let isVideoFullScreenSupported = true;
 let isVideoOnFullScreen = false;
 let isScreenSharingSupported = false;
 let isScreenStreaming = false;
@@ -600,7 +605,7 @@ let camera = 'user'; // user = front-facing camera on a smartphone. | environmen
 let leftChatAvatar;
 let rightChatAvatar;
 let chatMessagesId = 0;
-let showChatOnMessage = false;
+let showChatOnMessage = true;
 let isChatPinned = false;
 let isCaptionPinned = false;
 let isChatRoomVisible = false;
@@ -692,7 +697,7 @@ function getHtmlElementsById() {
     myVideoWrap = getId('myVideoWrap');
     myVideoAvatarImage = getId('myVideoAvatarImage');
     myPrivacyBtn = getId('myPrivacyBtn');
-    //myVideoPinBtn = getId('myVideoPinBtn');
+    myVideoPinBtn = getId('myVideoPinBtn');
     myPitchBar = getId('myPitchBar');
     // My username, hand/video/audio status
     myVideoParagraph = getId('myVideoParagraph');
@@ -710,6 +715,7 @@ function setButtonsToolTip() {
     if (isMobileDevice) return;
     // Init buttons
     setTippy(initScreenShareBtn, 'Toggle screen sharing', 'top');
+    setTippy(initVideoMirrorBtn, 'Toggle video mirror', 'top');
     setTippy(initUsernameEmojiButton, 'Toggle username emoji', 'top');
     // Main buttons
     refreshMainButtonsToolTipPlacement();
@@ -830,6 +836,7 @@ function refreshMainButtonsToolTipPlacement() {
     setTippy(myHandBtn, 'Raise your hand', bottomButtonsPlacement);
     setTippy(chatRoomBtn, 'Open the chat', bottomButtonsPlacement);
     setTippy(mySettingsBtn, 'Open the settings', bottomButtonsPlacement);
+    setTippy(leaveRoomBtn, 'Leave this room', bottomButtonsPlacement);
 }
 
 /**
@@ -1310,18 +1317,18 @@ function roomIsBusy() {
 function handleRules(isPresenter) {
     console.log('14. Peer isPresenter: ' + isPresenter + ' Reconnected to signaling server: ' + isPeerReconnected);
     if (!isPresenter) {
-        buttons.main.showShareRoomBtn = false;
+        //buttons.main.showShareRoomBtn = false;
         buttons.settings.showMicOptionsBtn = false;
         buttons.settings.showTabRoomParticipants = false;
         buttons.settings.showTabRoomSecurity = false;
         buttons.settings.showTabEmailInvitation = false;
-        buttons.remote.audioBtnClickAllowed = false;
-        buttons.remote.videoBtnClickAllowed = false;
+        // buttons.remote.audioBtnClickAllowed = false;
+        // buttons.remote.videoBtnClickAllowed = false;
         buttons.remote.showKickOutBtn = false;
         buttons.whiteboard.whiteboardLockBtn = false;
         //...
     } else {
-        buttons.main.showShareRoomBtn = false;
+        buttons.main.showShareRoomBtn = true;
         buttons.settings.showMicOptionsBtn = true;
         buttons.settings.showTabRoomParticipants = true;
         buttons.settings.showTabRoomSecurity = true;
@@ -1356,7 +1363,7 @@ function handleButtonsRule() {
     elemDisplay(whiteboardBtn, buttons.main.showWhiteboardBtn);
     elemDisplay(snapshotRoomBtn, buttons.main.showSnapshotRoomBtn && !isMobileDevice);
     elemDisplay(fileShareBtn, buttons.main.showFileShareBtn);
-    //elemDisplay(documentPiPBtn, showDocumentPipBtn && buttons.main.showDocumentPipBtn);
+    elemDisplay(documentPiPBtn, showDocumentPipBtn && buttons.main.showDocumentPipBtn);
     elemDisplay(mySettingsBtn, buttons.main.showMySettingsBtn);
     elemDisplay(aboutBtn, buttons.main.showAboutBtn);
     // chat
@@ -1449,6 +1456,9 @@ async function whoAreYou() {
     initAudioBtn.onclick = (e) => {
         handleAudio(e, true);
     };
+    initVideoMirrorBtn.onclick = (e) => {
+        toggleInitVideoMirror();
+    };
     initUsernameEmojiButton.onclick = (e) => {
         getId('usernameInput').value = '';
         toggleUsernameEmoji();
@@ -1460,6 +1470,7 @@ async function whoAreYou() {
         useVideo = false;
         elemDisplay(document.getElementById('initVideo'), false);
         elemDisplay(document.getElementById('initVideoBtn'), false);
+        elemDisplay(document.getElementById('initVideoMirrorBtn'), false);
         elemDisplay(document.getElementById('initVideoSelect'), false);
         elemDisplay(document.getElementById('tabVideoBtn'), false);
     }
@@ -1482,14 +1493,14 @@ async function whoAreYou() {
         allowOutsideClick: false,
         allowEscapeKey: false,
         background: swBg,
-        confirmButtonText: `Join meeting`,
+        title: brand.app?.name || 'MiroTalk P2P',
         position: 'center',
         input: 'text',
-        inputPlaceholder: 'Enter your name in this box',
+        inputPlaceholder: 'Enter your email or name',
         inputAttributes: { maxlength: 32, id: 'usernameInput' },
         inputValue: window.localStorage.peer_name ? window.localStorage.peer_name : '',
         html: initUser, // inject html
-        title: brand.app?.name || 'MiroTalk P2P',
+        confirmButtonText: `Join meeting`,
         customClass: { popup: 'init-modal-size' },
         showClass: { popup: 'animate__animated animate__fadeInDown' },
         hideClass: { popup: 'animate__animated animate__fadeOutUp' },
@@ -1713,6 +1724,25 @@ async function checkInitConfig() {
 }
 
 /**
+ * Detects whether the camera stream is front-facing ('user') or rear-facing ('environment').
+ * Defaults to 'user' (front-facing) if detection fails (e.g., desktop cameras).
+ * @param {MediaStream} stream - The video stream from `getUserMedia`.
+ * @returns {string} 'user' (front) or 'environment' (rear).
+ */
+function detectCameraFacingMode(stream) {
+    if (!stream || !stream.getVideoTracks().length) {
+        console.warn("No video track found in the stream. Defaulting to 'user'.");
+        return 'user';
+    }
+    const videoTrack = stream.getVideoTracks()[0];
+    const settings = videoTrack.getSettings();
+    const capabilities = videoTrack.getCapabilities?.() || {};
+    // Priority: settings.facingMode (actual) → capabilities.facingMode (possible) → default 'user'
+    const facingMode = settings.facingMode || capabilities.facingMode?.[0] || 'user';
+    return facingMode === 'environment' ? 'environment' : 'user'; // Force valid output
+}
+
+/**
  * Change init camera by device id
  * @param {string} deviceId
  */
@@ -1758,6 +1788,9 @@ async function changeInitCamera(deviceId) {
      */
     function updateInitLocalVideoMediaStream(camStream) {
         if (camStream) {
+            // Detect camera
+            camera = detectCameraFacingMode(camStream);
+            console.log('Detect Camera facing mode', camera);
             // We going to update init video stream
             initVideo.srcObject = camStream;
             initStream = camStream;
@@ -1829,6 +1862,8 @@ async function changeLocalCamera(deviceId) {
      */
     function updateLocalVideoMediaStream(camStream) {
         if (camStream) {
+            camera = detectCameraFacingMode(camStream);
+            console.log('Detect Camera facing mode', camera);
             myVideo.srcObject = camStream;
             localVideoMediaStream = camStream;
             logStreamSettingsInfo('Success attached local video stream', camStream);
@@ -1936,6 +1971,7 @@ async function joinToChannel() {
         userAgent: userAgent,
     });
     handleBodyOnMouseMove(); // show/hide buttonsBar, bottomButtons ...
+    makeRoomPopupQR();
 }
 
 /**
@@ -3008,6 +3044,7 @@ async function loadLocalMedia(stream, kind) {
             const myAudioStatusIcon = document.createElement('button');
             const myVideoFullScreenBtn = document.createElement('button');
             const myVideoPinBtn = document.createElement('button');
+            const myVideoMirrorBtn = document.createElement('button');
             const myVideoZoomInBtn = document.createElement('button');
             const myVideoZoomOutBtn = document.createElement('button');
             const myVideoPiPBtn = document.createElement('button');
@@ -3048,8 +3085,8 @@ async function loadLocalMedia(stream, kind) {
             myVideoToImgBtn.className = className.snapShot;
 
             // my video full screen mode
-            //myVideoFullScreenBtn.setAttribute('id', 'myVideoFullScreenBtn');
-            //myVideoFullScreenBtn.className = className.fullScreen;
+            myVideoFullScreenBtn.setAttribute('id', 'myVideoFullScreenBtn');
+            myVideoFullScreenBtn.className = className.fullScreen;
 
             // my video zoomIn/Out
             myVideoZoomInBtn.setAttribute('id', 'myVideoZoomInBtn');
@@ -3062,11 +3099,12 @@ async function loadLocalMedia(stream, kind) {
             myVideoPiPBtn.className = className.pip;
 
             // my video pin/unpin button
-            //myVideoPinBtn.setAttribute('id', 'myVideoPinBtn');
-            //myVideoPinBtn.className = className.pinUnpin;
+            myVideoPinBtn.setAttribute('id', 'myVideoPinBtn');
+            myVideoPinBtn.className = className.pinUnpin;
 
             // my video toggle mirror
-
+            myVideoMirrorBtn.setAttribute('id', 'myVideoMirror');
+            myVideoMirrorBtn.className = className.mirror;
 
             // no mobile devices
             if (!isMobileDevice) {
@@ -3077,11 +3115,12 @@ async function loadLocalMedia(stream, kind) {
                 setTippy(myVideoStatusIcon, 'My video is on', 'bottom');
                 setTippy(myAudioStatusIcon, 'My audio is on', 'bottom');
                 setTippy(myVideoToImgBtn, 'Take a snapshot', 'bottom');
-                //setTippy(myVideoFullScreenBtn, 'Full screen mode', 'bottom');
-                //setTippy(myVideoPiPBtn, 'Toggle picture in picture', 'bottom');
+                setTippy(myVideoFullScreenBtn, 'Full screen mode', 'bottom');
+                setTippy(myVideoPiPBtn, 'Toggle picture in picture', 'bottom');
                 setTippy(myVideoZoomInBtn, 'Zoom in video', 'bottom');
                 setTippy(myVideoZoomOutBtn, 'Zoom out video', 'bottom');
                 setTippy(myVideoPinBtn, 'Toggle Pin video', 'bottom');
+                setTippy(myVideoMirrorBtn, 'Toggle video mirror', 'bottom');
             }
 
             // my video avatar image
@@ -3101,8 +3140,9 @@ async function loadLocalMedia(stream, kind) {
             // attach to video nav bar
             myVideoNavBar.appendChild(mySessionTime);
 
-            //!isMobileDevice && myVideoNavBar.appendChild(myVideoPinBtn);
+            !isMobileDevice && myVideoNavBar.appendChild(myVideoPinBtn);
 
+            myVideoNavBar.appendChild(myVideoMirrorBtn);
 
             if (showVideoPipBtn && buttons.local.showVideoPipBtn) myVideoNavBar.appendChild(myVideoPiPBtn);
 
@@ -3151,6 +3191,7 @@ async function loadLocalMedia(stream, kind) {
             attachMediaStream(myLocalMedia, stream);
             adaptAspectRatio();
 
+            handleVideoToggleMirror(myLocalMedia.id, myVideoMirrorBtn.id);
 
             isVideoFullScreenSupported && handleVideoPlayerFs(myLocalMedia.id, myVideoFullScreenBtn.id);
 
@@ -3495,11 +3536,13 @@ async function loadRemoteMediaStream(stream, peers, peer_id, kind) {
                 handlePictureInPicture(remoteVideoPiPBtn.id, remoteMedia.id, peer_id);
 
             // handle video zoomIn/Out
-            //ZOOM_IN_OUT_ENABLED &&
-            //    handleVideoZoomInOut(remoteVideoZoomInBtn.id, remoteVideoZoomOutBtn.id, remoteMedia.id, peer_id);
+            ZOOM_IN_OUT_ENABLED &&
+                handleVideoZoomInOut(remoteVideoZoomInBtn.id, remoteVideoZoomOutBtn.id, remoteMedia.id, peer_id);
 
             // pin video on screen share detected
-            if (peer_video_status && peer_screen_status) remoteVideoPinBtn.click();
+            if (peer_video_status && peer_screen_status) {
+                remoteVideoPinBtn.click();
+            }
 
             // handle video full screen mode
             isVideoFullScreenSupported && handleVideoPlayerFs(remoteMedia.id, remoteVideoFullScreenBtn.id, peer_id);
@@ -4130,7 +4173,17 @@ function handleVideoZoomInOut(zoomInBtnId, zoomOutBtnId, mediaId, peerId = null)
     const zoomOut = getId(zoomOutBtnId);
     const video = getId(mediaId);
 
+    /**
+     * 1.1: This value is used when the `zoomDirection` is 'zoom-in'.
+     * It means that when the user scrolls the mouse wheel up (indicating a zoom-in action), the scale factor is set to 1.1.
+     * This means that the content will be scaled up to 110% of its original size with each scroll event, effectively making it larger.
+     */
     const ZOOM_IN_FACTOR = 1.1;
+    /**
+     * 0.9: This value is used when the zoomDirection is 'zoom-out'.
+     * It means that when the user scrolls the mouse wheel down (indicating a zoom-out action), the scale factor is set to 0.9.
+     * This means that the content will be scaled down to 90% of its original size with each scroll event, effectively making it smaller.
+     */
     const ZOOM_OUT_FACTOR = 0.9;
     const MAX_ZOOM = 1;
     const MIN_ZOOM = 1;
@@ -4149,7 +4202,48 @@ function handleVideoZoomInOut(zoomInBtnId, zoomOutBtnId, mediaId, peerId = null)
         video.style.transformOrigin = 'center';
     }
 
-    // Removed scroll wheel zoom behavior
+    if (!isMobileDevice) {
+        // Zoom center
+        if (ZOOM_CENTER_MODE) {
+            video.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                let delta = e.wheelDelta ? e.wheelDelta : -e.deltaY;
+                delta > 0 ? (zoom *= 1.2) : (zoom /= 1.2);
+                setTransform();
+            });
+        } else {
+            // Zoom on cursor position
+            video.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                if (isVideoOf(id) || isVideoPrivacyMode(video)) return;
+
+                const rect = videoWrap.getBoundingClientRect();
+                const cursorX = e.clientX - rect.left;
+                const cursorY = e.clientY - rect.top;
+
+                const zoomDirection = e.deltaY > 0 ? 'zoom-out' : 'zoom-in';
+                const scaleFactor = zoomDirection === 'zoom-out' ? ZOOM_OUT_FACTOR : ZOOM_IN_FACTOR;
+
+                zoom *= scaleFactor;
+                zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
+
+                video.style.transformOrigin = `${cursorX}px ${cursorY}px`;
+                video.style.transform = `scale(${zoom})`;
+                video.style.cursor = zoom === 1 ? 'pointer' : zoomDirection;
+            });
+
+            videoWrap.addEventListener('mouseleave', () => {
+                video.style.cursor = 'pointer';
+                if (video.id === myVideo.id && !isScreenStreaming) {
+                    resetZoom(video);
+                }
+            });
+
+            video.addEventListener('mouseleave', () => {
+                video.style.cursor = 'pointer';
+            });
+        }
+    }
 
     if (buttons.local.showZoomInOutBtn) {
         zoomIn.addEventListener('click', () => {
@@ -4382,6 +4476,7 @@ function manageButtons() {
     setSwapCameraBtn();
     setHideMeButton();
     setMyHandBtn();
+    setLeaveRoomBtn();
 }
 
 /**
@@ -4390,6 +4485,14 @@ function manageButtons() {
 function setShareRoomBtn() {
     shareRoomBtn.addEventListener('click', async (e) => {
         shareRoomUrl();
+    });
+    shareRoomBtn.addEventListener('mouseenter', () => {
+        if (isMobileDevice || !buttons.main.showShareQr) return;
+        elemDisplay(qrRoomPopupContainer, true);
+    });
+    shareRoomBtn.addEventListener('mouseleave', () => {
+        if (isMobileDevice || !buttons.main.showShareQr) return;
+        elemDisplay(qrRoomPopupContainer, false);
     });
 }
 
@@ -5363,7 +5466,11 @@ function setAboutBtn() {
 /**
  * Leave room button click event
  */
-
+function setLeaveRoomBtn() {
+    leaveRoomBtn.addEventListener('click', (e) => {
+        leaveRoom();
+    });
+}
 
 /**
  * Handle left buttons - status menù show - hide on body mouse move
@@ -5838,22 +5945,14 @@ function setupVideoUrlPlayer() {
  * Handle Camera mirror logic
  */
 async function handleLocalCameraMirror() {
-    if (isDesktopDevice) {
-        // Desktop devices...
-        if (!initVideo.classList.contains('mirror')) {
-            initVideo.classList.toggle('mirror');
-        }
-        if (!myVideo.classList.contains('mirror')) {
-            myVideo.classList.toggle('mirror');
-        }
+    if (camera === 'environment') {
+        // Back camera → No mirror
+        initVideo.classList.remove('mirror');
+        myVideo.classList.remove('mirror');
     } else {
-        // Mobile, Tablet, IPad devices...
-        if (initVideo.classList.contains('mirror')) {
-            initVideo.classList.remove('mirror');
-        }
-        if (myVideo.classList.contains('mirror')) {
-            myVideo.classList.remove('mirror');
-        }
+        // Disable mirror for rear camera
+        initVideo.classList.add('mirror');
+        myVideo.classList.add('mirror');
     }
 }
 
@@ -5881,6 +5980,13 @@ function handleUsernameEmojiPicker() {
     }
 }
 
+/**
+ * Toggle vide mirror
+ */
+function toggleInitVideoMirror() {
+    initVideo.classList.toggle('mirror');
+    myVideo.classList.toggle('mirror');
+}
 
 /**
  * Get audio - video constraints
@@ -6230,8 +6336,21 @@ function shareRoomMeetingURL(checkScreen = false) {
  * https://github.com/neocotic/qrious
  */
 function makeRoomQR() {
-    let qr = new QRious({
+    const qr = new QRious({
         element: getId('qrRoom'),
+        value: window.location.href,
+    });
+    qr.set({
+        size: 256,
+    });
+}
+
+/**
+ * Make Room Popup QR
+ */
+function makeRoomPopupQR() {
+    const qr = new QRious({
+        element: document.getElementById('qrRoomPopup'),
         value: window.location.href,
     });
     qr.set({
@@ -6372,6 +6491,7 @@ async function handleVideo(e, init, force = null) {
         initVideoSelect.disabled = !videoStatus;
         lS.setInitConfig(lS.MEDIA_TYPE.video, videoStatus);
         initVideoContainerShow(videoStatus);
+        elemDisplay(initVideoMirrorBtn, videoStatus);
     }
 
     if (!videoStatus) {
@@ -6550,7 +6670,9 @@ async function toggleScreenSharing(init = false) {
                 isScreenStreaming ? elemDisplay(myPrivacyBtn, false) : elemDisplay(myPrivacyBtn, true);
             }
 
-            if (isScreenStreaming || isVideoPinned) myVideoPinBtn.click();
+            if ((isScreenStreaming && thereArePeerConnections()) || isVideoPinned) {
+                myVideoPinBtn.click();
+            }
         }
     } catch (err) {
         err.name === 'NotAllowedError'
@@ -7175,7 +7297,7 @@ function handleMediaRecorderStop(event) {
         });
         isRecScreenStream = false;
     }
-    recordStreamBtn.style.setProperty('color', '#000');
+    recordStreamBtn.style.setProperty('color', '#ffffff');
     downloadRecordedStream();
     setTippy(recordStreamBtn, 'Start recording', placement);
     if (isMobileDevice) elemDisplay(swapCameraBtn, true, 'block');
@@ -8257,17 +8379,13 @@ function isHtml(str) {
  * @param {string} str to check
  * @returns boolean true/false
  */
-function isValidHttpURL(url) {
-    const pattern = new RegExp(
-        '^(https?:\\/\\/)?' + // protocol
-            '((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.)+[a-z]{2,}|' + // domain name
-            '((\\d{1,3}\\.){3}\\d{1,3}))' + // OR ip (v4) address
-            '(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*' + // port and path
-            '(\\?[;&a-z\\d%_.~+=-]*)?' + // query string
-            '(\\#[-a-z\\d_]*)?$',
-        'i', // fragment locator
-    );
-    return pattern.test(url);
+function isValidHttpURL(input) {
+    try {
+        new URL(input);
+        return true;
+    } catch (_) {
+        return false;
+    }
 }
 
 /**
@@ -10962,7 +11080,7 @@ function showAbout() {
     Swal.fire({
         background: swBg,
         position: 'center',
-        title: brand.about?.title && brand.about.title.trim() !== '' ? brand.about.title : 'WebRTC P2P v1.4.80',
+        title: brand.about?.title && brand.about.title.trim() !== '' ? brand.about.title : 'WebRTC P2P v1.4.98',
         imageUrl: brand.about?.imageUrl && brand.about.imageUrl.trim() !== '' ? brand.about.imageUrl : images.about,
         customClass: { image: 'img-about' },
         html: `
@@ -11011,6 +11129,14 @@ function showAbout() {
 /**
  * Leave the Room and create a new one
  */
+function leaveRoom() {
+    checkRecording();
+    if (surveyActive) {
+        leaveFeedback();
+    } else {
+        redirectOnLeave();
+    }
+}
 
 /**
  * Ask for feedback when room exit

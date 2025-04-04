@@ -94,6 +94,13 @@ access to use this app.
             </pre>
         </div>
 
+        <!-- Scan to Join -->
+
+        <div id="qrRoomPopupContainer" class="top-center fadein">
+            <canvas id="qrRoomPopup"></canvas>
+            <div id="qrText">Scan to join the room</div>
+        </div>
+
         <!-- init user devices -->
 
         <div id="initUser" class="init-user hidden">
@@ -111,6 +118,7 @@ access to use this app.
                 <button id="initVideoBtn" class="fas fa-video"></button>
                 <button id="initAudioBtn" class="fas fa-microphone"></button>
                 <button id="initScreenShareBtn" class="fas fa-desktop"></button>
+                <button id="initVideoMirrorBtn" class="fas fa-arrow-right-arrow-left"></button>
                 <button id="initUsernameEmojiButton" class="fas fa-smile"></button>
                 <select id="initVideoSelect" class="form-select text-light bg-dark"></select>
                 <select id="initMicrophoneSelect" class="form-select text-light bg-dark"></select>
@@ -149,6 +157,7 @@ access to use this app.
             <button id="myHandBtn" class="fas fa-hand-paper"></button>
             <button id="chatRoomBtn" class="fas fa-comment"></button>
             <button id="mySettingsBtn" class="fas fa-cogs"></button>
+            <button id="leaveRoomBtn" class="fa-solid fa-phone-slash"></button>
         </div>
 
         <!-- End bottom buttons -->

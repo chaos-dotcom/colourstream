@@ -22,7 +22,7 @@ let buttons = {
         showFileShareBtn: false,
         showDocumentPipBtn: false,
         showMySettingsBtn: true,
-        showAboutBtn: false, // Please keep me always true, Thank you!
+        showAboutBtn: true, // Please keep me always true, Thank you!
     },
     chat: {
         showTogglePinBtn: false,
@@ -35,8 +35,8 @@ let buttons = {
         showParticipantsBtn: false,
     },
     caption: {
-        showTogglePinBtn: false,
-        showMaxBtn: false,
+        showTogglePinBtn: true,
+        showMaxBtn: true,
     },
     settings: {
         showMicOptionsBtn: true,

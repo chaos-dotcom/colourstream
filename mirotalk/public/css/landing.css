@@ -1753,7 +1753,7 @@ textarea.form-input {
 @-webkit-keyframes slideUpInModal {
     0% {
         opacity: 0;
-        transform: translateY(-100%);
+        transform: translateY(-24px);
     }
     to {
         opacity: 1;
@@ -1764,7 +1764,7 @@ textarea.form-input {
 @keyframes slideUpInModal {
     0% {
         opacity: 0;
-        transform: translateY(-100%);
+        transform: translateY(-24px);
     }
     to {
         opacity: 1;

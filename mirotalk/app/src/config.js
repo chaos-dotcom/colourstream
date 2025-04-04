@@ -7,8 +7,8 @@ module.exports = {
     brand: {
         app: {
             language: 'en', // https://en.wikipedia.org/wiki/List_of_ISO_639_language_codes
-            name: 'ColourStream Video',
-            title: 'ColourStream Video<br />Free browser based Real-time video calls.<br />Simple, Secure, Fast.',
+            name: 'MiroTalk',
+            title: 'MiroTalk<br />Free browser based Real-time video calls.<br />Simple, Secure, Fast.',
             description:
                 'Start your next video call with a single click. No download, plug-in, or login is required. Just get straight to talking, messaging, and sharing your screen.',
             joinDescription: 'Pick a room name.<br />How about this one?',
@@ -17,26 +17,26 @@ module.exports = {
         },
         og: {
             type: 'app-webrtc',
-            siteName: 'ColourStream Video',
+            siteName: 'MiroTalk',
             title: 'Click the link to make a call.',
             description:
-                'ColourStream Video calling provides real-time HD quality and latency simply not available with traditional technology.',
-            image: 'https://video.colourstream.johnrogers.co.uk/images/preview.png',
-            url: 'https://video.colourstream.johnrogers.co.uk',
+                'MiroTalk calling provides real-time HD quality and latency simply not available with traditional technology.',
+            image: 'https://p2p.mirotalk.com/images/preview.png',
+            url: 'https://p2p.mirotalk.com',
         },
         site: {
             shortcutIcon: '../images/logo.svg',
             appleTouchIcon: '../images/logo.svg',
-            landingTitle: 'ColourStream Video a Free Secure Video Calls, Chat & Screen Sharing.',
-            newCallTitle: 'ColourStream Video a Free Secure Video Calls, Chat & Screen Sharing.',
+            landingTitle: 'MiroTalk a Free Secure Video Calls, Chat & Screen Sharing.',
+            newCallTitle: 'MiroTalk a Free Secure Video Calls, Chat & Screen Sharing.',
             newCallRoomTitle: 'Pick name. <br />Share URL. <br />Start conference.',
             newCallRoomDescription:
                 "Each room has its disposable URL. Just pick a room name and share your custom URL. It's that easy.",
-            loginTitle: 'ColourStream Video - Host Protected login required.',
-            clientTitle: 'ColourStream Video WebRTC Video call, Chat Room & Screen Sharing.',
-            privacyPolicyTitle: 'ColourStream Video - privacy and policy.',
+            loginTitle: 'MiroTalk - Host Protected login required.',
+            clientTitle: 'MiroTalk WebRTC Video call, Chat Room & Screen Sharing.',
+            privacyPolicyTitle: 'MiroTalk - privacy and policy.',
             stunTurnTitle: 'Test Stun/Turn Servers.',
-            notFoundTitle: 'ColourStream Video - 404 Page not found.',
+            notFoundTitle: 'MiroTalk - 404 Page not found.',
         },
         html: {
             features: true,
@@ -69,24 +69,25 @@ module.exports = {
                 Email:<a 
                     id="email-button" 
                     data-umami-event="Email button" 
-                    href="mailto:miroslav.pejic.85@gmail.com?subject=ColourStream Video P2P info"> 
+                    href="mailto:miroslav.pejic.85@gmail.com?subject=MiroTalk P2P info"> 
                     miroslav.pejic.85@gmail.com
                 </a>
                 <br /><br />
                 <hr />
-                <span>&copy; 2025 ColourStream Video P2P, all rights reserved</span>
+                <span>&copy; 2025 MiroTalk P2P, all rights reserved</span>
                 <hr />
             `,
         },
         //...
     },
     /**
-     * Configuration for controlling the visibility of buttons in the ColourStream Video P2P client.
+     * Configuration for controlling the visibility of buttons in the MiroTalk P2P client.
      * Set properties to true to show the corresponding buttons, or false to hide them.
      * captionBtn, showSwapCameraBtn, showScreenShareBtn, showFullScreenBtn, showVideoPipBtn, showDocumentPipBtn -> (auto-detected).
      */
     buttons: {
         main: {
+            showShareQr: false,
             showShareRoomBtn: false, // For guests
             showHideMeBtn: false,
             showAudioBtn: true,
@@ -102,7 +103,7 @@ module.exports = {
             showFileShareBtn: false,
             showDocumentPipBtn: false,
             showMySettingsBtn: true,
-            showAboutBtn: false, // Please keep me always true, Thank you!
+            showAboutBtn: true, // Please keep me always true, Thank you!
         },
         chat: {
             showTogglePinBtn: false,
@@ -110,45 +111,45 @@ module.exports = {
             showSaveMessageBtn: false,
             showMarkDownBtn: false,
             showChatGPTBtn: false,
-            showFileShareBtn: false,
-            showShareVideoAudioBtn: false,
-            showParticipantsBtn: false,
+            showFileShareBtn: true,
+            showShareVideoAudioBtn: true,
+            showParticipantsBtn: true,
         },
         caption: {
-            showTogglePinBtn: false,
-            showMaxBtn: false,
+            showTogglePinBtn: true,
+            showMaxBtn: true,
         },
         settings: {
             showMicOptionsBtn: true,
             showTabRoomPeerName: true,
             showTabRoomParticipants: true,
-            showTabRoomSecurity: false,
-            showTabEmailInvitation: false,
+            showTabRoomSecurity: true,
+            showTabEmailInvitation: true,
             showCaptionEveryoneBtn: true,
-            showMuteEveryoneBtn: false,
-            showHideEveryoneBtn: false,
-            showEjectEveryoneBtn: false,
-            showLockRoomBtn: false,
-            showUnlockRoomBtn: false,
-            showShortcutsBtn: false,
+            showMuteEveryoneBtn: true,
+            showHideEveryoneBtn: true,
+            showEjectEveryoneBtn: true,
+            showLockRoomBtn: true,
+            showUnlockRoomBtn: true,
+            showShortcutsBtn: true,
         },
         remote: {
             showAudioVolume: true,
-            audioBtnClickAllowed: false,
-            videoBtnClickAllowed: false,
-            showVideoPipBtn: false,
-            showKickOutBtn: false,
-            showSnapShotBtn: false,
-            showFileShareBtn: false,
-            showShareVideoAudioBtn: false,
-            showPrivateMessageBtn: false,
+            audioBtnClickAllowed: true,
+            videoBtnClickAllowed: true,
+            showVideoPipBtn: true,
+            showKickOutBtn: true,
+            showSnapShotBtn: true,
+            showFileShareBtn: true,
+            showShareVideoAudioBtn: true,
+            showPrivateMessageBtn: true,
             showZoomInOutBtn: false,
-            showVideoFocusBtn: false,
+            showVideoFocusBtn: true,
         },
         local: {
-            showVideoPipBtn: false,
-            showSnapShotBtn: false,
-            showVideoCircleBtn: false,
+            showVideoPipBtn: true,
+            showSnapShotBtn: true,
+            showVideoCircleBtn: true,
             showZoomInOutBtn: false,
         },
         whiteboard: {

@@ -87,6 +87,7 @@ module.exports = {
      */
     buttons: {
         main: {
+            showShareQr: true,
             showShareRoomBtn: true, // For guests
             showHideMeBtn: false,
             showAudioBtn: true,
