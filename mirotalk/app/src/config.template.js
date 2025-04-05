@@ -39,14 +39,14 @@ module.exports = {
             notFoundTitle: 'MiroTalk - 404 Page not found.',
         },
         html: {
-            features: false,
+            features: true,
             browsers: true,
             teams: true, // please keep me always true ;)
             tryEasier: true,
-            poweredBy: false,
-            sponsors: false,
-            advertisers: false,
-            footer: false,
+            poweredBy: true,
+            sponsors: true,
+            advertisers: true,
+            footer: true,
         },
         about: {
             imageUrl: '../images/mirotalk-logo.gif',
@@ -87,8 +87,9 @@ module.exports = {
      */
     buttons: {
         main: {
+            showShareQr: true,
             showShareRoomBtn: true, // For guests
-            showHideMeBtn: false,
+            showHideMeBtn: true,
             showAudioBtn: true,
             showVideoBtn: true,
             showScreenBtn: true, // autodetected

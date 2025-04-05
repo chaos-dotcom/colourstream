@@ -3495,8 +3495,8 @@ async function loadRemoteMediaStream(stream, peers, peer_id, kind) {
                 handlePictureInPicture(remoteVideoPiPBtn.id, remoteMedia.id, peer_id);
 
             // handle video zoomIn/Out
-            //ZOOM_IN_OUT_ENABLED &&
-            //    handleVideoZoomInOut(remoteVideoZoomInBtn.id, remoteVideoZoomOutBtn.id, remoteMedia.id, peer_id);
+            ZOOM_IN_OUT_ENABLED &&
+                handleVideoZoomInOut(remoteVideoZoomInBtn.id, remoteVideoZoomOutBtn.id, remoteMedia.id, peer_id);
 
             // pin video on screen share detected
             if (peer_video_status && peer_screen_status) remoteVideoPinBtn.click();

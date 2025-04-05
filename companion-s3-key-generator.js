@@ -1,17 +1,4 @@
 #!/usr/bin/env node
-
-/**
- * Custom key generator for Uppy Companion
- * This file implements the /CLIENT/PROJECT/filename structure for S3 uploads
- * 
- * File Structure:
- * - CLIENT - The client's name or code (spaces replaced with underscores)
- * - PROJECT - The project name (spaces replaced with underscores)
- * - filename - The original filename with UUIDs stripped
- * 
- * Example: "Client_Name/Project_Name/original_filename.mp4"
- */
-
 // This function will be used by Companion to generate clean keys for S3 uploads
 // It strips out UUIDs and organizes files by client and project folders
 // Reference: https://uppy.io/docs/companion/#s3-storage

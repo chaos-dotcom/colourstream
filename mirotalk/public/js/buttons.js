@@ -7,6 +7,7 @@
  */
 let buttons = {
     main: {
+        showShareQr: false,
         showShareRoomBtn: false, // For guests
         showHideMeBtn: false,
         showAudioBtn: true,
@@ -22,7 +23,7 @@ let buttons = {
         showFileShareBtn: false,
         showDocumentPipBtn: false,
         showMySettingsBtn: true,
-        showAboutBtn: false, // Please keep me always true, Thank you!
+        showAboutBtn: true, // Please keep me always true, Thank you!
     },
     chat: {
         showTogglePinBtn: false,

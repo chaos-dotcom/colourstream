@@ -372,28 +372,28 @@ services:
       - "traefik.http.middlewares.sio.headers.customrequestheaders.X-Forwarded-Proto=https"
       - "traefik.http.routers.mirotalk-ws.middlewares=sio"
 
-  coturn:
-    image: coturn/coturn
-    container_name: colourstream-coturn
-    restart: always
-    volumes:
-      - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
-      - ./certs/certs/video.colourstream.${DOMAIN}.crt:/certs/video.colourstream.${DOMAIN}.crt:ro
-      - ./certs/private/video.colourstream.${DOMAIN}.key:/certs/video.colourstream.${DOMAIN}.key:ro
-    ports:
-      - "3480:3480"
-      - "3480:3480/udp"
-      - "5350:5350"
-      - "5350:5350/udp"
-      - "30000-31000:30000-31000/udp"
-    networks:
-      - network
-    labels:
-      - "traefik.enable=true"
-      - "traefik.tcp.routers.coturn.rule=HostSNI(`*`)"
-      - "traefik.tcp.routers.coturn.entrypoints=websecure"
-      - "traefik.tcp.routers.coturn.service=coturn"
-      - "traefik.tcp.services.coturn.loadbalancer.server.port=3480"
+#  coturn:
+#    image: coturn/coturn
+#    container_name: colourstream-coturn
+#    restart: always
+#    volumes:
+#      - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+#      - ./certs/certs/video.colourstream.${DOMAIN}.crt:/certs/video.colourstream.${DOMAIN}.crt:ro
+#      - ./certs/private/video.colourstream.${DOMAIN}.key:/certs/video.colourstream.${DOMAIN}.key:ro
+#    ports:
+#      - "3480:3480"
+#      - "3480:3480/udp"
+#      - "5350:5350"
+#      - "5350:5350/udp"
+#      - "30000-31000:30000-31000/udp"
+#    networks:
+#      - network
+#    labels:
+#      - "traefik.enable=true"
+#      - "traefik.tcp.routers.coturn.rule=HostSNI(`*`)"
+#      - "traefik.tcp.routers.coturn.entrypoints=websecure"
+#      - "traefik.tcp.routers.coturn.service=coturn"
+#      - "traefik.tcp.services.coturn.loadbalancer.server.port=3480"
 
   minio:
     image: minio/minio:latest
@@ -470,7 +470,8 @@ services:
       # Custom S3 key generator to strip UUIDs from filenames
       # Uses /CLIENT/PROJECT/filename structure for consistent organization
       COMPANION_S3_GET_KEY_NAME: "stripUuid"
-      COMPANION_S3_GET_KEY_FROM_NAME: "true"
+      # Path inside the container to the custom module for S3 key generation
+      COMPANION_S3_KEY_MODULE_PATH: "/app/companion-s3-key-generator.js"
 
       # Performance optimizations for large files
       COMPANION_UPLOAD_TIMEOUT: 86400000 # 24 hours in milliseconds
@@ -482,9 +483,9 @@ services:
       # Redis for session storage (optional, can add later if needed)
       COMPANION_PATH: "/companion"
       COMPANION_DOMAIN: "upload.colourstream.${DOMAIN}"
-    env_file:
-      - ./.env.companion
     volumes:
+      # Mount the custom script into the container
+      - ./companion-s3-key-generator.js:/app/companion-s3-key-generator.js:ro
       - companion_data:/data
     networks:
       - network
