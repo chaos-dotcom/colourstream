@@ -4202,48 +4202,7 @@ function handleVideoZoomInOut(zoomInBtnId, zoomOutBtnId, mediaId, peerId = null)
         video.style.transformOrigin = 'center';
     }
 
-    if (!isMobileDevice) {
-        // Zoom center
-        if (ZOOM_CENTER_MODE) {
-            video.addEventListener('wheel', (e) => {
-                e.preventDefault();
-                let delta = e.wheelDelta ? e.wheelDelta : -e.deltaY;
-                delta > 0 ? (zoom *= 1.2) : (zoom /= 1.2);
-                setTransform();
-            });
-        } else {
-            // Zoom on cursor position
-            video.addEventListener('wheel', (e) => {
-                e.preventDefault();
-                if (isVideoOf(id) || isVideoPrivacyMode(video)) return;
-
-                const rect = videoWrap.getBoundingClientRect();
-                const cursorX = e.clientX - rect.left;
-                const cursorY = e.clientY - rect.top;
-
-                const zoomDirection = e.deltaY > 0 ? 'zoom-out' : 'zoom-in';
-                const scaleFactor = zoomDirection === 'zoom-out' ? ZOOM_OUT_FACTOR : ZOOM_IN_FACTOR;
-
-                zoom *= scaleFactor;
-                zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
-
-                video.style.transformOrigin = `${cursorX}px ${cursorY}px`;
-                video.style.transform = `scale(${zoom})`;
-                video.style.cursor = zoom === 1 ? 'pointer' : zoomDirection;
-            });
-
-            videoWrap.addEventListener('mouseleave', () => {
-                video.style.cursor = 'pointer';
-                if (video.id === myVideo.id && !isScreenStreaming) {
-                    resetZoom(video);
-                }
-            });
-
-            video.addEventListener('mouseleave', () => {
-                video.style.cursor = 'pointer';
-            });
-        }
-    }
+    // Removed scroll wheel zoom behavior
 
     if (buttons.local.showZoomInOutBtn) {
         zoomIn.addEventListener('click', () => {

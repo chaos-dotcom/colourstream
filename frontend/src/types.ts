@@ -51,4 +51,20 @@ export interface OIDCConfigResponse {
   config: OIDCConfig | null;
   isInitialized: boolean;
   clientSecret?: string | null;
-} 
+}
+
+// Interface for active upload data received via WebSocket
+export interface ActiveUpload {
+  id: string; // Corresponds to Uppy file ID
+  fileName: string;
+  size: number;
+  offset: number;
+  percentage: number;
+  speed?: number; // Optional speed in bytes/sec
+  clientName: string;
+  projectName: string;
+  startTime: string; // ISO string date
+  lastUpdate: string; // ISO string date
+  storage: string;
+  isComplete?: boolean; // Flag from backend
+}

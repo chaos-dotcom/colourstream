@@ -1,7 +1,7 @@
 import axios, { AxiosError, AxiosRequestConfig } from 'axios';
 import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
-import type { 
-  ApiResponse, 
+import type {
+  ApiResponse,
   AuthResponse,
   PasskeyInfo,
   WebAuthnRegistrationResponse,
@@ -22,10 +22,10 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
-  
+
   // Log all API requests for debugging
   console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`, config);
-  
+
   return config;
 });
 
@@ -162,7 +162,7 @@ export const createRoom = async (roomData: CreateRoomData): Promise<ApiResponse<
     ...roomData,
     password: roomData.password ? '***' : null, // Mask password for security
   });
-  
+
   const response = await api.post('/rooms', roomData);
   console.log('Room creation response:', response.data);
   return response.data as ApiResponse<{ room: Room }>;
@@ -205,7 +205,7 @@ export const getOBSSettings = async (): Promise<OBSSettings> => {
 export const updateOBSSettings = async (settings: OBSSettings): Promise<{ settings: OBSSettings, warning?: string }> => {
   const response = await api.put('/obs/settings', settings);
   const result = response.data as ApiResponse<{ settings: OBSSettings, warning?: string }>;
-  return { 
+  return {
     settings: result.data.settings,
     warning: result.data.warning
   };
@@ -214,7 +214,7 @@ export const updateOBSSettings = async (settings: OBSSettings): Promise<{ settin
 export const setOBSStreamKey = async (streamKey: string): Promise<void> => {
   // First get the current settings to know which protocol to use
   const settings = await getOBSSettings();
-  const response = await api.post('/obs/set-stream-key', { 
+  const response = await api.post('/obs/set-stream-key', {
     streamKey,
     protocol: settings.protocol || 'rtmp'  // Use protocol instead of streamType
   });
@@ -250,35 +250,35 @@ export const firstTimeSetup = async (): Promise<ApiResponse<AuthResponse>> => {
     if (!response.data) {
       throw new Error('No registration options received from server');
     }
-    
+
     // Check if the options are nested in an 'options' property
     const registrationOptions = response.data.options || response.data;
-    
+
     // Log the registration options for debugging
     console.log('Server registration options:', response.data);
-    
+
     // Validate that we have the expected WebAuthn options structure
     if (!registrationOptions.challenge || !registrationOptions.rp) {
       console.log('Invalid options received from server:', response.data);
       throw new Error('Server returned invalid registration options');
     }
-    
+
     // Step 2: Start the registration process in the browser
     try {
       const credential = await startRegistration(registrationOptions);
-      
+
       // Step 3: Send the credential back to the server for verification
       const verificationResponse = await api.post('/auth/webauthn/first-time-setup/verify', credential);
-      
+
       // Step 4: Store the authentication token
       const result = verificationResponse.data;
       console.log('Verification response received:', JSON.stringify(result, null, 2));
-      
+
       // Check if the token is in the expected location in the response
       if (result.data && result.data.token) {
         localStorage.setItem('adminToken', result.data.token);
         localStorage.setItem('isAdminAuthenticated', 'true');
-        
+
         return {
           status: 'success',
           data: {
@@ -290,7 +290,7 @@ export const firstTimeSetup = async (): Promise<ApiResponse<AuthResponse>> => {
         // Alternative location - directly in the result
         localStorage.setItem('adminToken', result.token);
         localStorage.setItem('isAdminAuthenticated', 'true');
-        
+
         return {
           status: 'success',
           data: {
@@ -319,26 +319,26 @@ export const registerPasskey = async (): Promise<ApiResponse<WebAuthnRegistratio
     if (!response.data) {
       throw new Error('No registration options received from server');
     }
-    
+
     // Check if the options are nested in an 'options' property
     const registrationOptions = response.data.options || response.data;
-    
+
     // Log the registration options for debugging
     console.log('Server registration options:', response.data);
-    
+
     // Validate that we have the expected WebAuthn options structure
     if (!registrationOptions.challenge || !registrationOptions.rp) {
       console.log('Invalid options received from server:', response.data);
       throw new Error('Server returned invalid registration options');
     }
-    
+
     // Step 2: Start the registration process in the browser
     try {
       const credential = await startRegistration(registrationOptions);
-      
+
       // Step 3: Send the credential back to the server for verification
       const verificationResponse = await api.post('/auth/webauthn/register/verify', credential);
-      
+
       return {
         status: 'success',
         data: verificationResponse.data
@@ -356,44 +356,44 @@ export const registerPasskey = async (): Promise<ApiResponse<WebAuthnRegistratio
 export const authenticateWithPasskey = async (): Promise<AuthResult> => {
   try {
     console.log('Starting passkey authentication');
-    
+
     // Step 1: Get authentication options from the server
     try {
       const optionsResponse = await axios.post(`${API_URL}/auth/webauthn/authenticate`);
       console.log('Authentication options response:', optionsResponse);
-      
+
       if (!optionsResponse.data) {
         console.error('No authentication options received');
         return { success: false, error: 'No authentication options received' };
       }
-      
+
       const options = optionsResponse.data;
       console.log('Authentication options:', options);
-      
+
       // Step 2: Create authentication credential in the browser
       const credential = await startAuthentication(options);
       console.log('Created authentication credential:', credential);
-      
+
       // Step 3: Send the credential to the server for verification
       const verificationResponse = await axios.post(`${API_URL}/auth/webauthn/authenticate/verify`, credential);
       console.log('Verification response:', verificationResponse);
-      
+
       // Extract token from the correct location in the response
       const responseData = verificationResponse.data;
-      
+
       if (responseData?.status === 'success' && responseData?.data?.token) {
         const token = responseData.data.token;
         console.log('Authentication token received, setting auth state');
-        
+
         // Store auth token consistently
         localStorage.setItem('adminToken', token);
         localStorage.setItem('isAdminAuthenticated', 'true');
         localStorage.setItem('authToken', token);
         localStorage.setItem('authTimestamp', Date.now().toString());
-        
+
         // Apply token to axios default headers for subsequent requests
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        
+
         return { success: true, token: token };
       } else {
         console.error('No token received from verification, response data:', responseData);
@@ -414,7 +414,7 @@ export const authenticateWithPasskey = async (): Promise<AuthResult> => {
     }
   } catch (error: any) {
     console.error('Passkey authentication error:', error);
-    
+
     // Handle specific WebAuthn errors
     if (error.name === 'NotAllowedError') {
       return { success: false, error: 'Authentication was not allowed by the user or the device' };
@@ -423,10 +423,10 @@ export const authenticateWithPasskey = async (): Promise<AuthResult> => {
     } else if (error.name === 'TypeError') {
       return { success: false, error: 'Invalid parameters were provided for authentication' };
     }
-    
-    return { 
-      success: false, 
-      error: error.response?.data?.message || error.message || 'Failed to authenticate with passkey' 
+
+    return {
+      success: false,
+      error: error.response?.data?.message || error.message || 'Failed to authenticate with passkey'
     };
   }
 };
@@ -491,7 +491,7 @@ export const getOIDCConfig = async (): Promise<OIDCConfigResponse> => {
     console.log('Getting OIDC config from:', `${API_URL}/auth/oidc/config`);
     const response = await axios.get(`${API_URL}/auth/oidc/config`);
     console.log('OIDC config response:', response);
-    
+
     // Check different possible response structures
     if (response.data?.status === 'success' && response.data?.data) {
       console.log('OIDC config found in response.data.data:', response.data.data);
@@ -499,299 +499,167 @@ export const getOIDCConfig = async (): Promise<OIDCConfigResponse> => {
         config: response.data.data.config || response.data.data,
         isInitialized: true
       };
+    } else if (response.data?.config) {
+      console.log('OIDC config found in response.data.config:', response.data.config);
+      return {
+        config: response.data.config,
+        isInitialized: true
+      };
+    } else {
+      console.log('OIDC config not found or not initialized:', response.data);
+      return {
+        config: null,
+        isInitialized: false
+      };
     }
-    
-    return response.data;
   } catch (error) {
-    console.error('Failed to get OIDC config:', error);
-    return { config: null, isInitialized: false };
+    console.error('Error fetching OIDC config:', error);
+    return {
+      config: null,
+      isInitialized: false
+    };
   }
 };
 
+
 export const updateOIDCConfig = async (config: OIDCConfig): Promise<OIDCConfigResponse> => {
   try {
-    console.log('Updating OIDC config at:', `${API_URL}/auth/oidc/config`);
-    console.log('OIDC config payload:', config);
-    const response = await axios.post(`${API_URL}/auth/oidc/config`, config);
-    console.log('OIDC config update response:', response);
-    return response.data;
-  } catch (error: any) {
-    console.error('Failed to update OIDC config:', error);
-    throw new Error(error.response?.data?.message || 'Failed to update OIDC configuration');
+    const response = await api.put('/auth/oidc/config', config);
+    return response.data.data;
+  } catch (error) {
+    console.error('Error updating OIDC config:', error);
+    throw new Error('Failed to update OIDC config');
   }
 };
 
 export const loginWithOIDC = async (redirectUrl: string): Promise<void> => {
   try {
-    console.log('Initiating OIDC login flow');
-    
-    // Get the OIDC configuration first
-    const oidcConfig = await getOIDCConfig();
-    
-    if (!oidcConfig.config?.enabled) {
-      console.error('OIDC is not enabled');
-      throw new Error('OIDC authentication is not enabled');
+    // Get the OIDC authorization URL from the backend
+    const response = await api.post('/auth/oidc/login', { redirectUrl });
+    const { authorizationUrl } = response.data.data;
+
+    if (!authorizationUrl) {
+      throw new Error('Authorization URL not provided by backend');
     }
-    
-    console.log('OIDC is enabled, proceeding with login');
-    
-    // Normalize the redirect URL to ensure we only store the path
-    let normalizedRedirectUrl = redirectUrl;
-    if (redirectUrl.startsWith('http')) {
-      try {
-        const url = new URL(redirectUrl);
-        normalizedRedirectUrl = url.pathname + url.search + url.hash;
-      } catch (e) {
-        console.error('Error parsing redirect URL, using as is:', e);
-      }
-    }
-    console.log('Original redirect URL:', redirectUrl);
-    console.log('Normalized redirect URL:', normalizedRedirectUrl);
-    
-    // Store the redirect URL in localStorage to use after successful authentication
-    localStorage.setItem('oidcRedirectUrl', normalizedRedirectUrl);
-    
-    // Generate a nonce for security
-    const nonce = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-    localStorage.setItem('oidcNonce', nonce);
-    
-    // Generate a state parameter for security
-    const state = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-    localStorage.setItem('oidcState', state);
-    console.log('Generated state parameter:', state);
-    
-    // Use a frontend callback URL instead of the API route to avoid conflicts
-    // This callback will be handled by our React router
-    const callbackUrl = `${window.location.origin}/auth/callback`;
-    console.log('Using callback URL:', callbackUrl);
-    
-    // Construct the authorization URL with the proper parameters
-    const params = new URLSearchParams({
-      client_id: oidcConfig.config?.clientId || '',
-      redirect_uri: callbackUrl,
-      response_type: 'code',
-      scope: oidcConfig.config?.scope || 'openid profile email',
-      nonce: nonce,
-      state: state // Add explicit state parameter
-    });
-    
-    // Use the correct authorization endpoint from environment variable
-    const authEndpoint = OIDC_AUTH_ENDPOINT;
-    const authUrl = `${authEndpoint}?${params.toString()}`;
-    
-    console.log('Redirecting to SSO provider:', authUrl);
-    
-    // Redirect to the authorization URL
-    window.location.href = authUrl;
-  } catch (error: any) {
-    console.error('Error during OIDC login:', error);
-    throw error;
+
+    // Redirect the user to the OIDC provider's login page
+    window.location.href = authorizationUrl;
+  } catch (error) {
+    console.error('OIDC login initiation failed:', error);
+    throw new Error('Failed to initiate OIDC login');
   }
 };
 
 export const getOIDCUserProfile = async (): Promise<any> => {
   try {
     const response = await api.get('/auth/oidc/profile');
-    return response.data;
+    return response.data.data.profile;
   } catch (error) {
-    console.error('Failed to get OIDC user profile:', error);
-    throw error;
+    console.error('Error fetching OIDC user profile:', error);
+    throw new Error('Failed to fetch OIDC user profile');
   }
 };
 
 export const getOIDCToken = async (): Promise<string> => {
   try {
     const response = await api.get('/auth/oidc/token');
-    if (response.data?.data?.token) {
-      return response.data.data.token;
-    }
-    throw new Error('No token received');
+    return response.data.data.token;
   } catch (error) {
-    console.error('Failed to get OIDC token:', error);
-    throw error;
+    console.error('Error fetching OIDC token:', error);
+    throw new Error('Failed to fetch OIDC token');
   }
 };
 
+
 export const handleOIDCCallback = async (): Promise<AuthResult> => {
   try {
-    console.log('Handling OIDC callback');
-    
-    // First check if we already have a token in the URL (backend redirect scenario)
     const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('token');
-    
-    if (token) {
-      console.log('Token found directly in URL, setting auth state');
-      
-      // Store auth token consistently with same pattern as passkey auth
+    const code = urlParams.get('code');
+    const state = urlParams.get('state');
+
+    if (!code || !state) {
+      throw new Error('Missing code or state in OIDC callback');
+    }
+
+    // Send the code and state to the backend for verification
+    const response = await api.post('/auth/oidc/callback', { code, state });
+
+    if (response.data?.status === 'success' && response.data?.data?.token) {
+      const token = response.data.data.token;
       localStorage.setItem('adminToken', token);
       localStorage.setItem('isAdminAuthenticated', 'true');
       localStorage.setItem('authToken', token);
       localStorage.setItem('authTimestamp', Date.now().toString());
-      
-      // Apply token to axios default headers for subsequent requests
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      
-      // Remove token from URL (for security)
-      window.history.replaceState({}, document.title, window.location.pathname);
-      
-      // Get the stored redirect URL if any
-      const redirectUrl = localStorage.getItem('oidcRedirectUrl');
-      if (redirectUrl) {
-        localStorage.removeItem('oidcRedirectUrl'); // Clean up
-        setTimeout(() => {
-          window.location.href = redirectUrl;
-        }, 300);
-      }
-      
-      return { success: true, token: token };
-    }
-    
-    // If no token in URL, proceed with the original flow
-    const code = urlParams.get('code');
-    
-    if (!code) {
-      console.error('No authorization code found in callback URL');
-      return { success: false, error: 'No authorization code found in callback URL' };
-    }
-    
-    console.log('Got authorization code, exchanging for token');
-    
-    try {
-      // The backend should handle the code exchange and state validation
-      const response = await axios.get(`${API_URL}/api/auth/oidc/callback${window.location.search}`);
-      
-      console.log('OIDC callback response:', response);
-      
-      if (response.data && response.data.token) {
-        const responseToken = response.data.token;
-        console.log('OIDC authentication token received, setting auth state');
-        
-        // Store auth token consistently with same pattern as passkey auth
-        localStorage.setItem('adminToken', responseToken);
-        localStorage.setItem('isAdminAuthenticated', 'true');
-        localStorage.setItem('authToken', responseToken);
-        localStorage.setItem('authTimestamp', Date.now().toString());
-        
-        // Apply token to axios default headers for subsequent requests
-        axios.defaults.headers.common['Authorization'] = `Bearer ${responseToken}`;
-        
-        // Get the stored redirect URL if any
-        const redirectUrl = localStorage.getItem('oidcRedirectUrl');
-        if (redirectUrl) {
-          localStorage.removeItem('oidcRedirectUrl'); // Clean up
-          console.log('Redirecting to:', redirectUrl);
-          setTimeout(() => {
-            window.location.href = redirectUrl;
-          }, 300);
-        }
-        
-        return { success: true, token: responseToken };
-      } else {
-        console.error('No token received from OIDC callback');
-        return { success: false, error: 'No token received from OIDC callback' };
-      }
-    } catch (error: any) {
-      console.error('OIDC callback error:', error);
-      
-      // Check for specific OIDC errors
-      if (error.response?.status === 400) {
-        return { 
-          success: false, 
-          error: 'Invalid OIDC authorization request. This may be due to an invalid state parameter or expired session. Please try logging in again.' 
-        };
-      }
-      
-      return { 
-        success: false, 
-        error: error.response?.data?.message || error.message || 'Failed to process OIDC callback' 
-      };
+      return { success: true, token };
+    } else {
+      throw new Error(response.data?.message || 'OIDC callback verification failed');
     }
   } catch (error: any) {
-    console.error('OIDC callback error:', error);
-    return { 
-      success: false, 
-      error: error.message || 'Failed to process OIDC callback' 
+    console.error('OIDC callback handling failed:', error);
+    return { success: false, error: error.message || 'Failed to handle OIDC callback' };
+  }
+};
+
+
+// Function to register the first passkey during initial setup
+export const registerFirstPasskey = async (): Promise<ApiResponse<AuthResponse>> => {
+  try {
+    // 1. Get registration options
+    const optionsResponse = await api.post('/auth/webauthn/register-first');
+    const registrationOptions = optionsResponse.data.data.options;
+
+    if (!registrationOptions) {
+      throw new Error('Failed to get registration options for first passkey.');
+    }
+
+    // 2. Start browser registration
+    let credential;
+    try {
+      credential = await startRegistration(registrationOptions);
+    } catch (registrationError: any) {
+      console.error('Browser passkey registration failed:', registrationError);
+      // Handle specific errors like cancellation
+      if (registrationError.name === 'NotAllowedError') {
+        throw new Error('Passkey registration cancelled by user.');
+      }
+      throw new Error('Failed to create passkey in browser.');
+    }
+
+    // 3. Verify credential with backend
+    const verificationResponse = await api.post('/auth/webauthn/register-first/verify', credential);
+
+    if (verificationResponse.data?.status === 'success' && verificationResponse.data?.data?.token) {
+      // Store token and mark as authenticated
+      const token = verificationResponse.data.data.token;
+      localStorage.setItem('adminToken', token);
+      localStorage.setItem('isAdminAuthenticated', 'true');
+      localStorage.setItem('authToken', token);
+      localStorage.setItem('authTimestamp', Date.now().toString());
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+
+      return {
+        status: 'success',
+        data: { token, verified: true } // Assuming AuthResponse structure
+      };
+    } else {
+      throw new Error(verificationResponse.data?.message || 'Failed to verify first passkey.');
+    }
+  } catch (error: any) {
+    console.error('Error registering first passkey:', error);
+    return {
+      status: 'error',
+      message: error.message || 'An unknown error occurred during first passkey registration.',
+      data: { token: '', verified: false } // Return appropriate error structure
     };
   }
 };
 
-// Register a passkey without requiring authentication
-export const registerFirstPasskey = async (): Promise<ApiResponse<AuthResponse>> => {
-  try {
-    // Step 1: Get registration options from the server
-    const response = await axios.post(`${API_URL}/auth/webauthn/first-time-setup`);
-    if (!response.data) {
-      throw new Error('No registration options received from server');
-    }
-    
-    // Check if the options are nested in an 'options' property
-    const registrationOptions = response.data.options || response.data;
-    
-    // Log the registration options for debugging
-    console.log('Server registration options:', response.data);
-    
-    // Validate that we have the expected WebAuthn options structure
-    if (!registrationOptions.challenge || !registrationOptions.rp) {
-      console.log('Invalid options received from server:', response.data);
-      throw new Error('Server returned invalid registration options');
-    }
-    
-    // Step 2: Start the registration process in the browser
-    try {
-      const credential = await startRegistration(registrationOptions);
-      
-      // Step 3: Send the credential back to the server for verification
-      const verificationResponse = await axios.post(`${API_URL}/auth/webauthn/first-time-setup/verify`, credential);
-      
-      // Step 4: Store the authentication token
-      const result = verificationResponse.data;
-      console.log('Verification response received:', JSON.stringify(result, null, 2));
-      
-      // Check if the token is in the expected location in the response
-      if (result.data && result.data.token) {
-        localStorage.setItem('adminToken', result.data.token);
-        localStorage.setItem('isAdminAuthenticated', 'true');
-        localStorage.setItem('authToken', result.data.token);
-        localStorage.setItem('authTimestamp', Date.now().toString());
-        
-        // Apply token to axios default headers for subsequent requests
-        axios.defaults.headers.common['Authorization'] = `Bearer ${result.data.token}`;
-        
-        return {
-          status: 'success',
-          data: {
-            token: result.data.token,
-            verified: true
-          }
-        };
-      } else if (result.token) {
-        // Alternative location - directly in the result
-        localStorage.setItem('adminToken', result.token);
-        localStorage.setItem('isAdminAuthenticated', 'true');
-        localStorage.setItem('authToken', result.token);
-        localStorage.setItem('authTimestamp', Date.now().toString());
-        
-        // Apply token to axios default headers for subsequent requests
-        axios.defaults.headers.common['Authorization'] = `Bearer ${result.token}`;
-        
-        return {
-          status: 'success',
-          data: {
-            token: result.token,
-            verified: true
-          }
-        };
-      } else {
-        console.error('Token not found in response:', result);
-        throw new Error('Registration successful but no token received');
-      }
-    } catch (error: any) {
-      console.error('WebAuthn registration error:', error);
-      throw new Error('Failed to register passkey');
-    }
-  } catch (error: any) {
-    console.error('Passkey registration error:', error);
-    throw new Error('Failed to register passkey');
+// Helper function to get Authorization header
+export const getAuthHeaders = (): { [key: string]: string } => {
+  const token = localStorage.getItem('adminToken');
+  if (token) {
+    return { Authorization: `Bearer ${token}` };
   }
-}; 
+  return {};
+};

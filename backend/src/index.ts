@@ -12,6 +12,7 @@ import securityRoutes from './routes/security';
 import healthRoutes from './routes/health';
 import omeWebhookRoutes from './routes/omeWebhook';
 import uploadRoutes from './routes/upload';
+import adminRoutes from './routes/admin'; // Import admin routes
 import { logger } from './utils/logger';
 import { initializePassword } from './utils/initPassword';
 import mirotalkRoutes from './routes/mirotalk';
@@ -19,6 +20,7 @@ import WebSocketService from './services/websocket';
 import OBSService from './services/obsService';
 import { initializeOIDC, initializeOIDCMiddleware } from './services/oidc-express';
 import { initializeTelegramService } from './services/telegram/initTelegram';
+import { initializeSocketIO, cleanupSocketIO } from './services/socket'; // Import Socket.IO functions (removed unused getIO)
 
 dotenv.config();
 
@@ -27,6 +29,8 @@ const server = http.createServer(app);
 
 // Initialize WebSocket service
 const wsService = new WebSocketService(server);
+// Initialize Socket.IO server
+initializeSocketIO(server);
 
 // Initialize OBS service with WebSocket service
 export const obsService = new OBSService(wsService);
@@ -82,6 +86,7 @@ app.use(`${basePath}/security`, securityRoutes);
 app.use('/api/mirotalk', mirotalkRoutes);
 app.use(`${basePath}/ome-webhook`, omeWebhookRoutes);
 app.use(`${basePath}/upload`, uploadRoutes);
+app.use(`${basePath}/admin`, adminRoutes); // Mount admin routes
 
 // Import routes from the main routes file which includes tusd hooks
 import routes from './routes';
@@ -126,6 +131,7 @@ process.on('SIGTERM', () => {
   logger.info('SIGTERM received. Cleaning up...');
   wsService.cleanup();
   obsService.cleanup();
+  cleanupSocketIO(); // Add Socket.IO cleanup
   server.close(() => {
     logger.info('Server closed');
     process.exit(0);
@@ -136,6 +142,7 @@ process.on('SIGINT', () => {
   logger.info('SIGINT received. Cleaning up...');
   wsService.cleanup();
   obsService.cleanup();
+  cleanupSocketIO(); // Add Socket.IO cleanup
   server.close(() => {
     logger.info('Server closed');
     process.exit(0);

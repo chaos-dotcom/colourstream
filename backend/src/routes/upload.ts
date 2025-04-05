@@ -10,7 +10,8 @@ import { uploadTracker } from '../services/uploads/uploadTracker';
 import { s3Service } from '../services/s3/s3Service';
 import { fixS3Filenames } from '../scripts/fix-s3-filenames';
 import { logger } from '../utils/logger';
-import { getTelegramBot } from '../services/telegram/telegramBot'; // Import the bot getter
+import { getTelegramBot } from '../services/telegram/telegramBot';
+import { getIO } from '../services/socket'; // Import Socket.IO getter
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -1396,7 +1397,13 @@ router.post('/progress/:token', async (req: Request, res: Response) => {
       return res.status(503).json({ status: 'error', message: 'Notification service unavailable' });
     }
 
-    // 3. Prepare data for the notification service
+    // 3. Prepare data for the notification service and Socket.IO broadcast
+    const isComplete = bytesUploaded >= bytesTotal;
+    const percentage = bytesTotal > 0 ? Math.round((bytesUploaded / bytesTotal) * 100) : (isComplete ? 100 : 0);
+
+    // Get the latest tracked info which might include speed
+    const trackedUpload = uploadTracker.getUpload(fileId);
+
     const uploadInfo = {
       id: fileId, // Use the Uppy file ID as the unique identifier for the message
       size: bytesTotal,
@@ -1405,19 +1412,46 @@ router.post('/progress/:token', async (req: Request, res: Response) => {
         filename: fileName,
         clientName: finalClientName,
         projectName: finalProjectName,
-        // Add any other relevant metadata if needed
+        storage: trackedUpload?.metadata?.storage || 'unknown' // Get storage type if available
       },
-      isComplete: bytesUploaded >= bytesTotal, // Mark as complete if fully uploaded
-      // uploadSpeed: can be calculated by the bot service based on time between updates
+      isComplete: isComplete, // Mark as complete if fully uploaded
+      uploadSpeed: trackedUpload?.uploadSpeed, // Get speed from tracker if available
+      percentage: percentage // Add percentage for socket broadcast
     };
 
     // 4. Send the notification (this handles sending/editing)
-    // Use await but don't block the response to the frontend
+    // 4. Send Telegram notification (don't block response)
     bot.sendUploadNotification(uploadInfo).catch(err => {
         logger.error(`[Upload Progress] Failed to send Telegram notification for ${fileId}:`, err);
     });
 
-    // 5. Respond to the frontend immediately
+    // 5. Broadcast progress update via Socket.IO to admin clients
+    const io = getIO();
+    if (io) {
+      // Prepare data specifically for WebSocket broadcast (might be same or different from Telegram)
+      const socketData = {
+        id: fileId,
+        fileName: fileName,
+        size: bytesTotal,
+        offset: bytesUploaded,
+        percentage: uploadInfo.percentage, // Use percentage calculated for Telegram
+        speed: uploadInfo.uploadSpeed, // Use speed calculated by tracker
+        clientName: finalClientName,
+        projectName: finalProjectName,
+        isComplete: uploadInfo.isComplete,
+        storage: uploadInfo.metadata?.storage || 'unknown'
+      };
+      // Emit to a specific room or globally - using 'admin_updates' room as an example
+      // Clients would need to join this room upon connection
+      io.to('admin_updates').emit('upload_progress_update', socketData);
+      // Or broadcast globally if no specific room is needed:
+      // io.emit('upload_progress_update', socketData);
+      logger.debug(`[Upload Progress] Broadcasted update for ${fileId} via Socket.IO`);
+    } else {
+       logger.warn(`[Upload Progress] Socket.IO instance not available, skipping broadcast for ${fileId}`);
+    }
+
+    // 6. Respond to the frontend immediately
     res.status(200).json({ status: 'progress received' });
 
   } catch (error) {

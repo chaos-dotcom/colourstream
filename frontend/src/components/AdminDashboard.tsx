@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+// Removed io, Socket imports
 import {
   Box,
   Tabs,
@@ -34,13 +35,15 @@ import {
   adminLogout, 
   generateMirotalkToken, 
   TokenGenerationRequest,
-  stopOBSStream
+  stopOBSStream, // Removed duplicate and added comma
+  getAuthHeaders // Assuming this exists or create it to get auth token
 } from '../utils/api';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import RoomManagement from './rooms/RoomManagement';
 import IPSecurity from './security/IPSecurity';
 import PasskeyManagement from './security/PasskeyManagement';
 import { OvenMediaConfig } from './OvenMediaConfig';
+// Removed ActiveUploadsDisplay, API_URL, ActiveUpload imports
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -88,6 +91,7 @@ const AdminDashboard: React.FC = () => {
   const [value, setValue] = useState(0);
   const [stoppingStream, setStoppingStream] = useState(false);
   const navigate = useNavigate();
+  // Removed activeUploads and socket state
 
   useEffect(() => {
     // Check if user is authenticated
@@ -96,6 +100,8 @@ const AdminDashboard: React.FC = () => {
       navigate('/admin/login');
     }
   }, [navigate]);
+
+  // Removed WebSocket useEffect hook
 
   const handleLogout = async () => {
     setLoading(true);
@@ -179,16 +185,18 @@ const AdminDashboard: React.FC = () => {
             <Tab label="OBS" {...a11yProps(1)} />
             <Tab label="Security" {...a11yProps(2)} />
             <Tab label="Settings" {...a11yProps(3)} />
-            <Tab 
-              label="Upload Clients" 
+            <Tab
+              label="Upload Management" // Renamed for clarity
               component={RouterLink}
-              to="/upload"
-              onClick={(e) => {
-                // Prevent the tab from being selected in the Tabs component
-                e.preventDefault();
-                // Navigate to the upload page
-                navigate('/upload');
-              }}
+              to="/upload" // Keep this pointing to the management portal
+              // Remove onClick handler as RouterLink handles navigation
+              {...a11yProps(4)} // Increment index
+            />
+            <Tab
+              label="Upload Monitor" // New tab for the monitor
+              component={RouterLink}
+              to="/admin/upload-monitor" // Link to the new monitor page
+              {...a11yProps(5)} // Increment index
             />
           </Tabs>
         </Box>
@@ -256,6 +264,8 @@ const AdminDashboard: React.FC = () => {
           </Typography>
           <OvenMediaConfig />
         </TabPanel>
+
+        {/* Removed ActiveUploadsDisplay rendering */}
       </Box>
 
       <Dialog open={tokenDialogOpen} onClose={handleCloseTokenDialog} maxWidth="md" fullWidth>

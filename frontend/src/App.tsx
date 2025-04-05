@@ -15,8 +15,9 @@ import govukTheme from './lib/govukTheme';
 import GovUkLayout from './components/GovUkLayout';
 import OIDCCallback from './components/OIDCCallback';
 import PasskeySetupPage from './components/PasskeySetupPage';
-import UploadPortal from './components/upload/UploadPortal';
-import ClientUploadPortal from './pages/UploadPortal';
+import UploadPortal from './components/upload/UploadPortal'; // Admin management portal
+import ClientUploadPortal from './pages/UploadPortal'; // Public upload page
+import AdminUploadMonitor from './pages/AdminUploadMonitor'; // New monitor page
 import About from './pages/About';
 import License from './pages/License';
 import Privacy from './pages/Privacy';
@@ -115,14 +116,27 @@ function App() {
               }
             />
             
-            {/* Upload Portal Routes */}
+            {/* Upload Management Portal Route */}
             <Route
-              path="/upload/*"
+              path="/upload/*" // Keep this for the management portal
               element={
                 <GovUkLayout serviceName="ColourStream" isAdminPage={true}>
                   <ProtectedRoute>
                     <RequirePasskey>
-                      <UploadPortal />
+                      <UploadPortal /> {/* Point back to the original component */}
+                    </RequirePasskey>
+                  </ProtectedRoute>
+                </GovUkLayout>
+              }
+            />
+            {/* New Route for Live Upload Monitor */}
+            <Route
+              path="/admin/upload-monitor"
+              element={
+                <GovUkLayout serviceName="ColourStream" isAdminPage={true}>
+                  <ProtectedRoute>
+                    <RequirePasskey>
+                      <AdminUploadMonitor />
                     </RequirePasskey>
                   </ProtectedRoute>
                 </GovUkLayout>

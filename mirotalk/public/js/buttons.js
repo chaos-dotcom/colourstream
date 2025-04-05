@@ -35,8 +35,8 @@ let buttons = {
         showParticipantsBtn: false,
     },
     caption: {
-        showTogglePinBtn: true,
-        showMaxBtn: true,
+        showTogglePinBtn: false,
+        showMaxBtn: false,
     },
     settings: {
         showMicOptionsBtn: true,

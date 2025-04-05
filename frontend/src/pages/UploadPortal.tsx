@@ -549,7 +549,62 @@ const UploadPortal: React.FC = () => {
               .catch(error => {
                 console.error('Error notifying backend about S3 upload:', error);
               });
+          });
+
+          // --- Progress Reporting for Direct S3 ---
+          // Store last reported percentage for throttling
+          const lastReportedPercentDirectS3: { [key: string]: number } = {};
+          const PERCENTAGE_THROTTLE_THRESHOLD_DIRECT_S3 = 2; // Send update every 2% increase
+
+          uppyInstance.on('upload-progress', (file, progress) => {
+            // Ensure we have necessary data and avoid division by zero
+            if (!file || !file.id || !file.name || progress.bytesTotal === null || progress.bytesUploaded === null || progress.bytesTotal === 0) {
+              return;
+            }
+
+            const currentPercent = (progress.bytesUploaded / progress.bytesTotal * 100);
+            const lastPercent = lastReportedPercentDirectS3[file.id] || 0;
+
+            // Throttle updates
+            const shouldUpdate = (currentPercent >= lastPercent + PERCENTAGE_THROTTLE_THRESHOLD_DIRECT_S3) || (lastPercent === 0 && currentPercent > 0) || (currentPercent === 100 && lastPercent < 100);
+
+            if (!shouldUpdate) {
+              return;
+            }
+
+            // Update last reported percentage
+            lastReportedPercentDirectS3[file.id] = currentPercent;
+
+            console.log(`Direct S3 Progress for ${file.name}: ${currentPercent.toFixed(2)}% - Sending update.`);
+
+            // Send progress update to backend
+            fetch(`${API_URL}/upload/progress/${token}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                fileId: file.id,
+                fileName: file.name,
+                bytesUploaded: progress.bytesUploaded,
+                bytesTotal: progress.bytesTotal,
+                percentage: currentPercent,
+                clientName: file.meta?.client || 'Unknown Client',
+                projectName: file.meta?.project || 'Unknown Project',
+              })
+            })
+            .then(response => {
+              if (!response.ok) {
+                console.warn(`Failed to send direct S3 progress update for ${file.name}: ${response.status}`);
+                lastReportedPercentDirectS3[file.id] = lastPercent; // Allow retry
+              }
+            })
+            .catch(error => {
+              console.error(`Error sending direct S3 progress update for ${file.name}:`, error);
+              lastReportedPercentDirectS3[file.id] = lastPercent; // Allow retry
             });
+          });
+          // --- End Progress Reporting for Direct S3 ---
             
             // Add specific listener for S3 multipart errors to get more detailed information
             uppyInstance.on('upload-error', (file, error, response) => {
@@ -598,6 +653,61 @@ const UploadPortal: React.FC = () => {
                 setError(`Error uploading ${file?.name}: ${error.message}`);
               }
             });
+
+          // --- Progress Reporting for XHR ---
+          // Store last reported percentage for throttling
+          const lastReportedPercentXHR: { [key: string]: number } = {};
+          const PERCENTAGE_THROTTLE_THRESHOLD_XHR = 2; // Send update every 2% increase
+
+          uppyInstance.on('upload-progress', (file, progress) => {
+            // Ensure we have necessary data and avoid division by zero
+            if (!file || !file.id || !file.name || progress.bytesTotal === null || progress.bytesUploaded === null || progress.bytesTotal === 0) {
+              return;
+            }
+
+            const currentPercent = (progress.bytesUploaded / progress.bytesTotal * 100);
+            const lastPercent = lastReportedPercentXHR[file.id] || 0;
+
+            // Throttle updates
+            const shouldUpdate = (currentPercent >= lastPercent + PERCENTAGE_THROTTLE_THRESHOLD_XHR) || (lastPercent === 0 && currentPercent > 0) || (currentPercent === 100 && lastPercent < 100);
+
+            if (!shouldUpdate) {
+              return;
+            }
+
+            // Update last reported percentage
+            lastReportedPercentXHR[file.id] = currentPercent;
+
+            console.log(`XHR Progress for ${file.name}: ${currentPercent.toFixed(2)}% - Sending update.`);
+
+            // Send progress update to backend
+            fetch(`${API_URL}/upload/progress/${token}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                fileId: file.id,
+                fileName: file.name,
+                bytesUploaded: progress.bytesUploaded,
+                bytesTotal: progress.bytesTotal,
+                percentage: currentPercent,
+                clientName: file.meta?.client || 'Unknown Client',
+                projectName: file.meta?.project || 'Unknown Project',
+              })
+            })
+            .then(response => {
+              if (!response.ok) {
+                console.warn(`Failed to send XHR progress update for ${file.name}: ${response.status}`);
+                lastReportedPercentXHR[file.id] = lastPercent; // Allow retry
+              }
+            })
+            .catch(error => {
+              console.error(`Error sending XHR progress update for ${file.name}:`, error);
+              lastReportedPercentXHR[file.id] = lastPercent; // Allow retry
+            });
+          });
+          // --- End Progress Reporting for XHR ---
           }
           
           // Set up error handling
