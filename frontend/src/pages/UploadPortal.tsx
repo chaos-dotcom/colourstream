@@ -150,7 +150,10 @@ const UploadPortal: React.FC = () => {
   const [uppy, setUppy] = useState<any>(null);
   const [accentColor, setAccentColor] = useState('#1d70b8');
   const useS3 = searchParams.get('S3') === 'true';
-  
+  const lastProgressUpdateRef = React.useRef<number>(0); // Timestamp of the last update sent
+  const lastPercentageUpdateRef = React.useRef<number>(0); // Last percentage milestone reported
+  const MIN_PROGRESS_UPDATE_INTERVAL = 3000; // Minimum ms between updates (e.g., 3 seconds)
+  const PERCENTAGE_UPDATE_THRESHOLD = 10; // Send update every X percent increase (e.g., 10%)
   useEffect(() => {
     // Select a random accent color on component mount
     const randomColor = accentColors[Math.floor(Math.random() * accentColors.length)];
@@ -337,17 +340,54 @@ const UploadPortal: React.FC = () => {
                 console.log(`Progress for ${file.name}: bytes information unavailable`);
                 return;
               }
-              const percent = progress.bytesUploaded / progress.bytesTotal * 100;
-              console.log(`Progress for ${file.name}: ${percent.toFixed(2)}% (${progress.bytesUploaded}/${progress.bytesTotal})`);
-            });
-            
-            // Add error logging for debugging upload issues
-            uppyInstance.on('error', (error: any) => {
-              console.error('Uppy error:', error);
-              if (error.request) {
-                console.error('Error request URL:', error.request.url);
-                console.error('Error request method:', error.request.method);
-                console.error('Error status:', error.status);
+              const currentPercent = Math.floor((progress.bytesUploaded / progress.bytesTotal) * 100);
+              console.log(`Progress for ${file.name}: ${currentPercent}% (${progress.bytesUploaded}/${progress.bytesTotal})`);
+
+              // Throttle progress updates based on time AND percentage change
+              const now = Date.now();
+              const timeSinceLastUpdate = now - lastProgressUpdateRef.current;
+              const percentageIncrease = currentPercent - lastPercentageUpdateRef.current;
+
+              // Send update if minimum time passed AND (significant percentage increase OR upload is complete)
+              // Also ensure we send the very first update (percentageIncrease will be >= threshold initially)
+              // And ensure we don't send updates for 0% unless it's the very first one.
+              const shouldSendUpdate = timeSinceLastUpdate >= MIN_PROGRESS_UPDATE_INTERVAL &&
+                                       (percentageIncrease >= PERCENTAGE_UPDATE_THRESHOLD || currentPercent === 100) &&
+                                       (currentPercent > 0 || lastPercentageUpdateRef.current === 0); // Allow first 0% update
+
+              if (shouldSendUpdate) {
+                lastProgressUpdateRef.current = now; // Update time timestamp
+                // Only update the percentage ref if it's not 100% to allow the final 100% message through
+                if (currentPercent < 100) {
+                    lastPercentageUpdateRef.current = currentPercent; // Update percentage timestamp
+                }
+
+
+                console.log(`Sending progress update for ${file.name} at ${currentPercent}%`);
+
+                // Send progress update to backend
+                fetch(`${API_URL}/upload/progress/${token}`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    uploadId: file.id, // Use Uppy's file ID
+                    bytesUploaded: progress.bytesUploaded,
+                    bytesTotal: progress.bytesTotal,
+                    filename: file.name,
+                    clientName: file.meta?.client,
+                    projectName: file.meta?.project,
+                  }),
+                })
+                .then(response => {
+                  if (!response.ok) {
+                    console.warn(`Backend progress update failed for ${file.name}: ${response.status}`);
+                  }
+                })
+                .catch(error => {
+                  console.error(`Error sending progress update for ${file.name}:`, error);
+                });
               }
             });
             
