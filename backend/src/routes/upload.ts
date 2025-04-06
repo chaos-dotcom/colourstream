@@ -977,81 +977,14 @@ router.get('/upload-links-all', authenticateToken, async (req: Request, res: Res
 // Endpoint for Companion to notify backend after successful S3 upload
 router.post('/s3-callback', async (req: Request, res: Response) => {
   try {
-    const { token } = req.params;
-    const filename = req.query.filename as string;
-    // Remove multipart query param check - AwsS3Multipart plugin always uses multipart flow
-    
-    if (!filename) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Filename is required'
-      });
-    }
-
-    // Validate the upload token
-    const uploadLink = await prisma.uploadLink.findUnique({
-      where: { token },
-      include: {
-        project: {
-          include: {
-            client: true
-          }
-        }
-      }
-    });
-
-    if (!uploadLink) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Upload link not found'
-      });
-    }
-
-    if (uploadLink.expiresAt < new Date()) {
-      return res.status(403).json({
-        status: 'error',
-        message: 'Upload link has expired'
-      });
-    }
-
-    // Clean the filename by removing UUIDs
-    // This regex matches UUIDs in formats like:
-    // - f53671c2-f356-417a-b14e-1c1b6476d723-Protape-Ltd-t-a-DataStores-50879.pdf
-    // - prefix-uuid-filename.ext or uuid-filename.ext
-    const uuidRegex = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-)/gi;
-    const cleanFilename = filename.replace(uuidRegex, '');
-    
-    // Generate S3 key for this file - using the clean $CLIENT/$PROJECT/FILENAME structure
-    // Ensure clientCode and projectName are defined here using the validated uploadLink
-    const clientCode = uploadLink.project.client.code || 'default';
-    const projectName = uploadLink.project.name || 'default';
-    
-    // Remove unused normalization variables
-    // const normalizedClientCode = clientCode.replace(/\s+/g, '_');
-    // const normalizedProjectName = projectName.replace(/\s+/g, '_');
-    
-    // Create the key directly
-    const s3Key = s3Service.generateKey(clientCode, projectName, cleanFilename);
-    
-    logger.info(`Generated S3 key for upload: ${s3Key}`);
-
-    // Enhanced logging for debugging filename issues
-    logger.info(`File upload request - Original filename: "${filename}"`);
-    logger.info(`Cleaned filename: "${cleanFilename}"`);
-    logger.info(`Generated S3 key: "${s3Key}" for file: "${filename}"`);
-    logger.info(`Client code: "${uploadLink.project.client.code || 'default'}", Project name: "${uploadLink.project.name}"`);
-
-    // Always initiate multipart upload when using AwsS3Multipart plugin
-    const { uploadId, key } = await s3Service.createMultipartUpload(s3Key, filename);
-    // *** This try block was incorrectly placed inside the /s3-callback route logic ***
-    // *** It should be part of the outer /s3-callback route handler ***
-    // try { // Remove this misplaced try
-    // Companion sends upload details in the request body
-    const { name, size, mimeType, metadata, s3 } = req.body; // This logic belongs inside the /s3-callback route handler above
-    const s3Key = s3?.key; // Key where Companion uploaded the file // This logic belongs inside the /s3-callback route handler above
+    // Correct logic starts here: Access data directly from Companion's request body
+    const { name, size, mimeType, metadata, s3 } = req.body; 
+    const s3Key = s3?.key; // Key where Companion uploaded the file
 
     logger.info('[/s3-callback] Received callback from Companion');
     logger.info('[/s3-callback] Body:', JSON.stringify(req.body, null, 2));
+
+    // Validate required data from Companion
 
     if (!metadata || !metadata.token || !s3Key) {
       logger.error('[/s3-callback] Missing required metadata (token) or S3 key from Companion callback');
