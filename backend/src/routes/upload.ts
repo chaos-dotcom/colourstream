@@ -1034,7 +1034,7 @@ router.post('/s3-callback', async (req: Request, res: Response) => {
     const s3Key = s3Service.generateKey(clientCode, projectName, cleanFilename);
     
     logger.info(`Generated S3 key for upload: ${s3Key}`);
-    
+
     // Enhanced logging for debugging filename issues
     logger.info(`File upload request - Original filename: "${filename}"`);
     logger.info(`Cleaned filename: "${cleanFilename}"`);
@@ -1043,10 +1043,12 @@ router.post('/s3-callback', async (req: Request, res: Response) => {
 
     // Always initiate multipart upload when using AwsS3Multipart plugin
     const { uploadId, key } = await s3Service.createMultipartUpload(s3Key, filename);
-  try {
+    // *** This try block was incorrectly placed inside the /s3-callback route logic ***
+    // *** It should be part of the outer /s3-callback route handler ***
+    // try { // Remove this misplaced try
     // Companion sends upload details in the request body
-    const { name, size, mimeType, metadata, s3 } = req.body;
-    const s3Key = s3?.key; // Key where Companion uploaded the file
+    const { name, size, mimeType, metadata, s3 } = req.body; // This logic belongs inside the /s3-callback route handler above
+    const s3Key = s3?.key; // Key where Companion uploaded the file // This logic belongs inside the /s3-callback route handler above
 
     logger.info('[/s3-callback] Received callback from Companion');
     logger.info('[/s3-callback] Body:', JSON.stringify(req.body, null, 2));

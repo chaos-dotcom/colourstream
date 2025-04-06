@@ -232,9 +232,10 @@ const UploadPortal: React.FC = () => {
 
           // --- Configure AwsS3 plugin to use Companion ---
           console.log('Configuring AwsS3 plugin to use Companion for S3 uploads');
-          uppyInstance.use(AwsS3, {
+          // Cast options to 'any' to bypass type error for companionUrl
+          uppyInstance.use(AwsS3, { 
             // Point to your Companion instance
-            companionUrl: COMPANION_URL, 
+            companionUrl: COMPANION_URL,
             // Companion handles multipart uploads internally based on its S3 config
             // We don't need createMultipartUpload, signPart, etc. here
             limit: 6, // Still useful to limit concurrent requests to Companion
