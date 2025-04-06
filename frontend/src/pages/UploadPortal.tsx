@@ -410,6 +410,10 @@ const UploadPortal: React.FC = () => {
               console.error('MULTIPART UPLOAD ERROR:');
               console.error('File:', file?.name, file?.size, file?.type);
               console.error('Error message:', error?.message);
+              // Log part number if available in the error object (Uppy might add this)
+              if ((error as any)?.partNumber) {
+                console.error('Failed part number:', (error as any).partNumber);
+              }
 
               if (response) {
                 console.error('Response status:', response.status);
