@@ -510,14 +510,15 @@ const UploadPortal: React.FC = () => {
           // The primary 'if (USE_COMPANION)' block now handles the correct AwsS3 setup.
 
           // Set up general error handling (add types)
-          uppyInstance.on('error', (error: Error) => {
+          uppyInstance.on('error', (error: Error) => { // Keep existing type
             console.error('Uppy error:', error);
             setError(`Upload error: ${error.message}`);
           });
 
-          uppyInstance.on('upload-error', (file: any, error: Error, response: any) => {
+          // Add types to upload-error handler parameters
+          uppyInstance.on('upload-error', (file: UppyFile<CustomFileMeta> | undefined, error: Error, response: any) => { 
             if (file) {
-              console.error('File error:', file, error);
+              console.error('File error:', file.name, error); // Log filename safely
               console.error('Upload error response:', response);
               // Try to extract more meaningful error details
               let errorMessage = error.message;
