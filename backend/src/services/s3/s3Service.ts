@@ -19,7 +19,18 @@ const s3Client = new S3Client({
 
 const bucket = process.env.S3_BUCKET || 'uploads';
 
+// Export the bucket name for use in other modules
+export const s3Bucket = bucket;
+
 export const s3Service = {
+  /**
+   * Get the bucket name
+   * @returns {string} - The S3 bucket name
+   */
+  getBucket(): string {
+    return bucket;
+  },
+
   /**
    * Generate a presigned URL for direct upload to S3
    * @param {string} key - The key (path) to store the file in S3
@@ -28,6 +39,25 @@ export const s3Service = {
    */
   async generatePresignedUrl(key: string, expiresIn: number = 3600): Promise<string> {
     try {
+      // Extract client, project, and filename from the key if it follows the pattern
+      const keyParts = key.split('/');
+      
+      // If the key doesn't have 3 parts (client/project/filename), it might have a UUID prefix
+      // In that case, we need to clean it
+      if (keyParts.length !== 3) {
+        // Extract the filename from the key (last part)
+        const originalFilename = keyParts.length > 0 ? keyParts[keyParts.length - 1] : 'unknown';
+        
+        // Try to extract client and project from the key if possible
+        const clientCode = keyParts.length > 2 ? keyParts[keyParts.length - 3] : 'default';
+        const projectName = keyParts.length > 1 ? keyParts[keyParts.length - 2] : 'default';
+        
+        // Generate a clean key using the generateKey method
+        key = this.generateKey(clientCode, projectName, originalFilename);
+        
+        logger.info(`Cleaned presigned URL key: ${key}`);
+      }
+      
       const command = new PutObjectCommand({
         Bucket: bucket,
         Key: key,
@@ -60,6 +90,26 @@ export const s3Service = {
    */
   async createMultipartUpload(key: string, filename: string): Promise<{uploadId: string, key: string}> {
     try {
+      // Extract client, project, and filename from the key if it follows the pattern
+      const keyParts = key.split('/');
+      
+      // If the key doesn't have 3 parts (client/project/filename), it might have a UUID prefix
+      // In that case, we need to clean it
+      if (keyParts.length !== 3) {
+        // Extract the filename from the key (last part)
+        const originalFilename = keyParts.length > 0 ? keyParts[keyParts.length - 1] : filename;
+        
+        // Try to extract client and project from the key if possible
+        const clientCode = keyParts.length > 2 ? keyParts[keyParts.length - 3] : 'default';
+        const projectName = keyParts.length > 1 ? keyParts[keyParts.length - 2] : 'default';
+        
+        // Generate a clean key using the generateKey method
+        key = this.generateKey(clientCode, projectName, originalFilename);
+        
+        logger.info(`Cleaned multipart upload key: ${key}`);
+      }
+      
+      // Now use the cleaned key for the multipart upload
       const command = new CreateMultipartUploadCommand({
         Bucket: bucket,
         Key: key,
@@ -97,6 +147,25 @@ export const s3Service = {
         throw new Error('Part number must be between 1 and 10000');
       }
       
+      // Extract client, project, and filename from the key if it follows the pattern
+      const keyParts = key.split('/');
+      
+      // If the key doesn't have 3 parts (client/project/filename), it might have a UUID prefix
+      // In that case, we need to clean it
+      if (keyParts.length !== 3) {
+        // Extract the filename from the key (last part)
+        const originalFilename = keyParts.length > 0 ? keyParts[keyParts.length - 1] : 'unknown';
+        
+        // Try to extract client and project from the key if possible
+        const clientCode = keyParts.length > 2 ? keyParts[keyParts.length - 3] : 'default';
+        const projectName = keyParts.length > 1 ? keyParts[keyParts.length - 2] : 'default';
+        
+        // Generate a clean key using the generateKey method
+        key = this.generateKey(clientCode, projectName, originalFilename);
+        
+        logger.info(`Cleaned part upload key: ${key}`);
+      }
+      
       const command = new UploadPartCommand({
         Bucket: bucket,
         Key: key,
@@ -130,11 +199,30 @@ export const s3Service = {
    * @returns {Promise<{location: string}>} - The URL of the completed upload
    */
   async completeMultipartUpload(
-    key: string, 
-    uploadId: string, 
+    key: string,
+    uploadId: string,
     parts: Array<{PartNumber: number, ETag: string}>
   ): Promise<{location: string}> {
     try {
+      // Extract client, project, and filename from the key if it follows the pattern
+      const keyParts = key.split('/');
+      
+      // If the key doesn't have 3 parts (client/project/filename), it might have a UUID prefix
+      // In that case, we need to clean it
+      if (keyParts.length !== 3) {
+        // Extract the filename from the key (last part)
+        const originalFilename = keyParts.length > 0 ? keyParts[keyParts.length - 1] : 'unknown';
+        
+        // Try to extract client and project from the key if possible
+        const clientCode = keyParts.length > 2 ? keyParts[keyParts.length - 3] : 'default';
+        const projectName = keyParts.length > 1 ? keyParts[keyParts.length - 2] : 'default';
+        
+        // Generate a clean key using the generateKey method
+        key = this.generateKey(clientCode, projectName, originalFilename);
+        
+        logger.info(`Cleaned multipart completion key: ${key}`);
+      }
+      
       // Sort parts by part number
       const sortedParts = [...parts].sort((a, b) => a.PartNumber - b.PartNumber);
       
@@ -177,6 +265,25 @@ export const s3Service = {
    */
   async abortMultipartUpload(key: string, uploadId: string): Promise<void> {
     try {
+      // Extract client, project, and filename from the key if it follows the pattern
+      const keyParts = key.split('/');
+      
+      // If the key doesn't have 3 parts (client/project/filename), it might have a UUID prefix
+      // In that case, we need to clean it
+      if (keyParts.length !== 3) {
+        // Extract the filename from the key (last part)
+        const originalFilename = keyParts.length > 0 ? keyParts[keyParts.length - 1] : 'unknown';
+        
+        // Try to extract client and project from the key if possible
+        const clientCode = keyParts.length > 2 ? keyParts[keyParts.length - 3] : 'default';
+        const projectName = keyParts.length > 1 ? keyParts[keyParts.length - 2] : 'default';
+        
+        // Generate a clean key using the generateKey method
+        key = this.generateKey(clientCode, projectName, originalFilename);
+        
+        logger.info(`Cleaned abort multipart key: ${key}`);
+      }
+      
       const command = new AbortMultipartUploadCommand({
         Bucket: bucket,
         Key: key,
@@ -246,9 +353,28 @@ export const s3Service = {
     metadata: Record<string, string> = {}
   ): Promise<string> {
     try {
+      // Extract client, project, and filename from the key if it follows the pattern
+      const keyParts = key.split('/');
+      
+      // If the key doesn't have 3 parts (client/project/filename), it might have a UUID prefix
+      // In that case, we need to clean it
+      if (keyParts.length !== 3) {
+        // Extract the filename from the key (last part)
+        const originalFilename = keyParts.length > 0 ? keyParts[keyParts.length - 1] : 'unknown';
+        
+        // Try to extract client and project from the key if possible
+        const clientCode = keyParts.length > 2 ? keyParts[keyParts.length - 3] : 'default';
+        const projectName = keyParts.length > 1 ? keyParts[keyParts.length - 2] : 'default';
+        
+        // Generate a clean key using the generateKey method
+        key = this.generateKey(clientCode, projectName, originalFilename);
+        
+        logger.info(`Cleaned upload file key: ${key}`);
+      }
+      
       // If fileContent is a Buffer, convert it to a Readable stream
-      const body = Buffer.isBuffer(fileContent) 
-        ? Readable.from(fileContent) 
+      const body = Buffer.isBuffer(fileContent)
+        ? Readable.from(fileContent)
         : fileContent;
 
       const upload = new Upload({
@@ -264,8 +390,9 @@ export const s3Service = {
 
       await upload.done();
       
-      // Generate the URL for the uploaded file
-      const fileUrl = `${process.env.S3_ENDPOINT}/${bucket}/${key}`;
+      // Generate the URL for the uploaded file using the public endpoint
+      const s3Endpoint = process.env.S3_PUBLIC_ENDPOINT || 'https://s3.colourstream.johnrogerscolour.co.uk';
+      const fileUrl = `${s3Endpoint}/${bucket}/${key}`;
       logger.info(`File uploaded to S3: ${fileUrl}`);
       
       return fileUrl;
@@ -282,6 +409,25 @@ export const s3Service = {
    */
   async getFile(key: string): Promise<{ stream: Readable; metadata: Record<string, string> }> {
     try {
+      // Extract client, project, and filename from the key if it follows the pattern
+      const keyParts = key.split('/');
+      
+      // If the key doesn't have 3 parts (client/project/filename), it might have a UUID prefix
+      // In that case, we need to clean it
+      if (keyParts.length !== 3) {
+        // Extract the filename from the key (last part)
+        const originalFilename = keyParts.length > 0 ? keyParts[keyParts.length - 1] : 'unknown';
+        
+        // Try to extract client and project from the key if possible
+        const clientCode = keyParts.length > 2 ? keyParts[keyParts.length - 3] : 'default';
+        const projectName = keyParts.length > 1 ? keyParts[keyParts.length - 2] : 'default';
+        
+        // Generate a clean key using the generateKey method
+        key = this.generateKey(clientCode, projectName, originalFilename);
+        
+        logger.info(`Cleaned get file key: ${key}`);
+      }
+      
       const command = new GetObjectCommand({
         Bucket: bucket,
         Key: key,
@@ -319,6 +465,25 @@ export const s3Service = {
    */
   async getFileContent(key: string): Promise<Buffer | null> {
     try {
+      // Extract client, project, and filename from the key if it follows the pattern
+      const keyParts = key.split('/');
+      
+      // If the key doesn't have 3 parts (client/project/filename), it might have a UUID prefix
+      // In that case, we need to clean it
+      if (keyParts.length !== 3) {
+        // Extract the filename from the key (last part)
+        const originalFilename = keyParts.length > 0 ? keyParts[keyParts.length - 1] : 'unknown';
+        
+        // Try to extract client and project from the key if possible
+        const clientCode = keyParts.length > 2 ? keyParts[keyParts.length - 3] : 'default';
+        const projectName = keyParts.length > 1 ? keyParts[keyParts.length - 2] : 'default';
+        
+        // Generate a clean key using the generateKey method
+        key = this.generateKey(clientCode, projectName, originalFilename);
+        
+        logger.info(`Cleaned get file content key: ${key}`);
+      }
+      
       const command = new GetObjectCommand({
         Bucket: bucket,
         Key: key,
@@ -357,6 +522,25 @@ export const s3Service = {
    */
   async deleteFile(key: string): Promise<void> {
     try {
+      // Extract client, project, and filename from the key if it follows the pattern
+      const keyParts = key.split('/');
+      
+      // If the key doesn't have 3 parts (client/project/filename), it might have a UUID prefix
+      // In that case, we need to clean it
+      if (keyParts.length !== 3) {
+        // Extract the filename from the key (last part)
+        const originalFilename = keyParts.length > 0 ? keyParts[keyParts.length - 1] : 'unknown';
+        
+        // Try to extract client and project from the key if possible
+        const clientCode = keyParts.length > 2 ? keyParts[keyParts.length - 3] : 'default';
+        const projectName = keyParts.length > 1 ? keyParts[keyParts.length - 2] : 'default';
+        
+        // Generate a clean key using the generateKey method
+        key = this.generateKey(clientCode, projectName, originalFilename);
+        
+        logger.info(`Cleaned delete file key: ${key}`);
+      }
+      
       const command = new DeleteObjectCommand({
         Bucket: bucket,
         Key: key,
@@ -382,9 +566,11 @@ export const s3Service = {
     const normalizedClientCode = clientCode?.replace(/\s+/g, '_') || 'default';
     const normalizedProjectName = projectName?.replace(/\s+/g, '_') || 'default';
     
-    // Strip out any UUID patterns from the filename (assumes standard UUID format)
-    // This regex matches UUIDs in formats like: prefix-uuid-filename.ext or uuid-filename.ext
-    const filenameWithoutUuid = filename.replace(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-)/gi, '');
+    // Strip out any UUID patterns from the filename
+    // This regex matches UUIDs in formats like:
+    // - f53671c2-f356-417a-b14e-1c1b6476d723-Protape-Ltd-t-a-DataStores-50879.pdf
+    // - prefix-uuid-filename.ext or uuid-filename.ext
+    const filenameWithoutUuid = filename.replace(/^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-)/gi, '');
     
     // Ensure the filename is valid for S3 but preserve the original name as much as possible
     // Only replace characters that are invalid for S3 keys
@@ -405,7 +591,8 @@ export const s3Service = {
       // Skip if source and destination are the same
       if (sourceKey === destinationKey) {
         logger.info(`Key already cleaned: ${sourceKey}`);
-        return `${process.env.S3_ENDPOINT}/${bucket}/${sourceKey}`;
+        const s3Endpoint = process.env.S3_PUBLIC_ENDPOINT || 'https://s3.colourstream.johnrogerscolour.co.uk';
+        return `${s3Endpoint}/${bucket}/${sourceKey}`;
       }
 
       logger.info(`Renaming S3 object: ${sourceKey} -> ${destinationKey}`);
@@ -423,8 +610,9 @@ export const s3Service = {
         Key: sourceKey
       }));
       
-      // Generate the URL for the renamed file
-      const fileUrl = `${process.env.S3_ENDPOINT}/${bucket}/${destinationKey}`;
+      // Generate the URL for the renamed file using the public endpoint
+      const s3Endpoint = process.env.S3_PUBLIC_ENDPOINT || 'https://s3.colourstream.johnrogerscolour.co.uk';
+      const fileUrl = `${s3Endpoint}/${bucket}/${destinationKey}`;
       logger.info(`Successfully renamed S3 object to: ${fileUrl}`);
       
       return fileUrl;
@@ -432,7 +620,69 @@ export const s3Service = {
       logger.error(`Error renaming object in S3 from ${sourceKey} to ${destinationKey}:`, error);
       throw new Error(`Failed to rename object in S3: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  },
+
+  /**
+   * Check if a file exists in S3
+   * @param {string} key - The key (path) of the file in S3
+   * @returns {Promise<boolean>} - Whether the file exists
+   */
+  async fileExists(key: string): Promise<boolean> {
+    try {
+      logger.info(`Checking if file exists in S3: ${key}`);
+      
+      // Extract client, project, and filename from the key if it follows the pattern
+      const keyParts = key.split('/');
+      
+      // If the key doesn't have 3 parts (client/project/filename), it might have a UUID prefix
+      // In that case, we need to clean it
+      if (keyParts.length !== 3) {
+        // Extract the filename from the key (last part)
+        const originalFilename = keyParts.length > 0 ? keyParts[keyParts.length - 1] : 'unknown';
+        
+        // Try to extract client and project from the key if possible
+        const clientCode = keyParts.length > 2 ? keyParts[keyParts.length - 3] : 'default';
+        const projectName = keyParts.length > 1 ? keyParts[keyParts.length - 2] : 'default';
+        
+        // Generate a clean key using the generateKey method
+        key = this.generateKey(clientCode, projectName, originalFilename);
+        
+        logger.info(`Cleaned file exists key: ${key}`);
+      }
+      
+      const command = new GetObjectCommand({
+        Bucket: bucket,
+        Key: key,
+      });
+
+      try {
+        await s3Client.send(command);
+        logger.info(`File exists in S3: ${key}`);
+        return true;
+      } catch (error) {
+        // If the error is a NoSuchKey error, the file doesn't exist
+        if ((error as any)?.name === 'NoSuchKey' || (error as any)?.Code === 'NoSuchKey') {
+          logger.info(`File does not exist in S3: ${key} (NoSuchKey)`);
+          return false;
+        }
+        
+        // Check for other error types that might indicate the file doesn't exist
+        if ((error as any)?.message?.includes('does not exist') ||
+            (error as any)?.message?.includes('not found')) {
+          logger.info(`File does not exist in S3: ${key} (error message)`);
+          return false;
+        }
+        
+        // For other errors, log and return false to be safe
+        logger.error(`Error checking if file exists in S3 for key ${key}:`, error);
+        return false;
+      }
+    } catch (error) {
+      // Catch any other errors and return false to be safe
+      logger.error(`Unexpected error checking if file exists in S3 for key ${key}:`, error);
+      return false;
+    }
   }
 };
 
-export default s3Service; 
+export default s3Service;
