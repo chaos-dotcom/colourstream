@@ -1137,6 +1137,12 @@ router.post('/s3-complete/:token', async (req: Request, res: Response) => {
       });
     }
 
+    // *** ADD LOGGING HERE ***
+    logger.info(`[/s3-complete] Received key from client/companion: ${key}`);
+    logger.info(`[/s3-complete] Received uploadId: ${uploadId}`);
+    logger.info(`[/s3-complete] Received parts count: ${parts?.length}`);
+    // *** END LOGGING ***
+
     // Complete the multipart upload
     const result = await s3Service.completeMultipartUpload(key, uploadId, parts);
     
