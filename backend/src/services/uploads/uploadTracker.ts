@@ -1,6 +1,5 @@
 import { logger } from '../../utils/logger';
 import { getTelegramBot } from '../telegram/telegramBot';
-import { processFilesByToken } from '../../scripts/fix-s3-filenames';
 
 interface UploadInfo {
   id: string;
