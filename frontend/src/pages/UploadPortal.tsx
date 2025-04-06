@@ -230,13 +230,115 @@ const UploadPortal: React.FC = () => {
             }
           });
 
-          // --- Remove AwsS3 plugin configuration ---
-          // Companion handles the S3 upload based on its server-side configuration.
-          // Uppy client only needs to talk to Companion.
-          console.log('Companion is configured server-side for S3 uploads. No AwsS3 plugin needed in Uppy client.');
+          // --- Configure AwsS3 plugin for direct uploads with backend signing ---
+          console.log('Configuring AwsS3 plugin for direct S3 uploads via backend signing');
+          uppyInstance.use(AwsS3, {
+            // Determine multipart based on size (default is > 100MB)
+            shouldUseMultipart: (file) => file.size > 100 * 1024 * 1024, 
+            // Limit concurrent uploads (adjust as needed)
+            limit: 5, 
+            
+            // --- Signing functions pointing to backend ---
+            
+            // Function to initiate multipart upload
+            createMultipartUpload: async (file) => {
+              console.log('[AwsS3] createMultipartUpload called for:', file.name);
+              const response = await fetch(`${API_URL}/upload/s3/multipart/create`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  filename: file.name,
+                  contentType: file.type,
+                  metadata: file.meta // Send all file metadata (includes token, clientCode, project)
+                }),
+              });
+              if (!response.ok) {
+                const errorText = await response.text();
+                console.error('[AwsS3] createMultipartUpload failed:', response.status, errorText);
+                throw new Error(`Failed to create multipart upload: ${response.status} ${errorText}`);
+              }
+              const data = await response.json();
+              console.log('[AwsS3] createMultipartUpload response:', data);
+              // Store the key in file.meta for subsequent requests
+              uppyInstance.setFileMeta(file.id, { key: data.data.key }); 
+              // Expected response: { key: string, uploadId: string }
+              return data.data; 
+            },
+            
+            // Function to get presigned URLs for parts
+            signPart: async (file, partData) => {
+              console.log('[AwsS3] signPart called for:', file.name, 'partNumber:', partData.partNumber);
+              const response = await fetch(`${API_URL}/upload/s3/multipart/sign-part`, { // Changed endpoint name
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  key: file.meta.key, // Use the key stored in meta
+                  uploadId: partData.uploadId,
+                  partNumber: partData.partNumber,
+                  metadata: file.meta // Send all file metadata
+                }),
+              });
+              if (!response.ok) {
+                const errorText = await response.text();
+                console.error('[AwsS3] signPart failed:', response.status, errorText);
+                throw new Error(`Failed to sign part: ${response.status} ${errorText}`);
+              }
+              const data = await response.json();
+              console.log('[AwsS3] signPart response:', data);
+              // Expected response: { url: string }
+              return data.data; 
+            },
+
+            // Function to abort multipart upload
+            abortMultipartUpload: async (file, { key, uploadId }) => {
+              console.log('[AwsS3] abortMultipartUpload called for:', file.name, key, uploadId);
+              const response = await fetch(`${API_URL}/upload/s3/multipart/abort`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                  key: key, 
+                  uploadId: uploadId,
+                  metadata: file.meta // Send all file metadata
+                }),
+              });
+              if (!response.ok) {
+                 const errorText = await response.text();
+                 console.error('[AwsS3] abortMultipartUpload failed:', response.status, errorText);
+                 // Don't throw here, as abort should ideally succeed silently if possible
+              }
+              console.log('[AwsS3] abortMultipartUpload completed for:', key);
+            },
+
+            // Function to complete multipart upload
+            completeMultipartUpload: async (file, { key, uploadId, parts }) => {
+              console.log('[AwsS3] completeMultipartUpload called for:', file.name, key, uploadId);
+              const response = await fetch(`${API_URL}/upload/s3/multipart/complete`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  key: key,
+                  uploadId: uploadId,
+                  parts: parts,
+                  metadata: file.meta // Send all file metadata
+                }),
+              });
+              if (!response.ok) {
+                const errorText = await response.text();
+                console.error('[AwsS3] completeMultipartUpload failed:', response.status, errorText);
+                throw new Error(`Failed to complete multipart upload: ${response.status} ${errorText}`);
+              }
+              const data = await response.json();
+              console.log('[AwsS3] completeMultipartUpload response:', data);
+              // Expected response: { location: url }
+              return data.data; 
+            },
+            
+            // listParts is optional, only needed for resuming uploads
+            // listParts: async (file, { key, uploadId }) => { ... } 
+          });
 
           // --- Configure Companion-based providers (Dropbox, Google Drive) ---
-          // These require Companion regardless of the final destination
+          // These still require Companion
           console.log('Configuring Dropbox/Google Drive.');
           // Add Dropbox support if enabled
           if (ENABLE_DROPBOX) {
