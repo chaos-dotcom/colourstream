@@ -138,9 +138,9 @@ export const s3Service = {
       throw new Error(`Failed to generate presigned URL for part: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   },
-
-  // --- Helper function to replace S3 endpoint ---
   
+  /**
+   * Complete a multipart upload
    * @param {string} key - The key (path) of the file in S3
    * @param {string} uploadId - The upload ID for the multipart upload
    * @param {CompletedPart[]} parts - The parts to include in the completed upload (using AWS SDK type)
