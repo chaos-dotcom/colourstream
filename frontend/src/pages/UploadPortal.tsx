@@ -236,10 +236,10 @@ const UploadPortal: React.FC = () => {
           });
 
           // --- Configure AwsS3 plugin for direct uploads with backend signing ---
-          console.log('Configuring AwsS3 plugin for direct S3 uploads via backend signing');
+          // console.log('Configuring AwsS3 plugin for direct S3 uploads via backend signing'); // Removed confusing log
           uppyInstance.use(AwsS3, {
             // Determine multipart based on size (default is > 100MB)
-            shouldUseMultipart: (file) => file.size > 100 * 1024 * 1024, 
+            shouldUseMultipart: (file) => file.size > 100 * 1024 * 1024,
             // Limit concurrent uploads (adjust as needed)
             limit: 5, 
             
@@ -468,16 +468,14 @@ const UploadPortal: React.FC = () => {
               }
             });
 
-            // Log upload starts without depending on fileIDs
-            uppyInstance.on('upload', (data: any) => {
-              console.log('Upload process started');
-              console.log('Upload data object:', JSON.stringify({
-                // Safely extract only the properties we're interested in
-                fileCount: data && typeof data === 'object' ? Object.keys(data).length : 'unknown',
-                dataType: typeof data
-              }));
+            // Log when the upload process begins
+            uppyInstance.on('upload', (data: { id: string; fileIDs: string[] }) => {
+              console.log('Upload process started. Batch ID:', data.id);
+              console.log('File IDs in this batch:', data.fileIDs);
+              // Log the raw data object for inspection
+              console.log('Raw upload event data:', data);
 
-              // Try to get file information without using fileIDs
+              // Log current files managed by Uppy instance
               try {
                 const files = uppyInstance.getFiles();
                 if (files && files.length > 0) {
