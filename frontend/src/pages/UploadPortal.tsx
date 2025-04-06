@@ -245,11 +245,23 @@ const UploadPortal: React.FC = () => {
           // --- Configure AwsS3 plugin for direct uploads with backend signing ---
           // console.log('Configuring AwsS3 plugin for direct S3 uploads via backend signing'); // Removed confusing log
           uppyInstance.use(AwsS3, {
+            // Required for non-multipart uploads, even if primarily using multipart
+            getUploadParameters: (file) => {
+              // This function should ideally ask the backend for parameters
+              // for non-multipart uploads. Since we force multipart for large files
+              // and handle signing via the other functions, we can throw or return
+              // dummy data here, but it must exist to satisfy types.
+              console.warn('[AwsS3] getUploadParameters called unexpectedly for file:', file.name);
+              // Throwing an error might be safer if this path shouldn't be hit
+              throw new Error('getUploadParameters should not be called in this configuration');
+              // Or return dummy data:
+              // return { method: 'POST', url: '', fields: {}, headers: {} };
+            },
             // Determine multipart based on size (default is > 100MB)
             shouldUseMultipart: (file) => file.size ? file.size > 100 * 1024 * 1024 : false,
             // Limit concurrent uploads (adjust as needed)
-            limit: 5, 
-            
+            limit: 5,
+
             // --- Signing functions pointing to backend ---
             
             // Function to initiate multipart upload
@@ -480,14 +492,12 @@ const UploadPortal: React.FC = () => {
             });
 
             // Log when the upload process begins
-            // Signature matches Uppy's expected type
-            uppyInstance.on('upload', (data: { id: string; fileIDs: string[] }) => {
-              console.log('Upload process started. Batch ID:', data.id);
-              console.log('File IDs in this batch:', data.fileIDs);
-              // Log the raw data object for inspection
-              console.log('Raw upload event data:', data);
+            // Correct signature: (uploadID: string, files: UppyFile[]) => void
+            uppyInstance.on('upload', (uploadID: string, files: UppyFile<CustomFileMeta, Record<string, never>>[]) => {
+              console.log('Upload process started. Batch ID:', uploadID);
+              console.log(`Files in this batch (${files.length}):`, files.map(f => f.name));
 
-              // Log current files managed by Uppy instance
+              // Log current files managed by Uppy instance (redundant with above, but kept for consistency)
               try {
                 const files = uppyInstance.getFiles();
                 if (files && files.length > 0) {
@@ -580,7 +590,12 @@ const UploadPortal: React.FC = () => {
     return () => {
       // Add null check and use correct close method signature
       if (uppy) {
-        uppy.close({ reason: 'unmount' }); // Use standard close method
+        // Ensure the close method exists and call it correctly
+        if (typeof uppy.close === 'function') {
+           uppy.close({ reason: 'unmount' });
+        } else {
+           console.warn('Uppy instance does not have a close method.');
+        }
       }
     };
   // Removed useS3 dependency as it's not used anymore
