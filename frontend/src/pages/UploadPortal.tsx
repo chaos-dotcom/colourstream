@@ -17,8 +17,8 @@ import {
 import { styled } from '@mui/material/styles';
 import { Dashboard } from '@uppy/react';
 import Uppy from '@uppy/core';
-// Remove AwsS3 import - Companion handles S3 uploads server-side
-// import AwsS3 from '@uppy/aws-s3'; 
+// Import AwsS3 for Companion-driven uploads (Reverting change)
+import AwsS3 from '@uppy/aws-s3'; 
 import Dropbox from '@uppy/dropbox';
 import GoogleDrivePicker from '@uppy/google-drive-picker';
 import type { UppyFile } from '@uppy/core';
@@ -230,13 +230,18 @@ const UploadPortal: React.FC = () => {
             }
           });
 
-          // --- Remove AwsS3 plugin configuration ---
-          // Companion handles the S3 upload based on its server-side configuration.
-          // Uppy client only needs to talk to Companion.
-          console.log('Companion is configured server-side for S3 uploads. No AwsS3 plugin needed in Uppy client.');
+          // --- Configure AwsS3 plugin to use Companion (Reverting change) ---
+          console.log('Configuring AwsS3 plugin to use Companion for S3 uploads');
+          uppyInstance.use(AwsS3, {
+            // Point to your Companion instance
+            companionUrl: COMPANION_URL,
+            // Remove other options like limit and retryDelays, relying solely on Companion
+            // limit: 6, // Removed
+            // retryDelays: [0, 1000, 3000, 5000, 10000], // Removed
+          });
 
-          // --- Configure Companion-based providers (Dropbox, Google Drive) ---
-          // These require Companion regardless of the final destination
+          // --- Configure other Companion-based providers (Dropbox, Google Drive) ---
+          // These require Companion regardless of whether S3 uses it
           console.log('Configuring Dropbox/Google Drive.');
           // Add Dropbox support if enabled
           if (ENABLE_DROPBOX) {
