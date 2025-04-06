@@ -202,7 +202,7 @@ const UploadPortal: React.FC = () => {
           });
 
           // Initialize Uppy with the token in metadata and correct generic types
-          const uppyInstance = new Uppy<CustomFileMeta, Record<string, never>>({ // Add generics here
+          const uppyInstance = new Uppy<CustomFileMeta, Record<string, never>>({ // Ensure generics match state type
             id: 'clientUploader',
             autoProceed: true,
             allowMultipleUploadBatches: true,
