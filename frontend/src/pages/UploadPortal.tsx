@@ -590,12 +590,8 @@ const UploadPortal: React.FC = () => {
     return () => {
       // Add null check and use correct close method signature
       if (uppy) {
-        // Ensure the close method exists and call it correctly
-        if (typeof uppy.close === 'function') {
-           uppy.close({ reason: 'unmount' });
-        } else {
-           console.warn('Uppy instance does not have a close method.');
-        }
+        // Call close directly after null check, assuming the method exists on a valid instance
+        uppy.close({ reason: 'unmount' });
       }
     };
   // Removed useS3 dependency as it's not used anymore
