@@ -209,6 +209,8 @@ services:
       - "--certificatesresolvers.myresolver.acme.email=${ADMIN_EMAIL}"
       - "--certificatesresolvers.myresolver.acme.storage=/acme.json"
       - "--log.level=DEBUG"
+      - "--accesslog=true" # Enable access logs
+      - "--accesslog.format=json" # Use JSON format for detailed logs
       - "--serversTransport.forwardingTimeouts.dialTimeout=60s"
       - "--serversTransport.forwardingTimeouts.responseHeaderTimeout=600s"
       - "--serversTransport.forwardingTimeouts.idleConnTimeout=600s"

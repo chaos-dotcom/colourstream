@@ -15,8 +15,18 @@ const s3Client = new S3Client({
     accessKeyId: process.env.S3_ACCESS_KEY || 'minioadmin',
     secretAccessKey: process.env.S3_SECRET_KEY || 'minioadmin',
   },
-  // forcePathStyle: true, // REMOVED: Let SDK generate virtual-host style URLs to match Traefik routing
+  // forcePathStyle: true, // Ensure this is commented out or false
 });
+
+// Log S3 client configuration on startup
+logger.info('S3 Client Initialized:', {
+  region: process.env.S3_REGION || 'us-east-1',
+  endpoint: process.env.S3_ENDPOINT || 'http://minio:9000',
+  bucket: process.env.S3_BUCKET || 'uploads',
+  // Explicitly log if forcePathStyle is somehow active (it shouldn't be)
+  forcePathStyle: (s3Client.config as any).forcePathStyle ?? false 
+});
+
 
 const bucket = process.env.S3_BUCKET || 'uploads';
 
