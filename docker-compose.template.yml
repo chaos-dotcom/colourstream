@@ -467,11 +467,9 @@ services:
       # Google Drive integration
       COMPANION_GOOGLE_SECRET: "${GOOGLE_DRIVE_SECRET}"
 
-      # Custom S3 key generator to strip UUIDs from filenames
-      # Uses /CLIENT/PROJECT/filename structure for consistent organization
-      COMPANION_S3_GET_KEY_NAME: "stripUuid"
-      # Path inside the container to the custom module for S3 key generation
-      COMPANION_S3_KEY_MODULE_PATH: "/app/companion-s3-key-generator.js"
+      # Removed custom S3 key generator. Companion will now use the key provided by the backend /s3-params endpoint.
+      # COMPANION_S3_GET_KEY_NAME: "stripUuid"
+      # COMPANION_S3_KEY_MODULE_PATH: "/app/companion-s3-key-generator.js"
 
       # Performance optimizations for large files
       COMPANION_UPLOAD_TIMEOUT: 86400000 # 24 hours in milliseconds
@@ -484,8 +482,8 @@ services:
       COMPANION_PATH: "/companion"
       COMPANION_DOMAIN: "upload.colourstream.${DOMAIN}"
     volumes:
-      # Mount the custom script into the container
-      - ./companion-s3-key-generator.js:/app/companion-s3-key-generator.js:ro
+      # Removed volume mount for custom S3 key generator script.
+      # - ./companion-s3-key-generator.js:/app/companion-s3-key-generator.js:ro
       - companion_data:/data
     networks:
       - network
