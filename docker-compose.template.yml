@@ -131,6 +131,14 @@ services:
       OME_WEBHOOK_SECRET: ${OME_WEBHOOK_SECRET}
       POSTGRES_USER: colourstream
       POSTGRES_DB: colourstream
+      # --- Add S3 config for backend signing ---
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      S3_ENDPOINT: http://minio:9000 # Internal endpoint for SDK
+      S3_PUBLIC_ENDPOINT: https://s3.colourstream.${DOMAIN} # Public endpoint for URL replacement
+      S3_REGION: us-east-1 # Match SDK client config
+      S3_BUCKET: uploads # Match SDK client config
+      # --- End S3 config ---
     depends_on:
       postgres:
         condition: service_healthy

@@ -15,7 +15,7 @@ const s3Client = new S3Client({
     accessKeyId: process.env.S3_ACCESS_KEY || 'minioadmin',
     secretAccessKey: process.env.S3_SECRET_KEY || 'minioadmin',
   },
-  forcePathStyle: true, // This is required for MinIO and most S3-compatible storage
+  // forcePathStyle: true, // REMOVED: Let SDK generate virtual-host style URLs to match Traefik routing
 });
 
 const bucket = process.env.S3_BUCKET || 'uploads';
