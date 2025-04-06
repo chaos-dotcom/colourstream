@@ -257,8 +257,8 @@ const UploadPortal: React.FC = () => {
               // Or return dummy data:
               // return { method: 'POST', url: '', fields: {}, headers: {} };
             },
-            // Determine multipart based on size (default is > 100MB)
-            shouldUseMultipart: (file) => file.size ? file.size > 100 * 1024 * 1024 : false,
+            // Force multipart for all files to ensure backend signing flow is used
+            shouldUseMultipart: (_file) => true,
             // Limit concurrent uploads (adjust as needed)
             limit: 5,
 
