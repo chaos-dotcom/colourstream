@@ -23,8 +23,8 @@ logger.info('S3 Client Initialized:', {
   region: process.env.S3_REGION || 'us-east-1',
   endpoint: process.env.S3_ENDPOINT || 'http://minio:9000',
   bucket: process.env.S3_BUCKET || 'uploads',
-  // Explicitly log if forcePathStyle is somehow active (it shouldn't be)
-  forcePathStyle: (s3Client.config as any).forcePathStyle ?? false 
+  // Explicitly log the forcePathStyle setting
+  forcePathStyle: (s3Client.config as any).forcePathStyle ?? false
 });
 
 
