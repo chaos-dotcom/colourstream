@@ -1022,9 +1022,9 @@ router.get('/s3-params/:token', async (req: Request, res: Response) => {
     const clientCode = uploadLink.project.client.code || 'default';
     const projectName = uploadLink.project.name || 'default';
     
-    // Normalize the client code and project name (replace spaces with underscores)
-    const normalizedClientCode = clientCode.replace(/\s+/g, '_');
-    const normalizedProjectName = projectName.replace(/\s+/g, '_');
+    // Remove unused normalization variables
+    // const normalizedClientCode = clientCode.replace(/\s+/g, '_');
+    // const normalizedProjectName = projectName.replace(/\s+/g, '_');
     
     // Create the key directly
     const s3Key = s3Service.generateKey(clientCode, projectName, cleanFilename);
@@ -1165,8 +1165,11 @@ router.post('/s3-complete/:token', async (req: Request, res: Response) => {
     logger.info(`[/s3-complete] Completing multipart upload. Key: ${key}, UploadId: ${uploadId}, Parts: ${parts.length}`);
     
     // Complete the multipart upload in S3
-    const result = await s3Service.completeMultipartUpload(key, uploadId, parts);
-    const fileUrl = result.location; // Use the location returned by S3
+    // Remove 'const' as 'result' and 'fileUrl' are declared earlier in the scope if needed, or use different names.
+    // Let's assume 'result' and 'fileUrl' from the earlier block are sufficient or should be renamed.
+    // We'll use the 'result' from the s3Service call directly.
+    const completionResult = await s3Service.completeMultipartUpload(key, uploadId, parts);
+    const finalFileUrl = completionResult.location; // Use the location returned by S3, rename variable
     
     // Extract filename from the key - last part after the final slash
     const keyParts = key.split('/');
@@ -1180,10 +1183,10 @@ router.post('/s3-complete/:token', async (req: Request, res: Response) => {
 
     const uploadedFile = await prisma.uploadedFile.create({
       data: {
-        name: cleanFilename, // Use the extracted filename
+        name: finalCleanFilename, // Use renamed variable
         path: key, // Use the key from the request (should be correct now)
         size: estimatedSize, 
-        mimeType: s3Service.getContentTypeFromFileName(cleanFilename), // Get content type from filename
+        mimeType: s3Service.getContentTypeFromFileName(finalCleanFilename), // Use renamed variable
         hash: `s3-multipart-${uploadId}`, // Use uploadId for hash consistency
         project: {
           connect: { id: uploadLink.projectId }
@@ -1212,7 +1215,7 @@ router.post('/s3-complete/:token', async (req: Request, res: Response) => {
       size: uploadedFile.size || 0,
       offset: uploadedFile.size || 0, // Ensure offset matches size for completion
       metadata: {
-        filename: uploadedFile.name,
+        filename: finalCleanFilename, // Use renamed variable
         filetype: uploadedFile.mimeType || '',
         token: token,
         clientName: uploadLink.project.client.name,
@@ -1225,8 +1228,8 @@ router.post('/s3-complete/:token', async (req: Request, res: Response) => {
 
     res.json({
       status: 'success',
-      location: fileUrl,
-      key: finalKey,
+      location: finalFileUrl, // Use renamed variable
+      key: key, // Use the original key variable
       fileId: uploadedFile.id
     });
   } catch (error) {
