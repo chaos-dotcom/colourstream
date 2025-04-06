@@ -417,6 +417,18 @@ const UploadPortal: React.FC = () => {
 
               // Store the final URL in the file metadata if needed
             });
+            
+            // Log overall progress (bytes uploaded / total)
+            uppyInstance.on('progress', (progress) => {
+              // This logs the percentage completion of the entire batch
+              console.log('[Uppy Progress]', `Total batch progress: ${progress}%`);
+            });
+
+            // Log restriction failures
+            uppyInstance.on('restriction-failed', (file, error) => {
+              console.error('[Uppy Restriction Failed]', `File: ${file?.name}, Error: ${error.message}`);
+              setError(`File restriction error for ${file?.name}: ${error.message}`);
+            });
 
             // Enhanced error handling for AwsS3 with backend signing
             uppyInstance.on('upload-error', (file, error, response) => {
@@ -530,10 +542,10 @@ const UploadPortal: React.FC = () => {
               }
             });
 
-          // Set up general error handling
-          uppyInstance.on('error', (error: Error) => {
-            console.error('Uppy error:', error);
-            setError(`Upload error: ${error.message}`);
+          // Set up general error handling (catches broader Uppy errors)
+          uppyInstance.on('error', (error) => {
+            // Log the error but avoid setting the main error state if upload-error handles specifics
+            console.error('[Uppy General Error]', error); 
           });
 
           // This is a duplicate handler for 'upload-error' - ideally consolidate with the one above
