@@ -1338,8 +1338,8 @@ router.post('/s3-callback/:token', async (req: Request, res: Response) => {
 
     // Use the uploadTracker to mark the upload as complete
     // This will handle the Telegram notification and avoid duplicates
-    // Use a consistent ID format that doesn't include UUID prefixes
-    const trackerId = `s3-direct-${uploadedFile.id}`; // Use a consistent ID format
+    // Use an ID format based on the S3 key for better correlation
+    const trackerId = `s3-direct-${cleanKey.replace(/\//g, '-')}`; // Use S3 key based ID
     logger.info(`[/s3-callback] Marking upload ${trackerId} as complete via uploadTracker`);
     
     // Import the uploadTracker
