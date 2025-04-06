@@ -260,11 +260,11 @@ const UploadPortal: React.FC = () => {
             // Force multipart for all files to ensure backend signing flow is used
             shouldUseMultipart: (_file) => true,
             // Increase concurrent uploads aggressively to hide signing latency
-            limit: 50,
+            limit: 1500,
             // Decrease chunk size further for faster signing/upload cycles
             getChunkSize: (file) => {
               // 16 MB chunk size
-              return 16 * 1024 * 1024;
+              return 5 * 1024 * 1024;
             },
 
             // --- Signing functions pointing to backend ---
