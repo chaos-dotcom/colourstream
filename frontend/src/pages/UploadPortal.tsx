@@ -200,8 +200,8 @@ const UploadPortal: React.FC = () => {
             expiresAt: data.expiresAt
           });
 
-          // Initialize Uppy with the token in metadata
-          const uppyInstance = new Uppy({
+          // Initialize Uppy with the token in metadata and correct generic types
+          const uppyInstance = new Uppy<CustomFileMeta, Record<string, never>>({ // Add generics here
             id: 'clientUploader',
             autoProceed: true,
             allowMultipleUploadBatches: true,
@@ -286,8 +286,9 @@ const UploadPortal: React.FC = () => {
                 }
               },
               // Endpoint on your backend to get presigned URL for each part (only called if shouldUseMultipart is true)
-              // Adjust signature to match expected parameters from AwsS3 plugin
-              signPart: async (file: UppyFile<CustomFileMeta, Record<string, never>>, partData: { uploadId: string; key: string; partNumber: number; body: Blob; signal?: AbortSignal }): Promise<AwsS3UploadParameters> => { 
+              // Adjust signature to use Uppy's base Meta and Body types where needed
+              signPart: async (file: UppyFile<Meta, Body>, partData: { uploadId: string; key: string; partNumber: number; body: Blob; signal?: AbortSignal }): Promise<AwsS3UploadParameters> => { 
+                 // Access custom meta safely if needed: const customMeta = file.meta as CustomFileMeta;
                  console.log(`[signPart] Requesting signed URL for part: ${partData.partNumber}, key: ${partData.key}, uploadId: ${partData.uploadId}`);
                  // Ensure partData.key is a string before encoding
                  const encodedKey = encodeURIComponent(partData.key || ''); 
@@ -304,8 +305,9 @@ const UploadPortal: React.FC = () => {
                  return { url: data.url };
               },
               // Endpoint on your backend to complete the multipart upload (only called if shouldUseMultipart is true)
-              // Adjust signature to match expected parameters from AwsS3 plugin
-              completeMultipartUpload: async (file: UppyFile<CustomFileMeta, Record<string, never>>, { key, uploadId, parts, signal }: { key: string; uploadId: string; parts: AwsS3Part[]; signal?: AbortSignal }): Promise<{ location?: string }> => { 
+              // Adjust signature to use Uppy's base Meta and Body types where needed
+              completeMultipartUpload: async (file: UppyFile<Meta, Body>, { key, uploadId, parts, signal }: { key: string; uploadId: string; parts: AwsS3Part[]; signal?: AbortSignal }): Promise<{ location?: string }> => { 
+                 // Access custom meta safely if needed: const customMeta = file.meta as CustomFileMeta;
                  console.log(`[completeMultipartUpload] Completing: key=${key}, uploadId=${uploadId}, parts=${parts.length}`);
                  const response = await fetch(`${API_URL}/upload/s3-complete/${token}`, {
                     method: 'POST',
@@ -327,8 +329,9 @@ const UploadPortal: React.FC = () => {
                  return { location: data.location }; 
               },
               // Endpoint on your backend to abort the multipart upload (only called if shouldUseMultipart is true)
-              // Adjust signature to match expected parameters from AwsS3 plugin
-              abortMultipartUpload: async (file: UppyFile<CustomFileMeta, Record<string, never>>, { key, uploadId, signal }: { key: string; uploadId?: string; signal?: AbortSignal }): Promise<void> => { 
+              // Adjust signature to use Uppy's base Meta and Body types where needed
+              abortMultipartUpload: async (file: UppyFile<Meta, Body>, { key, uploadId, signal }: { key: string; uploadId?: string; signal?: AbortSignal }): Promise<void> => { 
+                 // Access custom meta safely if needed: const customMeta = file.meta as CustomFileMeta;
                  console.log(`[abortMultipartUpload] Aborting: key=${key}, uploadId=${uploadId}`);
                  // Ensure key is a string before encoding
                  const encodedKey = encodeURIComponent(key || '');
@@ -592,7 +595,7 @@ const UploadPortal: React.FC = () => {
     return () => {
       // Add null check and use correct close method signature
       if (uppy) {
-        // Uppy's close method doesn't take arguments according to latest types
+        // Call close without arguments
         uppy.close(); 
       }
     };
