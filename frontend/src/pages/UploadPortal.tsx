@@ -261,6 +261,11 @@ const UploadPortal: React.FC = () => {
             shouldUseMultipart: (_file) => true,
             // Limit concurrent uploads (adjust as needed)
             limit: 5,
+            // Set chunk size to 128MB
+            getChunkSize: (file) => {
+              // 128 MB chunk size
+              return 128 * 1024 * 1024;
+            },
 
             // --- Signing functions pointing to backend ---
             
