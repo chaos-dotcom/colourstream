@@ -150,46 +150,48 @@ export const s3Service = {
    * Complete a multipart upload
    * @param {string} key - The key (path) of the file in S3
    * @param {string} uploadId - The upload ID for the multipart upload
-   * @param {Array<{PartNumber: number, ETag: string}>} parts - The parts to include in the completed upload
+   * @param {CompletedPart[]} parts - The parts to include in the completed upload (using AWS SDK type)
    * @returns {Promise<{location: string}>} - The URL of the completed upload
    */
   async completeMultipartUpload(
     key: string,
     uploadId: string,
-    parts: Array<{PartNumber: number, ETag: string}>
+    parts: CompletedPart[] // Use the imported CompletedPart type
   ): Promise<{location: string}> {
     try {
       // Ensure the key provided follows the 'client/project/filename' structure.
       // The caller is responsible for generating the correct key using `generateKey`.
       logger.debug(`Completing multipart upload for key: ${key}`);
 
-      // Sort parts by part number
-      const sortedParts = [...parts].sort((a, b) => a.PartNumber - b.PartNumber);
-      
-      // Create the MultipartUpload parts array in the format AWS expects
-      const completedParts: CompletedPart[] = sortedParts.map(part => ({
-        PartNumber: part.PartNumber,
-        ETag: part.ETag
-      }));
+      // Sort parts by part number - ensure PartNumber is defined for sorting
+      const sortedParts = [...parts].sort((a, b) => (a.PartNumber ?? 0) - (b.PartNumber ?? 0));
+
+      // The AWS SDK command expects CompletedPart[], so we can use the sorted array directly.
+      // We should filter out any parts that might be missing essential info, although Uppy should provide valid parts.
+      const validParts = sortedParts.filter(part => part.PartNumber !== undefined && part.ETag !== undefined);
+
+      if (validParts.length !== sortedParts.length) {
+        logger.warn(`[completeMultipartUpload] Filtered out parts with missing PartNumber or ETag for key: ${key}`);
+      }
 
       const command = new CompleteMultipartUploadCommand({
         Bucket: bucket,
         Key: key,
         UploadId: uploadId,
         MultipartUpload: {
-          Parts: completedParts
+          Parts: validParts // Use the validated and sorted parts directly
         }
       });
 
       // Send the command to complete the multipart upload
-      await s3Client.send(command);
-      
+      const response = await s3Client.send(command); // Capture response if needed (e.g., for ETag)
+
       // Generate S3 URL for the completed upload
       const s3Endpoint = process.env.S3_PUBLIC_ENDPOINT || 'https://s3.colourstream.johnrogerscolour.co.uk';
-      const location = `${s3Endpoint}/${bucket}/${key}`;
-      
-      logger.info(`Completed multipart upload for key: ${key}, uploadId: ${uploadId}, parts: ${completedParts.length}`);
-      
+      const location = response.Location || `${s3Endpoint}/${bucket}/${key}`; // Use Location from response if available
+
+      logger.info(`Completed multipart upload for key: ${key}, uploadId: ${uploadId}, parts: ${validParts.length}, Location: ${location}`);
+
       return { location };
     } catch (error) {
       logger.error('Error completing multipart upload:', error);
