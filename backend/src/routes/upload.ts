@@ -10,7 +10,7 @@ import { uploadTracker } from '../services/uploads/uploadTracker';
 import { s3Service } from '../services/s3/s3Service';
 import { fixS3Filenames } from '../scripts/fix-s3-filenames';
 import { logger } from '../utils/logger';
-
+import { getTelegramBot } from '../services/telegram/telegramBot'; // Import the function
 const router = express.Router();
 const prisma = new PrismaClient();
 
@@ -343,7 +343,7 @@ router.get('/upload-links/:token', async (req: Request, res: Response) => {
     res.json({
       status: 'success',
       data: {
-        clientName: uploadLink.project.client.name,
+        clientCode: uploadLink.project.client.code, // Use client code for consistency
         projectName: uploadLink.project.name,
         expiresAt: uploadLink.expiresAt
       }
@@ -1303,30 +1303,32 @@ router.post('/s3-callback/:token', async (req: Request, res: Response) => {
       data: { usedCount: { increment: 1 } }
     });
 
-    // Track the upload using our tracking system
-    const uploadId = `s3-${uploadedFile.id}`;
-    
-    console.log('[DEBUG] Registering S3 upload with tracker:', uploadId);
-    
-    uploadTracker.trackUpload({
-      id: uploadId,
-      size: uploadedFile.size,
-      offset: uploadedFile.size, // Already completed
-      metadata: {
-        filename: uploadedFile.name,
-        filetype: uploadedFile.mimeType || '',
-        token: token,
-        clientName: uploadLink.project.client.name,
-        projectName: uploadLink.project.name,
-        storage: 's3' // This is crucial for triggering the cleanup
-      },
-      createdAt: new Date(),
-      isComplete: true
-    });
-
-    // Also explicitly call completeUpload to ensure the cleanup is triggered
-    uploadTracker.completeUpload(uploadId);
-
+    // NOTE: Tracking is handled by the /api/upload/progress endpoint.
+    // Final completion notification will be sent from here.
+    const telegramBot = getTelegramBot();
+    if (telegramBot) {
+      const uploadId = req.body.hash || `s3-${uploadedFile.id}`; // Try to use hash from body if available, fallback
+      logger.info(`[/s3-callback] Sending final completion notification for ${uploadId}`);
+      const finalUploadInfo = {
+        id: uploadId,
+        size: uploadedFile.size,
+        offset: uploadedFile.size, // Ensure offset matches size for completion
+        metadata: {
+          filename: uploadedFile.name,
+          filetype: uploadedFile.mimeType || '',
+          token: token,
+          clientName: uploadLink.project.client.name,
+          projectName: uploadLink.project.name,
+          storage: 's3'
+        },
+        isComplete: true // Explicitly mark as complete
+      };
+      telegramBot.sendUploadNotification(finalUploadInfo).catch((err: any) => {
+         logger.error(`[/s3-callback] Error sending final Telegram notification for ${uploadId}:`, err);
+      });
+    } else {
+       logger.error('[/s3-callback] Telegram bot not initialized, cannot send final notification.');
+    }
     res.json({
       status: 'success',
       data: uploadedFile
@@ -1356,6 +1358,60 @@ router.post('/cleanup-filenames', authenticateToken, async (_req: Request, res: 
       status: 'error',
       message: 'Failed to run filename cleanup process'
     });
+  }
+});
+
+// New endpoint to receive progress updates from the frontend
+router.post('/progress/:token', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    const { uploadId, bytesUploaded, bytesTotal, filename, clientName, projectName } = req.body;
+
+    // Basic validation
+    if (!uploadId || bytesUploaded === undefined || bytesTotal === undefined || !filename || !token) {
+      logger.warn('[Progress Update] Received incomplete payload:', req.body);
+      return res.status(400).json({ status: 'error', message: 'Incomplete progress data' });
+    }
+
+    // Validate token (optional but good practice)
+    // You might want to add a quick check here if needed, similar to other routes
+
+    const telegramBot = getTelegramBot();
+    if (!telegramBot) {
+      logger.error('[Progress Update] Telegram bot not initialized.');
+      // Don't block the frontend, just log the error server-side
+      return res.status(200).json({ status: 'warning', message: 'Telegram bot not available' });
+    }
+
+    // Prepare data for the notification function
+    const uploadInfo = {
+      id: uploadId, // Use the uploadId provided by Uppy/frontend
+      size: Number(bytesTotal),
+      offset: Number(bytesUploaded),
+      metadata: {
+        filename: filename,
+        // Add client/project if available in request body
+        clientName: clientName || 'Unknown Client',
+        projectName: projectName || 'Unknown Project',
+        token: token, // Include token if needed
+      },
+      // isComplete: false, // Explicitly ensure progress endpoint doesn't mark as complete
+      storage: 's3', // Assuming these are S3 uploads via Companion
+      // uploadSpeed: Can be calculated if needed, but let telegramBot handle it for now
+    };
+
+    // Send notification (don't wait for it to finish)
+    telegramBot.sendUploadNotification(uploadInfo).catch((err: any) => { // Add type to err
+      logger.error(`[Progress Update] Error sending Telegram notification for ${uploadId}:`, err);
+    });
+
+    // Respond quickly to the frontend
+    res.status(200).json({ status: 'success', message: 'Progress received' });
+
+  } catch (error) {
+    logger.error('[Progress Update] Error processing progress update:', error);
+    // Avoid sending error back to frontend unless necessary
+    res.status(500).json({ status: 'error', message: 'Internal server error processing progress' });
   }
 });
 

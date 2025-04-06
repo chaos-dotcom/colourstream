@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useLocation, useSearchParams } from 'react-router-dom';
-import { 
-  Box, 
-  Typography, 
-  Paper, 
+import {
+  Box,
+  Typography,
+  Paper,
   Container,
   Card,
   CardContent,
@@ -23,13 +23,14 @@ import Dropbox from '@uppy/dropbox';
 import GoogleDrivePicker from '@uppy/google-drive-picker';
 import type { UppyFile } from '@uppy/core';
 import type { AwsS3UploadParameters } from '@uppy/aws-s3';
+import { v4 as uuidv4 } from 'uuid'; // Import uuid for fallback key generation
 import '@uppy/core/dist/style.min.css';
 import '@uppy/dashboard/dist/style.min.css';
 import { getUploadLink } from '../services/uploadService';
 import { ApiResponse } from '../types';
-import { 
-  UPLOAD_ENDPOINT_URL, 
-  API_URL, 
+import {
+  UPLOAD_ENDPOINT_URL,
+  API_URL,
   NAMEFORUPLOADCOMPLETION,
   S3_ENDPOINT,
   S3_REGION,
@@ -68,16 +69,17 @@ const StyledDashboard = styled(Box)(({ theme }) => ({
 const SafeDashboard: React.FC<any> = (props) => {
   // Save a reference to the uppy instance
   const uppyRef = React.useRef(props.uppy);
-  
+
   // Add safety monkey patches to prevent fileIDs undefined errors
   React.useEffect(() => {
     if (uppyRef.current) {
       // Store the original upload method
       const originalUpload = uppyRef.current.upload;
-      
+
       // Replace with a safer version
       uppyRef.current.upload = function() {
         try {
+          // @ts-ignore
           return originalUpload.apply(this, arguments);
         } catch (error) {
           console.error('Error in Uppy upload method:', error);
@@ -89,6 +91,7 @@ const SafeDashboard: React.FC<any> = (props) => {
       const originalGetFiles = uppyRef.current.getFiles;
       uppyRef.current.getFiles = function() {
         try {
+          // @ts-ignore
           return originalGetFiles.apply(this, arguments);
         } catch (error) {
           console.error('Error in Uppy getFiles method:', error);
@@ -97,7 +100,7 @@ const SafeDashboard: React.FC<any> = (props) => {
       };
     }
   }, []);
-  
+
   // Render the Dashboard component with the original props
   try {
     return <Dashboard {...props} />;
@@ -134,9 +137,17 @@ const StyledAppBar = styled(AppBar)(() => ({
 
 // Interface for API response data
 interface UploadLinkResponse {
-  clientName: string;
+  clientCode: string; // Use clientCode
   projectName: string;
   expiresAt: string;
+}
+
+// Interface for custom Uppy file metadata
+interface CustomFileMeta {
+  clientCode?: string;
+  project?: string;
+  token?: string;
+  key?: string; // The generated S3 key we add
 }
 
 // Main upload portal for clients (standalone page not requiring authentication)
@@ -153,7 +164,8 @@ const UploadPortal: React.FC = () => {
   const lastProgressUpdateRef = React.useRef<number>(0); // Timestamp of the last update sent
   const lastPercentageUpdateRef = React.useRef<number>(0); // Last percentage milestone reported
   const MIN_PROGRESS_UPDATE_INTERVAL = 3000; // Minimum ms between updates (e.g., 3 seconds)
-  const PERCENTAGE_UPDATE_THRESHOLD = 10; // Send update every X percent increase (e.g., 10%)
+  const PERCENTAGE_UPDATE_THRESHOLD = 5; // Send update every X percent increase (e.g., 5%)
+
   useEffect(() => {
     // Select a random accent color on component mount
     const randomColor = accentColors[Math.floor(Math.random() * accentColors.length)];
@@ -166,20 +178,21 @@ const UploadPortal: React.FC = () => {
         setLoading(false);
         return;
       }
-      
+
       try {
         const response = await getUploadLink(token);
         if (response.status === 'success') {
           // The API returns data in this format directly
           // We need to cast it to any to avoid TypeScript errors
           const data = response.data as any;
-          
+
+          // Use clientCode from the response
           setProjectInfo({
-            clientName: data.clientName,
+            clientCode: data.clientCode,
             projectName: data.projectName,
             expiresAt: data.expiresAt
           });
-          
+
           // Initialize Uppy with the token in metadata
           const uppyInstance = new Uppy({
             id: 'clientUploader',
@@ -191,9 +204,9 @@ const UploadPortal: React.FC = () => {
               maxNumberOfFiles: 1000,
               // Allow all file types - this service is for all files
             },
+            // Set global metadata using clientCode
             meta: {
-              // Set global metadata that will apply to all files
-              client: data.clientName,
+              clientCode: data.clientCode, // Store clientCode
               project: data.projectName,
               token: token
             },
@@ -215,7 +228,7 @@ const UploadPortal: React.FC = () => {
           if (USE_COMPANION) {
             console.log('Using AwsS3Multipart with Companion for large file uploads');
             console.log('Companion URL configured as:', COMPANION_URL);
-            
+
             // Use the AWS S3 Multipart plugin with Companion for chunked uploads
             // @ts-expect-error - Uppy plugins have complex typings that are difficult to match exactly
             uppyInstance.use(AwsS3Multipart, {
@@ -245,9 +258,33 @@ const UploadPortal: React.FC = () => {
                 }
                 // For very large files (like your 600GB files)
                 return 50 * 1024 * 1024; // 50MB chunks for very large files
+              },
+
+              // *** CORRECTED getKey function using clientCode ***
+              getKey: (file: UppyFile<any, any>): string => {
+                // Use clientCode from meta
+                const clientCode = file.meta?.clientCode ? String(file.meta.clientCode) : 'default_client';
+                const projectName = file.meta?.project ? String(file.meta.project) : 'default_project';
+                const originalFilename = file.name || `fallback-${uuidv4()}`; // Use original name or fallback
+
+                // Normalize client code and project name
+                const normalizedClientCode = clientCode.replace(/\s+/g, '_');
+                const normalizedProjectName = projectName.replace(/\s+/g, '_');
+
+                // Strip out the UUID pattern from the filename (if present from other sources)
+                const filenameWithoutUuid = originalFilename.replace(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-)/gi, '');
+
+                // Ensure the filename is valid for S3 but preserve the original name as much as possible
+                const safeName = filenameWithoutUuid.replace(/[\/\\:*?"<>|]/g, '_');
+
+                const key = `${normalizedClientCode}/${normalizedProjectName}/${safeName}`;
+                console.log(`[Frontend KeyGen] Generated S3 key for ${originalFilename}: ${key}`);
+                // Store the generated key in meta for later use in upload-success
+                file.meta.key = key;
+                return key;
               }
             });
-            
+
             // Add Dropbox support if enabled
             if (ENABLE_DROPBOX) {
               console.log('Enabling Dropbox integration');
@@ -255,7 +292,7 @@ const UploadPortal: React.FC = () => {
                 companionUrl: COMPANION_URL,
               });
             }
-            
+
             // Add Google Drive support if enabled
             if (ENABLE_GOOGLE_DRIVE) {
               console.log('Enabling Google Drive Picker integration');
@@ -266,32 +303,22 @@ const UploadPortal: React.FC = () => {
                 appId: GOOGLE_DRIVE_APP_ID
               });
             }
-            
+
             // Log all events for multipart uploads to help debug
             uppyInstance.on('upload-success', (file, response) => {
               if (!file) {
                 console.error('No file information available in upload-success event');
                 return;
               }
-              
+
               console.log('Multipart upload succeeded:', file.name);
               console.log('Response details:', response);
-              
-              // Extract key information for callback
-              let key;
-              if (file.name) {
-                // Construct the key using the client/project structure with the clean filename 
-                key = `${file.meta?.client ? String(file.meta.client).replace(/\s+/g, '_') : 'default'}/${
-                  file.meta?.project ? String(file.meta.project).replace(/\s+/g, '_') : 'default'
-                }/${file.name}`;
-              } else if (response.uploadURL) {
-                // If we have a URL but no filename, extract the key from the URL
-                key = response.uploadURL.split('?')[0].split('/').slice(3).join('/');
-              } else {
-                // Fallback for when we can't determine the key
-                key = `unknown/${Date.now()}.bin`;
-              }
-                
+
+              // Extract key information for callback - Use the key stored in meta by getKey
+              const key = (file.meta as CustomFileMeta).key || `unknown/${Date.now()}.bin`; // Use stored key or fallback
+              console.log('Using key for backend callback:', key);
+
+
               // Notify backend about the successful S3 multipart upload
               fetch(`${API_URL}/upload/s3-callback/${token}`, {
                 method: 'POST',
@@ -299,7 +326,7 @@ const UploadPortal: React.FC = () => {
                   'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                  key: key,
+                  key: key, // Send the correctly generated key
                   size: file.size || 0,
                   filename: file.name || 'unknown',
                   mimeType: file.type || 'application/octet-stream',
@@ -314,13 +341,13 @@ const UploadPortal: React.FC = () => {
                 console.error('Error notifying backend about S3 multipart upload:', error);
               });
             });
-            
+
             // Enhanced error handling for multipart uploads
             uppyInstance.on('upload-error', (file, error, response) => {
               console.error('MULTIPART UPLOAD ERROR:');
               console.error('File:', file?.name, file?.size, file?.type);
               console.error('Error message:', error?.message);
-              
+
               if (response) {
                 console.error('Response status:', response.status);
                 try {
@@ -329,10 +356,10 @@ const UploadPortal: React.FC = () => {
                   console.error('Could not stringify response');
                 }
               }
-              
+
               setError(`Error uploading ${file?.name || 'unknown file'}: ${error?.message || 'Unknown error'}`);
             });
-            
+
             // Add specific logging for chunk uploads to debug performance
             uppyInstance.on('upload-progress', (file, progress) => {
               if (!file || !file.name) return;
@@ -376,7 +403,7 @@ const UploadPortal: React.FC = () => {
                     bytesUploaded: progress.bytesUploaded,
                     bytesTotal: progress.bytesTotal,
                     filename: file.name,
-                    clientName: file.meta?.client,
+                    clientName: file.meta?.clientCode, // Use clientCode here too if needed by backend
                     projectName: file.meta?.project,
                   }),
                 })
@@ -390,7 +417,17 @@ const UploadPortal: React.FC = () => {
                 });
               }
             });
-            
+
+            // Add error logging for debugging upload issues
+            uppyInstance.on('error', (error: any) => {
+              console.error('Uppy error:', error);
+              if (error.request) {
+                console.error('Error request URL:', error.request.url);
+                console.error('Error request method:', error.request.method);
+                console.error('Error status:', error.status);
+              }
+            });
+
             // Log upload starts without depending on fileIDs
             uppyInstance.on('upload', (data: any) => {
               console.log('Upload process started');
@@ -399,7 +436,7 @@ const UploadPortal: React.FC = () => {
                 fileCount: data && typeof data === 'object' ? Object.keys(data).length : 'unknown',
                 dataType: typeof data
               }));
-              
+
               // Try to get file information without using fileIDs
               try {
                 const files = uppyInstance.getFiles();
@@ -419,7 +456,7 @@ const UploadPortal: React.FC = () => {
             // Fall back to regular S3 if Companion is not enabled
             console.log('Using AwsS3 for direct uploads (Companion disabled)');
             console.log('S3 endpoint configured as:', S3_ENDPOINT);
-            
+
             uppyInstance.use(AwsS3, {
               shouldUseMultipart: false, // Explicitly disable multipart uploads
               limit: 1, // Process one file at a time to avoid issues
@@ -428,43 +465,47 @@ const UploadPortal: React.FC = () => {
               getUploadParameters: async (file) => {
                 // Log original filename for debugging
                 console.log('Original filename before S3 upload:', file.name);
-                
+
                 // Ensure we have valid strings for file names
                 const fileName = typeof file.name === 'string' ? file.name : 'unnamed-file';
-                const clientName = file.meta?.client ? String(file.meta.client).replace(/\s+/g, '_') : 'default';
+                // Use clientCode from meta
+                const clientCode = file.meta?.clientCode ? String(file.meta.clientCode).replace(/\s+/g, '_') : 'default';
                 const projectName = file.meta?.project ? String(file.meta.project).replace(/\s+/g, '_') : 'default';
-                
+
+                // Generate the key using clientCode
+                const generatedKey = `${clientCode}/${projectName}/${fileName}`;
+
                 // Set the file meta to include the original name without any modification
                 // This prevents Uppy from adding a UUID prefix
                 file.meta = {
                   ...file.meta,
-                  key: `${clientName}/${projectName}/${fileName}`,
+                  key: generatedKey, // Use the key generated with clientCode
                   // This prevents the AWS S3 plugin from adding random identifiers to the filename
                   name: fileName
                 };
-                
+
                 // Generate a simple URL for debugging
                 const requestUrl = `${API_URL}/upload/s3-params/${token}?filename=${encodeURIComponent(fileName)}`;
                 console.log('Requesting S3 URL from:', requestUrl);
-                
+
                 // Simple fetch to get presigned URL
                 const response = await fetch(requestUrl);
-                
+
                 if (!response.ok) {
                   console.error('S3 params request failed:', response.status, response.statusText);
                   throw new Error(`S3 params request failed: ${response.status} ${response.statusText}`);
                 }
-                
+
                 const data = await response.json();
-                
+
                 if (data.status !== 'success' || !data.url) {
                   console.error('Invalid S3 response:', data);
                   throw new Error('Invalid S3 response from server');
                 }
-                
+
                 console.log('S3 presigned URL:', data.url);
-                console.log('S3 key from backend:', data.key);
-                
+                console.log('S3 key from backend:', data.key); // Backend still generates a key, but we override it
+
                 // Return the complete upload parameters including Content-Type
                 return {
                   method: 'PUT',
@@ -475,12 +516,12 @@ const UploadPortal: React.FC = () => {
                     // Add cache control to prevent caching issues
                     'Cache-Control': 'no-cache'
                   },
-                  // Add the key from the backend to override the default Uppy UUID generation
-                  key: data.key
+                  // Add the key generated using clientCode to override the default Uppy UUID generation
+                  key: generatedKey
                 };
               }
             });
-            
+
             // Add event handler for successful uploads to record in the database
             uppyInstance.on('upload-success', (file, response) => {
               // Check that file exists before proceeding
@@ -488,8 +529,8 @@ const UploadPortal: React.FC = () => {
                 console.error('Missing file data in upload-success event');
                 return;
               }
-              
-              // Enhanced logging for debugging 
+
+              // Enhanced logging for debugging
               console.log('Upload successful to S3 - Original file name:', file.name);
               console.log('File metadata:', file.meta);
               console.log('Upload response details:', {
@@ -497,28 +538,11 @@ const UploadPortal: React.FC = () => {
                 body: response.body,
                 uploadURL: response.uploadURL
               });
-              
-              // Extract the key from the upload response or construct it
-              // Important: We need to extract just the original filename without any UUID prefix
-              let key;
-              if (response.uploadURL) {
-                // When we get a URL back, extract just the key path from it (after the bucket)
-                const urlPath = response.uploadURL.split('?')[0].split('/').slice(3).join('/');
-                console.log('Extracted URL path from S3 response:', urlPath);
-                // Use the path from the response
-                key = urlPath;
-              } else {
-                // Construct the key using the client/project structure with the clean filename
-                // Strip any UUID patterns from the filename (standard UUID format)
-                const cleanFileName = file.name.replace(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-)/gi, '');
-                console.log('Clean filename (after UUID removal):', cleanFileName);
-                
-                key = `${file.meta.client ? file.meta.client.replace(/\s+/g, '_') : 'default'}/${
-                      file.meta.project ? file.meta.project.replace(/\s+/g, '_') : 'default'
-                    }/${cleanFileName}`;
-                console.log('Generated key from filename:', key);
-              }
-              
+
+              // Extract the key from the file metadata (where we stored the correct one)
+              const key = (file.meta as CustomFileMeta).key || `unknown/${Date.now()}.bin`; // Use stored key or fallback
+              console.log('Using key from file meta for backend callback:', key);
+
               // Notify the backend about the successful S3 upload
               fetch(`${API_URL}/upload/s3-callback/${token}`, {
                 method: 'POST',
@@ -526,7 +550,7 @@ const UploadPortal: React.FC = () => {
                   'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                  key: key,
+                  key: key, // Send the correctly generated key
                   size: file.size || 0,
                   filename: file.name, // Use the original filename
                   mimeType: file.type || 'application/octet-stream',
@@ -541,34 +565,34 @@ const UploadPortal: React.FC = () => {
                 console.error('Error notifying backend about S3 upload:', error);
               });
             });
-            
+
             // Add specific listener for S3 multipart errors to get more detailed information
             uppyInstance.on('upload-error', (file, error, response) => {
               console.error('UPLOAD ERROR DETAILS:');
               console.error('File:', file?.name, file?.size, file?.type);
               console.error('Error message:', error?.message);
-              
+
               // Try to extract the request details
               if (response) {
                 console.error('Response status:', response.status);
-                
+
                 // Log all response properties safely using a try/catch to avoid TypeScript errors
                 try {
                   console.error('Response details:', JSON.stringify(response, null, 2));
                 } catch (e) {
                   console.error('Could not stringify response');
                 }
-                
+
                 // Log response body if available
                 if (response.body) {
-                  console.error('Response body:', 
-                    typeof response.body === 'string' 
-                      ? response.body 
+                  console.error('Response body:',
+                    typeof response.body === 'string'
+                      ? response.body
                       : JSON.stringify(response.body, null, 2)
                   );
                 }
               }
-              
+
               // Log MinIO specific diagnostic info
               if (error.message === 'Non 2xx' && response) {
                 console.error('MinIO S3 error details:', {
@@ -590,13 +614,13 @@ const UploadPortal: React.FC = () => {
               }
             });
           }
-          
+
           // Set up error handling
           uppyInstance.on('error', (error: Error) => {
             console.error('Uppy error:', error);
             setError(`Upload error: ${error.message}`);
           });
-          
+
           uppyInstance.on('upload-error', (file: any, error: Error, response: any) => {
             if (file) {
               console.error('File error:', file, error);
@@ -607,8 +631,8 @@ const UploadPortal: React.FC = () => {
                 errorMessage = `HTTP ${response.status}: ${errorMessage}`;
                 if (response.body) {
                   try {
-                    const errorBody = typeof response.body === 'string' 
-                      ? JSON.parse(response.body) 
+                    const errorBody = typeof response.body === 'string'
+                      ? JSON.parse(response.body)
                       : response.body;
                     errorMessage += ` - ${errorBody.message || JSON.stringify(errorBody)}`;
                   } catch (e) {
@@ -640,7 +664,7 @@ const UploadPortal: React.FC = () => {
               setError(`Error uploading ${file.name}: ${errorMessage}`);
             }
           });
-          
+
           // Add file validation to block .turbosort files
           uppyInstance.on('file-added', (file) => {
             const fileName = file.name || '';
@@ -649,7 +673,7 @@ const UploadPortal: React.FC = () => {
               uppyInstance.removeFile(file.id);
             }
           });
-          
+
           setUppy(uppyInstance);
         }
       } catch (error) {
@@ -661,7 +685,7 @@ const UploadPortal: React.FC = () => {
     };
 
     validateToken();
-    
+
     // Clean up Uppy instance on unmount
     return () => {
       if (uppy) {
@@ -754,9 +778,9 @@ const UploadPortal: React.FC = () => {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       {renderHeader()}
-      
+
       <Container maxWidth="lg" sx={{ py: 6, flexGrow: 1 }}>
-        <Typography variant="h3" component="h1" gutterBottom sx={{ 
+        <Typography variant="h3" component="h1" gutterBottom sx={{
           color: '#0b0c0c',
           fontFamily: '"GDS Transport", Arial, sans-serif',
           fontWeight: 700,
@@ -765,22 +789,22 @@ const UploadPortal: React.FC = () => {
           Upload Files
         </Typography>
 
-        <Paper elevation={3} sx={{ 
-          p: 4, 
+        <Paper elevation={3} sx={{
+          p: 4,
           mb: 4,
           borderRadius: '0',
           border: '1px solid #b1b4b6'
         }}>
-          <Typography variant="body1" sx={{ 
-            marginBottom: '30px', 
+          <Typography variant="body1" sx={{
+            marginBottom: '30px',
             fontSize: '19px',
             color: '#0b0c0c'
           }}>
             Upload large video files with high-speed direct upload. {useS3 && '(Using S3 storage for native filenames)'}
           </Typography>
-          
+
           <StyledDashboard>
-            <SafeDashboard 
+            <SafeDashboard
               uppy={uppy}
               showProgressDetails
               showRemoveButtonAfterComplete
@@ -794,7 +818,7 @@ const UploadPortal: React.FC = () => {
           </StyledDashboard>
         </Paper>
       </Container>
-      
+
       <Box sx={{ marginTop: 'auto', borderTop: '1px solid #b1b4b6', py: 4, bgcolor: '#f3f2f1' }}>
         <Container>
           <Typography variant="body2" color="text.secondary">
@@ -809,4 +833,4 @@ const UploadPortal: React.FC = () => {
   );
 };
 
-export default UploadPortal; 
+export default UploadPortal;
