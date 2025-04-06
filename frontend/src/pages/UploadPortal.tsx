@@ -260,11 +260,11 @@ const UploadPortal: React.FC = () => {
             // Force multipart for all files to ensure backend signing flow is used
             shouldUseMultipart: (_file) => true,
             // Limit concurrent uploads (try 3 instead of 5 for smoother flow)
-            limit: 3,
+            limit: 20,
             // Set chunk size to 64MB
             getChunkSize: (file) => {
               // 64 MB chunk size
-              return 64 * 1024 * 1024;
+              return 32 * 1024 * 1024;
             },
 
             // --- Signing functions pointing to backend ---
