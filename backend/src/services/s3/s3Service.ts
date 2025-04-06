@@ -146,29 +146,14 @@ export const s3Service = {
       if (partNumber < 1 || partNumber > 10000) {
         throw new Error('Part number must be between 1 and 10000');
       }
-      
-      // Extract client, project, and filename from the key if it follows the pattern
-      const keyParts = key.split('/');
-      
-      // If the key doesn't have 3 parts (client/project/filename), it might have a UUID prefix
-      // In that case, we need to clean it
-      if (keyParts.length !== 3) {
-        // Extract the filename from the key (last part)
-        const originalFilename = keyParts.length > 0 ? keyParts[keyParts.length - 1] : 'unknown';
-        
-        // Try to extract client and project from the key if possible
-        const clientCode = keyParts.length > 2 ? keyParts[keyParts.length - 3] : 'default';
-        const projectName = keyParts.length > 1 ? keyParts[keyParts.length - 2] : 'default';
-        
-        // Generate a clean key using the generateKey method
-        key = this.generateKey(clientCode, projectName, originalFilename);
-        
-        logger.info(`Cleaned part upload key: ${key}`);
-      }
-      
+    
+      // Ensure the key provided follows the 'client/project/filename' structure.
+      // The caller is responsible for generating the correct key using `generateKey`.
+      logger.debug(`Generating presigned URL for part ${partNumber} for key: ${key}`);
+    
       const command = new UploadPartCommand({
         Bucket: bucket,
-        Key: key,
+        Key: key, // Use the provided key directly
         UploadId: uploadId,
         PartNumber: partNumber
       });
@@ -204,25 +189,10 @@ export const s3Service = {
     parts: Array<{PartNumber: number, ETag: string}>
   ): Promise<{location: string}> {
     try {
-      // Extract client, project, and filename from the key if it follows the pattern
-      const keyParts = key.split('/');
-      
-      // If the key doesn't have 3 parts (client/project/filename), it might have a UUID prefix
-      // In that case, we need to clean it
-      if (keyParts.length !== 3) {
-        // Extract the filename from the key (last part)
-        const originalFilename = keyParts.length > 0 ? keyParts[keyParts.length - 1] : 'unknown';
-        
-        // Try to extract client and project from the key if possible
-        const clientCode = keyParts.length > 2 ? keyParts[keyParts.length - 3] : 'default';
-        const projectName = keyParts.length > 1 ? keyParts[keyParts.length - 2] : 'default';
-        
-        // Generate a clean key using the generateKey method
-        key = this.generateKey(clientCode, projectName, originalFilename);
-        
-        logger.info(`Cleaned multipart completion key: ${key}`);
-      }
-      
+      // Ensure the key provided follows the 'client/project/filename' structure.
+      // The caller is responsible for generating the correct key using `generateKey`.
+      logger.debug(`Completing multipart upload for key: ${key}`);
+
       // Sort parts by part number
       const sortedParts = [...parts].sort((a, b) => a.PartNumber - b.PartNumber);
       
@@ -353,25 +323,10 @@ export const s3Service = {
     metadata: Record<string, string> = {}
   ): Promise<string> {
     try {
-      // Extract client, project, and filename from the key if it follows the pattern
-      const keyParts = key.split('/');
-      
-      // If the key doesn't have 3 parts (client/project/filename), it might have a UUID prefix
-      // In that case, we need to clean it
-      if (keyParts.length !== 3) {
-        // Extract the filename from the key (last part)
-        const originalFilename = keyParts.length > 0 ? keyParts[keyParts.length - 1] : 'unknown';
-        
-        // Try to extract client and project from the key if possible
-        const clientCode = keyParts.length > 2 ? keyParts[keyParts.length - 3] : 'default';
-        const projectName = keyParts.length > 1 ? keyParts[keyParts.length - 2] : 'default';
-        
-        // Generate a clean key using the generateKey method
-        key = this.generateKey(clientCode, projectName, originalFilename);
-        
-        logger.info(`Cleaned upload file key: ${key}`);
-      }
-      
+      // Ensure the key provided follows the 'client/project/filename' structure.
+      // The caller is responsible for generating the correct key using `generateKey`.
+      logger.debug(`Uploading file to S3 key: ${key}`);
+
       // If fileContent is a Buffer, convert it to a Readable stream
       const body = Buffer.isBuffer(fileContent)
         ? Readable.from(fileContent)
@@ -629,30 +584,13 @@ export const s3Service = {
    */
   async fileExists(key: string): Promise<boolean> {
     try {
-      logger.info(`Checking if file exists in S3: ${key}`);
-      
-      // Extract client, project, and filename from the key if it follows the pattern
-      const keyParts = key.split('/');
-      
-      // If the key doesn't have 3 parts (client/project/filename), it might have a UUID prefix
-      // In that case, we need to clean it
-      if (keyParts.length !== 3) {
-        // Extract the filename from the key (last part)
-        const originalFilename = keyParts.length > 0 ? keyParts[keyParts.length - 1] : 'unknown';
-        
-        // Try to extract client and project from the key if possible
-        const clientCode = keyParts.length > 2 ? keyParts[keyParts.length - 3] : 'default';
-        const projectName = keyParts.length > 1 ? keyParts[keyParts.length - 2] : 'default';
-        
-        // Generate a clean key using the generateKey method
-        key = this.generateKey(clientCode, projectName, originalFilename);
-        
-        logger.info(`Cleaned file exists key: ${key}`);
-      }
-      
+      // Ensure the key provided follows the 'client/project/filename' structure.
+      // The caller is responsible for generating the correct key using `generateKey`.
+      logger.debug(`Checking if file exists in S3: ${key}`);
+
       const command = new GetObjectCommand({
         Bucket: bucket,
-        Key: key,
+        Key: key, // Use the provided key directly
       });
 
       try {
