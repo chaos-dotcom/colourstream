@@ -736,3 +736,5 @@ const UploadPortal: React.FC = () => {
 
 // Removed duplicated code block from line 720 to 863
 // Removed second default export at line 1024
+
+export default UploadPortal; // Add the default export back
