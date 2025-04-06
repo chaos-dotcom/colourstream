@@ -508,8 +508,11 @@ services:
       - minio
     entrypoint: >
       /bin/sh -c '
+      set -ex # Exit on error and print commands
+      
       echo "Waiting for MinIO to be ready...";
       sleep 5;
+      
       echo "Adding MinIO host configuration...";
       /usr/bin/mc config host add myminio http://minio:9000 $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD;
       echo "Host configuration added.";
@@ -518,13 +521,13 @@ services:
       /usr/bin/mc mb --ignore-existing myminio/$S3_BUCKET;
       echo "Bucket creation command finished.";
       
-      # Set the bucket policy to allow public read/write access (adjust if needed, but required for createbuckets to set CORS)
-      echo "Setting anonymous policy for bucket $S3_BUCKET...";
-      /usr/bin/mc anonymous set readwrite myminio/$S3_BUCKET;
-      echo "Anonymous policy command finished.";
+      # Removed anonymous policy setting - bucket should remain private
+      # echo "Setting anonymous policy for bucket $S3_BUCKET...";
+      # /usr/bin/mc anonymous set readwrite myminio/$S3_BUCKET;
+      # echo "Anonymous policy command finished.";
       
-      # Configure CORS for the bucket to allow cross-origin requests
-      echo "Setting up CORS configuration for bucket $S3_BUCKET...";
+      # Configure CORS directly using admin config set (legacy method, better for private buckets)
+      echo "Setting up CORS configuration for bucket $S3_BUCKET using admin config set...";
       echo '{
         "CORSRules": [
           {
@@ -534,29 +537,19 @@ services:
             "ExposeHeaders": ["ETag", "Content-Length", "Content-Type"],
             "MaxAgeSeconds": 3600
           }
-        ]
-      }' > /tmp/cors.json;
-      echo "Attempting mc anonymous set-cors for bucket $S3_BUCKET...";
-      /usr/bin/mc anonymous set-cors /tmp/cors.json myminio/$S3_BUCKET;
+      # Directly use the admin config set method
+      /usr/bin/mc admin config set myminio api cors_allow_origin="*"
+      /usr/bin/mc admin config set myminio cors AllowedOrigins="*" \
+                                                AllowedMethods="GET,PUT,POST,DELETE,HEAD" \
+                                                AllowedHeaders="*" \
+                                                ExposeHeaders="ETag,Content-Length,Content-Type" \
+                                                MaxAgeSeconds=3600;
+      echo "CORS configuration command finished. Restarting MinIO service...";
+      /usr/bin/mc admin service restart myminio;
+      echo "MinIO service restart command finished.";
       
-      # Check the exit status of the set-cors command
-      if [ $? -ne 0 ]; then
-        echo "mc anonymous set-cors failed, trying legacy method...";
-        echo "Attempting legacy CORS configuration...";
-        /usr/bin/mc admin config set myminio cors:uploads AllowedOrigins="*" \
-                                                          AllowedMethods="GET,PUT,POST,DELETE,HEAD" \
-                                                          AllowedHeaders="*" \
-                                                          ExposeHeaders="ETag,Content-Length,Content-Type" \
-                                                          MaxAgeSeconds=3600;
-        echo "Legacy CORS command finished. Restarting MinIO service...";
-        /usr/bin/mc admin service restart myminio;
-        echo "MinIO service restart command finished.";
-      else
-        echo "mc anonymous set-cors succeeded.";
-      fi
-      
-      echo "CORS configuration process completed for bucket $S3_BUCKET.";
-      exit 0;
+      echo "Bucket setup and CORS configuration process completed for bucket $S3_BUCKET.";
+      exit 0; # Exit successfully
       '
     networks:
       - network
