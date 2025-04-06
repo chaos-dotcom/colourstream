@@ -236,11 +236,11 @@ const UploadPortal: React.FC = () => {
           uppyInstance.use(AwsS3, {
             // Point to your Companion instance
             companionUrl: COMPANION_URL,
-            // Explicitly disable multipart functions to ensure Companion flow is used
-            createMultipartUpload: false,
-            signPart: false,
-            completeMultipartUpload: false,
-            abortMultipartUpload: false,
+            // Remove explicitly disabled multipart functions; Companion handles this automatically when companionUrl is set
+            // createMultipartUpload: false, // Removed
+            // signPart: false, // Removed
+            // completeMultipartUpload: false, // Removed
+            // abortMultipartUpload: false, // Removed
             // Companion handles multipart uploads internally based on its S3 config
             limit: 6, // Still useful to limit concurrent requests to Companion
             retryDelays: [0, 1000, 3000, 5000, 10000], // Retry delays for failed parts
