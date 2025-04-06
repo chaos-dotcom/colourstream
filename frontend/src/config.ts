@@ -15,9 +15,9 @@ interface RuntimeConfig {
   S3_REGION: string;
   S3_BUCKET: string;
   // Companion configuration
-  COMPANION_URL: string; // Ensure this key is defined
-  COMPANION_AWS_ENDPOINT: string;
-  USE_COMPANION: string;
+  COMPANION_URL: string; // URL for Companion (used by Dropbox, Google Drive, etc.)
+  // COMPANION_AWS_ENDPOINT: string; // Removed - Not used by @uppy/aws-s3 with backend signing
+  USE_COMPANION: string; // Still relevant for providers like Dropbox/Google Drive
   // Provider configuration
   ENABLE_DROPBOX: string;
   ENABLE_GOOGLE_DRIVE: string;
@@ -120,9 +120,9 @@ export const S3_ENDPOINT = getConfig('S3_ENDPOINT');
 export const S3_REGION = getConfig('S3_REGION');
 export const S3_BUCKET = getConfig('S3_BUCKET');
 // Export Companion configuration
-export const COMPANION_URL = getConfig('COMPANION_URL'); // Ensure this uses the getConfig function
-export const COMPANION_AWS_ENDPOINT = getConfig('COMPANION_AWS_ENDPOINT');
-export const USE_COMPANION = getConfig('USE_COMPANION') === 'true';
+export const COMPANION_URL = getConfig('COMPANION_URL'); // URL for Companion (used by Dropbox, Google Drive, etc.)
+// export const COMPANION_AWS_ENDPOINT = getConfig('COMPANION_AWS_ENDPOINT'); // Removed
+export const USE_COMPANION = getConfig('USE_COMPANION') === 'true'; // Still relevant for providers like Dropbox/Google Drive
 // Export Provider configuration
 export const ENABLE_DROPBOX = getConfig('ENABLE_DROPBOX') === 'true';
 export const ENABLE_GOOGLE_DRIVE = getConfig('ENABLE_GOOGLE_DRIVE') === 'true';
@@ -146,8 +146,8 @@ if (typeof window !== 'undefined') {
     S3_ENDPOINT,
     S3_REGION,
     S3_BUCKET,
-    COMPANION_URL, // Add COMPANION_URL here (already present, just ensuring consistency)
-    COMPANION_AWS_ENDPOINT,
+    COMPANION_URL,
+    // COMPANION_AWS_ENDPOINT, // Removed
     USE_COMPANION,
     ENABLE_DROPBOX,
     ENABLE_GOOGLE_DRIVE,
@@ -172,8 +172,8 @@ export default {
   S3_ENDPOINT,
   S3_REGION,
   S3_BUCKET,
-  COMPANION_URL, // Add COMPANION_URL here (already present, just ensuring consistency)
-  COMPANION_AWS_ENDPOINT,
+  COMPANION_URL,
+  // COMPANION_AWS_ENDPOINT, // Removed
   USE_COMPANION,
   ENABLE_DROPBOX,
   ENABLE_GOOGLE_DRIVE,

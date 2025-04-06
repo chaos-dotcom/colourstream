@@ -462,19 +462,19 @@ services:
       # Allow uploads from the frontend domains
       COMPANION_CLIENT_ORIGINS: "https://live.colourstream.${DOMAIN},https://upload.colourstream.${DOMAIN}"
       # Metadata fields to forward to S3 and potentially the backend callback
-      COMPANION_METADATA_FIELDS: "name,type,token,clientCode,projectName" # Add token, clientCode, projectName
+      COMPANION_METADATA_FIELDS: "name,type,token,clientCode,projectName" # Metadata Companion might still handle for other providers
 
-      # AWS S3 Provider Settings (pointing to MinIO)
-      COMPANION_PROVIDER_AWS_KEY: "${S3_ACCESS_KEY}"
-      COMPANION_PROVIDER_AWS_SECRET: "${S3_SECRET_KEY}"
-      COMPANION_PROVIDER_AWS_BUCKET: "${S3_BUCKET}"
-      COMPANION_PROVIDER_AWS_ENDPOINT: "${S3_ENDPOINT}" # Internal MinIO endpoint (e.g., http://minio:9000)
-      COMPANION_PROVIDER_AWS_REGION: "${S3_REGION}"
-      COMPANION_PROVIDER_AWS_USE_PATH_STYLE: "true" # Required for MinIO
-      # Optional: Define a prefix for keys Companion creates (backend will rename later)
-      # COMPANION_AWS_S3_KEY_PREFIX: "companion-uploads/" 
+      # --- AWS S3 Provider Settings Removed ---
+      # Backend handles S3 signing directly for multipart uploads via @uppy/aws-s3 plugin
+      # Companion only needs credentials for providers it directly handles (e.g., Dropbox, Google Drive)
+      # COMPANION_PROVIDER_AWS_KEY: "${S3_ACCESS_KEY}"
+      # COMPANION_PROVIDER_AWS_SECRET: "${S3_SECRET_KEY}"
+      # COMPANION_PROVIDER_AWS_BUCKET: "${S3_BUCKET}"
+      # COMPANION_PROVIDER_AWS_ENDPOINT: "${S3_ENDPOINT}"
+      # COMPANION_PROVIDER_AWS_REGION: "${S3_REGION}"
+      # COMPANION_PROVIDER_AWS_USE_PATH_STYLE: "true"
 
-      # Optional: Dropbox Provider Settings
+      # Optional: Dropbox Provider Settings (Companion still needed for this)
       COMPANION_DROPBOX_KEY: "${DROPBOX_KEY}"
       COMPANION_DROPBOX_SECRET: "${DROPBOX_SECRET}"
 
