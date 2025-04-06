@@ -972,7 +972,7 @@ router.get('/s3-params/:token', async (req: Request, res: Response) => {
   try {
     const { token } = req.params;
     const filename = req.query.filename as string;
-    const multipart = req.query.multipart === 'true';
+    // Remove multipart query param check - AwsS3Multipart plugin always uses multipart flow
     
     if (!filename) {
       return res.status(400).json({
@@ -1034,29 +1034,14 @@ router.get('/s3-params/:token', async (req: Request, res: Response) => {
     logger.info(`Generated S3 key: "${s3Key}" for file: "${filename}"`);
     logger.info(`Client code: "${uploadLink.project.client.code || 'default'}", Project name: "${uploadLink.project.name}"`);
 
-    // Handle multipart upload initialization or regular presigned URL
-    if (multipart) {
-      // For AwsS3 plugin, initiate multipart and return key & uploadId
-      const { uploadId, key } = await s3Service.createMultipartUpload(s3Key, filename);
-      logger.info(`[/s3-params] Multipart initiated. Key: ${key}, UploadId: ${uploadId}`);
-      res.json({
-        status: 'success',
-        key: key, // The final S3 key
-        uploadId: uploadId // The ID for the multipart upload
-      });
-    } else {
-      // For AwsS3 plugin (single part), generate presigned PUT URL
-      const url = await s3Service.generatePresignedUrl(s3Key);
-      logger.info(`[/s3-params] Single part presigned URL generated. Key: ${s3Key}`);
-      res.json({
-        status: 'success',
-        method: 'PUT', // Required by AwsS3 plugin
-        url: url,      // The presigned URL
-        fields: {},    // No fields needed for PUT
-        headers: {},   // Headers might be needed depending on S3 config (like Content-Type)
-        key: s3Key     // Include the key for consistency
-      });
-    }
+    // Always initiate multipart upload when using AwsS3Multipart plugin
+    const { uploadId, key } = await s3Service.createMultipartUpload(s3Key, filename);
+    logger.info(`[/s3-params] Multipart initiated via AwsS3Multipart plugin. Key: ${key}, UploadId: ${uploadId}`);
+    res.json({
+      status: 'success',
+      key: key, // The final S3 key
+      uploadId: uploadId // The ID for the multipart upload
+    });
   } catch (error) {
     console.error('Failed to generate S3 params:', error);
     res.status(500).json({

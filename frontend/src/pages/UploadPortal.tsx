@@ -17,10 +17,8 @@ import {
 import { styled } from '@mui/material/styles';
 import { Dashboard } from '@uppy/react';
 import Uppy from '@uppy/core';
-// Import AwsS3 instead of AwsS3Multipart
-import AwsS3 from '@uppy/aws-s3'; 
-// Keep AwsS3Multipart commented or removed if not needed for other flows
-// import AwsS3Multipart from '@uppy/aws-s3-multipart'; 
+// Import AwsS3Multipart for backend-driven multipart uploads
+import AwsS3Multipart from '@uppy/aws-s3-multipart'; 
 import Dropbox from '@uppy/dropbox';
 import GoogleDrivePicker from '@uppy/google-drive-picker';
 import type { UppyFile } from '@uppy/core';
@@ -236,13 +234,11 @@ const UploadPortal: React.FC = () => {
           if (USE_COMPANION) {
             console.log('Using AwsS3 plugin for direct-to-S3 uploads via backend presigned URLs');
 
-            // Use the AWS S3 plugin for direct uploads
-            // Removed @ts-expect-error as types should be handled now
-            uppyInstance.use(AwsS3, {
-              // Determine if multipart should be used based on file size (Uppy default is > 100MB)
-              shouldUseMultipart: (file: UppyFile<CustomFileMeta, Record<string, never>>) => !!file.size && file.size > 100 * 1024 * 1024, // Add explicit type and null check for file.size
+            // Use the AWS S3 Multipart plugin for direct uploads with backend signing
+            uppyInstance.use(AwsS3Multipart, {
+              // Remove shouldUseMultipart - AwsS3Multipart handles this internally
               
-              // Endpoint for initiating multipart uploads (called when shouldUseMultipart is true)
+              // Endpoint for initiating multipart uploads
               createMultipartUpload: async (file: UppyFile<CustomFileMeta, Record<string, never>>) => {
                 const safeFilename = file.name || 'unknown_file';
                 console.log(`[createMultipartUpload] Initiating for file: ${safeFilename}`);
@@ -259,33 +255,9 @@ const UploadPortal: React.FC = () => {
                  };
               },
               
-              // Endpoint for getting single-part presigned URLs (called when shouldUseMultipart is false)
-              getUploadParameters: async (file: UppyFile<CustomFileMeta, Record<string, never>>) => {
-                const safeFilename = file.name || 'unknown_file';
-                console.log(`[getUploadParameters] Getting single-part URL for file: ${safeFilename}`);
-                const response = await fetch(`${API_URL}/upload/s3-params/${token}?filename=${encodeURIComponent(safeFilename)}&multipart=false`);
-                if (!response.ok) {
-                  const errorData = await response.json().catch(() => ({ message: 'Failed to fetch S3 parameters' }));
-                  throw new Error(errorData.message || `Failed to get S3 parameters: ${response.statusText}`);
-                }
-                const data = await response.json();
-                if (data.status !== 'success') {
-                   throw new Error(data.message || 'Backend failed to provide S3 parameters');
-                }
-                console.log('[getUploadParameters] Received single-part params from backend:', data);
-                // Return the presigned URL details for PUT request
-                return {
-                  method: 'PUT',
-                  url: data.url,
-                  fields: {},
-                  headers: {
-                    'Content-Type': file.type || 'application/octet-stream'
-                  },
-                  key: data.key // Include the key for consistency
-                };
-              },
+              // Remove getUploadParameters - AwsS3Multipart does not use it
               
-              // Endpoint on your backend to get presigned URL for each part (only called if shouldUseMultipart is true)
+              // Endpoint on your backend to get presigned URL for each part
               // Use 'any' for opts and type assertion 'as any' to bypass complex type errors from AwsS3 plugin
               signPart: (async (file: UppyFile<CustomFileMeta, Record<string, never>>, opts: any): Promise<AwsS3UploadParameters> => {
                  console.log(`[signPart] Requesting signed URL for part: ${opts.partNumber}, key: ${opts.key}, uploadId: ${opts.uploadId}`);
