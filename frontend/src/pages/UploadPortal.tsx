@@ -26,6 +26,8 @@ import GoogleDrivePicker from '@uppy/google-drive-picker';
 import type { UppyFile } from '@uppy/core';
 // Import only the types that are actually exported
 import type { AwsS3UploadParameters, AwsS3Part } from '@uppy/aws-s3'; 
+// Import base Uppy types for function signatures
+import type { Meta, Body } from '@uppy/core'; 
 import { v4 as uuidv4 } from 'uuid'; // Import uuid for fallback key generation
 import '@uppy/core/dist/style.min.css';
 import '@uppy/dashboard/dist/style.min.css';
@@ -286,13 +288,13 @@ const UploadPortal: React.FC = () => {
                 }
               },
               // Endpoint on your backend to get presigned URL for each part (only called if shouldUseMultipart is true)
-              // Use base UppyFile type in signature
-              signPart: async (file: UppyFile, partData: { uploadId: string; key: string; partNumber: number; body: Blob; signal?: AbortSignal }): Promise<{ url: string; headers?: Record<string, string> }> => { 
+              // Use Uppy's base Meta/Body types and match expected 'opts' structure
+              signPart: async (file: UppyFile<Meta, Body>, opts: { uploadId: string; key: string; partNumber: number; body: Blob; signal?: AbortSignal }): Promise<AwsS3UploadParameters> => { 
                  // Access custom meta if needed: const customMeta = file.meta as CustomFileMeta;
-                 console.log(`[signPart] Requesting signed URL for part: ${partData.partNumber}, key: ${partData.key}, uploadId: ${partData.uploadId}`);
-                 // Ensure partData.key is a string before encoding
-                 const encodedKey = encodeURIComponent(partData.key || ''); 
-                 const response = await fetch(`${API_URL}/upload/s3-part-params/${token}?uploadId=${partData.uploadId}&key=${encodedKey}&partNumber=${partData.partNumber}`);
+                 console.log(`[signPart] Requesting signed URL for part: ${opts.partNumber}, key: ${opts.key}, uploadId: ${opts.uploadId}`);
+                 // Ensure opts.key is a string before encoding
+                 const encodedKey = encodeURIComponent(opts.key || ''); 
+                 const response = await fetch(`${API_URL}/upload/s3-part-params/${token}?uploadId=${opts.uploadId}&key=${encodedKey}&partNumber=${opts.partNumber}`);
                  if (!response.ok) {
                     const errorData = await response.json().catch(() => ({ message: 'Failed to sign part' }));
                     throw new Error(errorData.message || `Failed to sign part ${partData.partNumber}: ${response.statusText}`);
@@ -305,15 +307,15 @@ const UploadPortal: React.FC = () => {
                  return { url: data.url };
               },
               // Endpoint on your backend to complete the multipart upload (only called if shouldUseMultipart is true)
-              // Use base UppyFile type in signature
-              completeMultipartUpload: async (file: UppyFile, { key, uploadId, parts, signal }: { key: string; uploadId: string; parts: AwsS3Part[]; signal?: AbortSignal }): Promise<{ location?: string }> => { 
+              // Use Uppy's base Meta/Body types and match expected 'opts' structure
+              completeMultipartUpload: async (file: UppyFile<Meta, Body>, opts: { key: string; uploadId: string; parts: AwsS3Part[]; signal?: AbortSignal }): Promise<{ location?: string }> => { 
                  // Access custom meta if needed: const customMeta = file.meta as CustomFileMeta;
-                 console.log(`[completeMultipartUpload] Completing: key=${key}, uploadId=${uploadId}, parts=${parts.length}`);
+                 console.log(`[completeMultipartUpload] Completing: key=${opts.key}, uploadId=${opts.uploadId}, parts=${opts.parts.length}`);
                  const response = await fetch(`${API_URL}/upload/s3-complete/${token}`, {
                     method: 'POST',
-                    signal, // Pass signal for potential cancellation
+                    signal: opts.signal, // Pass signal for potential cancellation
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ key, uploadId, parts }),
+                    body: JSON.stringify({ key: opts.key, uploadId: opts.uploadId, parts: opts.parts }),
                  });
                  if (!response.ok) {
                     const errorData = await response.json().catch(() => ({ message: 'Failed to complete multipart upload' }));
@@ -329,14 +331,14 @@ const UploadPortal: React.FC = () => {
                  return { location: data.location }; 
               },
               // Endpoint on your backend to abort the multipart upload (only called if shouldUseMultipart is true)
-              // Use base UppyFile type in signature
-              abortMultipartUpload: async (file: UppyFile, { key, uploadId, signal }: { key: string; uploadId?: string; signal?: AbortSignal }): Promise<void> => { 
+              // Use Uppy's base Meta/Body types and match expected 'opts' structure
+              abortMultipartUpload: async (file: UppyFile<Meta, Body>, opts: { key: string; uploadId?: string; signal?: AbortSignal }): Promise<void> => { 
                  // Access custom meta if needed: const customMeta = file.meta as CustomFileMeta;
-                 console.log(`[abortMultipartUpload] Aborting: key=${key}, uploadId=${uploadId}`);
+                 console.log(`[abortMultipartUpload] Aborting: key=${opts.key}, uploadId=${opts.uploadId}`);
                  // Ensure key is a string before encoding
-                 const encodedKey = encodeURIComponent(key || '');
+                 const encodedKey = encodeURIComponent(opts.key || '');
                  // Note: Uppy expects query params for abort, matching our backend
-                 const response = await fetch(`${API_URL}/upload/s3-abort/${token}?key=${encodedKey}&uploadId=${uploadId}`, {
+                 const response = await fetch(`${API_URL}/upload/s3-abort/${token}?key=${encodedKey}&uploadId=${opts.uploadId}`, {
                     method: 'POST', // Backend route uses POST
                  });
                  if (!response.ok) {
