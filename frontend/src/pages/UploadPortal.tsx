@@ -248,7 +248,7 @@ const UploadPortal: React.FC = () => {
             // Add null check for file.size
             shouldUseMultipart: (file) => (file.size ?? 0) > 5 * 1024 * 1024,
             // Adjust concurrency based on network/backend capacity, not signing latency
-            limit: 10,
+            limit: 20,
             // Use a larger chunk size now that signing overhead is removed
             getChunkSize: (file) => {
               // 64 MB chunk size (S3 minimum is 5MB)
