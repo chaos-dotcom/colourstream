@@ -242,15 +242,11 @@ const UploadPortal: React.FC = () => {
               // Determine if multipart should be used based on file size (Uppy default is > 100MB)
               shouldUseMultipart: (file: UppyFile<CustomFileMeta, Record<string, never>>) => !!file.size && file.size > 100 * 1024 * 1024, // Add explicit type and null check for file.size
               
-              // Endpoint on your backend to get upload parameters (presigned URL or multipart details)
-              // This reuses the existing /s3-params endpoint logic
-              getUploadParameters: async (file: UppyFile<CustomFileMeta, Record<string, never>>) => { // Fix UppyFile generic
-                // Determine if this file will use multipart based on the same logic
-                const isMultipart = !!file.size && file.size > 100 * 1024 * 1024; // Add null check
-                const safeFilename = file.name || 'unknown_file'; // Handle potentially undefined filename
-                console.log(`[getUploadParameters] File: ${safeFilename}, Size: ${file.size}, Multipart: ${isMultipart}`);
-                
-                const response = await fetch(`${API_URL}/upload/s3-params/${token}?filename=${encodeURIComponent(safeFilename)}&multipart=${isMultipart}`);
+              // Endpoint for initiating multipart uploads (called when shouldUseMultipart is true)
+              createMultipartUpload: async (file: UppyFile<CustomFileMeta, Record<string, never>>) => {
+                const safeFilename = file.name || 'unknown_file';
+                console.log(`[createMultipartUpload] Initiating for file: ${safeFilename}`);
+                const response = await fetch(`${API_URL}/upload/s3-params/${token}?filename=${encodeURIComponent(safeFilename)}&multipart=true`);
                 if (!response.ok) {
                   const errorData = await response.json().catch(() => ({ message: 'Failed to fetch S3 parameters' }));
                   throw new Error(errorData.message || `Failed to get S3 parameters: ${response.statusText}`);
