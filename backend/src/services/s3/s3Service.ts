@@ -15,7 +15,7 @@ const s3Client = new S3Client({
     accessKeyId: process.env.S3_ACCESS_KEY || 'minioadmin',
     secretAccessKey: process.env.S3_SECRET_KEY || 'minioadmin',
   },
-  // forcePathStyle: true, // Ensure this is commented out or false
+  forcePathStyle: true, // RE-ADD: Use path-style addressing (e.g., http://minio:9000/uploads) for internal backend->MinIO communication
 });
 
 // Log S3 client configuration on startup
