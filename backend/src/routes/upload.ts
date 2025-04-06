@@ -1007,10 +1007,7 @@ router.get('/s3-params/:token', async (req: Request, res: Response) => {
       });
     }
 
-    // Extract client and project information to generate the CORRECT key
-    // These are already defined earlier in the scope, remove redeclaration
-    // const clientCode = uploadLink.project.client.code || 'default';
-    // const projectName = uploadLink.project.name || 'default';
+    // Use clientCode and projectName defined earlier in the scope
 
     // Clean the filename by removing UUIDs
     // This regex matches UUIDs in formats like:
@@ -1020,8 +1017,7 @@ router.get('/s3-params/:token', async (req: Request, res: Response) => {
     const cleanFilename = filename.replace(uuidRegex, '');
     
     // Generate S3 key for this file - using the clean $CLIENT/$PROJECT/FILENAME structure
-    // Ensure clientCode and projectName are defined from the earlier scope
-    // (They are defined just above this block)
+    // Use clientCode and projectName defined above
     
     // Remove unused normalization variables
     // const normalizedClientCode = clientCode.replace(/\s+/g, '_');
