@@ -1008,8 +1008,9 @@ router.get('/s3-params/:token', async (req: Request, res: Response) => {
     }
 
     // Extract client and project information to generate the CORRECT key
-    const clientCode = uploadLink.project.client.code || 'default';
-    const projectName = uploadLink.project.name || 'default';
+    // These are already defined earlier in the scope, remove redeclaration
+    // const clientCode = uploadLink.project.client.code || 'default';
+    // const projectName = uploadLink.project.name || 'default';
 
     // Clean the filename by removing UUIDs
     // This regex matches UUIDs in formats like:
@@ -1019,9 +1020,8 @@ router.get('/s3-params/:token', async (req: Request, res: Response) => {
     const cleanFilename = filename.replace(uuidRegex, '');
     
     // Generate S3 key for this file - using the clean $CLIENT/$PROJECT/FILENAME structure
-    // Remove the duplicate declarations below as they are already defined above
-    // const clientCode = uploadLink.project.client.code || 'default';
-    // const projectName = uploadLink.project.name || 'default';
+    // Ensure clientCode and projectName are defined from the earlier scope
+    // (They are defined just above this block)
     
     // Remove unused normalization variables
     // const normalizedClientCode = clientCode.replace(/\s+/g, '_');
@@ -1161,7 +1161,6 @@ router.post('/s3-complete/:token', async (req: Request, res: Response) => {
     const keyParts = key.split('/');
     const cleanFilename = keyParts.pop() || 'unknown'; // Assume key is correct, so filename is the last part
     // Remove unused finalKey declaration, 'key' variable holds the correct value
-    // const finalKey = key; 
     const fileUrl = result.location; // Use the location returned by S3
     
     logger.info(`[/s3-complete] Completing multipart upload. Key: ${key}, UploadId: ${uploadId}, Parts: ${parts.length}`);
