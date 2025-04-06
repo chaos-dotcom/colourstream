@@ -259,30 +259,7 @@ const UploadPortal: React.FC = () => {
                 // For very large files (like your 600GB files)
                 return 50 * 1024 * 1024; // 50MB chunks for very large files
               },
-
-              // *** CORRECTED getKey function using clientCode ***
-              getKey: (file: UppyFile<any, any>): string => {
-                // Use clientCode from meta
-                const clientCode = file.meta?.clientCode ? String(file.meta.clientCode) : 'default_client';
-                const projectName = file.meta?.project ? String(file.meta.project) : 'default_project';
-                const originalFilename = file.name || `fallback-${uuidv4()}`; // Use original name or fallback
-
-                // Normalize client code and project name
-                const normalizedClientCode = clientCode.replace(/\s+/g, '_');
-                const normalizedProjectName = projectName.replace(/\s+/g, '_');
-
-                // Strip out the UUID pattern from the filename (if present from other sources)
-                const filenameWithoutUuid = originalFilename.replace(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-)/gi, '');
-
-                // Ensure the filename is valid for S3 but preserve the original name as much as possible
-                const safeName = filenameWithoutUuid.replace(/[\/\\:*?"<>|]/g, '_');
-
-                const key = `${normalizedClientCode}/${normalizedProjectName}/${safeName}`;
-                console.log(`[Frontend KeyGen] Generated S3 key for ${originalFilename}: ${key}`);
-                // Store the generated key in meta for later use in upload-success
-                file.meta.key = key;
-                return key;
-              }
+              // Removed getKey function. Companion will get the key from the backend /s3-params endpoint.
             });
 
             // Add Dropbox support if enabled
@@ -314,10 +291,33 @@ const UploadPortal: React.FC = () => {
               console.log('Multipart upload succeeded:', file.name);
               console.log('Response details:', response);
 
-              // Extract key information for callback - Use the key stored in meta by getKey
-              const key = (file.meta as CustomFileMeta).key || `unknown/${Date.now()}.bin`; // Use stored key or fallback
-              console.log('Using key for backend callback:', key);
-
+              // Extract the final S3 key from the uploadURL provided by the backend/S3
+              // The uploadURL typically looks like: https://s3-endpoint/bucket/CLIENT/PROJECT/FILENAME.ext
+              let key = `unknown/${Date.now()}.bin`; // Fallback key
+              if (response.uploadURL) {
+                try {
+                  const url = new URL(response.uploadURL);
+                  // Remove leading slash from pathname to get the key
+                  key = url.pathname.startsWith('/') ? url.pathname.substring(1) : url.pathname;
+                  // The key might be URL-encoded, decode it
+                  key = decodeURIComponent(key);
+                  // Remove the bucket name prefix if the endpoint includes it (common with MinIO paths)
+                  const bucketName = S3_BUCKET; // Get bucket name from config
+                  if (key.startsWith(`${bucketName}/`)) {
+                    key = key.substring(bucketName.length + 1);
+                  }
+                  console.log('Extracted key from uploadURL for backend callback:', key);
+                } catch (e) {
+                  console.error('Failed to parse uploadURL to extract key:', e);
+                  // Use the key from file.meta if available as a fallback (though it shouldn't be set anymore)
+                  key = (file.meta as CustomFileMeta).key || key;
+                  console.warn('Using fallback key for backend callback:', key);
+                }
+              } else {
+                 console.warn('uploadURL not found in response, using fallback key.');
+                 // Attempt fallback using file.meta just in case, though getKey was removed
+                 key = (file.meta as CustomFileMeta).key || key;
+              }
 
               // Notify backend about the successful S3 multipart upload
               fetch(`${API_URL}/upload/s3-callback/${token}`, {
