@@ -239,7 +239,7 @@ const UploadPortal: React.FC = () => {
             // Remove other options like limit and retryDelays, relying solely on Companion
             // limit: 6, // Removed
             // retryDelays: [0, 1000, 3000, 5000, 10000], // Removed
-          } as any); // Keep 'as any' for now due to potential type definition issues
+          }); // Remove 'as any' cast
 
           // --- Configure other Companion-based providers (Dropbox, Google Drive) ---
           // These require Companion regardless of whether S3 uses it
