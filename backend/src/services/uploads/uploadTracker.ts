@@ -111,12 +111,14 @@ class UploadTracker {
       console.log('[DEBUG] Upload metadata:', upload.metadata);
       console.log('[DEBUG] Storage value:', upload.metadata?.storage);
       
-      if (upload.metadata?.storage === 's3' && upload.metadata?.token) {
-        console.log('[DEBUG] Will trigger S3 cleanup for upload:', id);
-        this.triggerS3Cleanup(id, upload.metadata.token);
-      } else {
-        console.log('[DEBUG] Skipping S3 cleanup for upload:', id, 'as storage is not s3 or token is missing');
-      }
+      // Disable automatic S3 cleanup trigger for new uploads, as the key should be correct initially.
+      // The cleanup script can be run manually if needed for legacy files.
+      // if (upload.metadata?.storage === 's3' && upload.metadata?.token) {
+      //   console.log('[DEBUG] Will trigger S3 cleanup for upload:', id);
+      //   this.triggerS3Cleanup(id, upload.metadata.token);
+      // } else {
+      //   console.log('[DEBUG] Skipping S3 cleanup for upload:', id, 'as storage is not s3 or token is missing');
+      // }
     } else {
       logger.warn(`Attempted to complete unknown upload: ${id}`);
     }
