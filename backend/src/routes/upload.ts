@@ -967,8 +967,15 @@ router.get('/upload-links-all', authenticateToken, async (req: Request, res: Res
   }
 });
 
-// Endpoint to get S3 upload parameters for AWS S3 direct upload
-router.get('/s3-params/:token', async (req: Request, res: Response) => {
+// --- Remove backend signing endpoints ---
+// router.get('/s3-params/:token', ... ); 
+// router.get('/s3-part-params/:token', ... );
+// router.post('/s3-complete/:token', ... );
+// router.post('/s3-abort/:token', ... );
+// --- End remove backend signing endpoints ---
+
+// Endpoint for Companion to notify backend after successful S3 upload
+router.post('/s3-callback', async (req: Request, res: Response) => {
   try {
     const { token } = req.params;
     const filename = req.query.filename as string;
@@ -1036,239 +1043,99 @@ router.get('/s3-params/:token', async (req: Request, res: Response) => {
 
     // Always initiate multipart upload when using AwsS3Multipart plugin
     const { uploadId, key } = await s3Service.createMultipartUpload(s3Key, filename);
-    logger.info(`[/s3-params] Multipart initiated via AwsS3Multipart plugin. Key: ${key}, UploadId: ${uploadId}`);
-    res.json({
-      status: 'success',
-      key: key, // The final S3 key
-      uploadId: uploadId // The ID for the multipart upload
-    });
-  } catch (error) {
-    console.error('Failed to generate S3 params:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Failed to generate S3 parameters'
-    });
-  }
-});
-
-// Add endpoint for multipart upload part presigned URL generation
-router.get('/s3-part-params/:token', async (req: Request, res: Response) => {
   try {
-    const { token } = req.params;
-    const { uploadId, key, partNumber } = req.query;
-    
-    if (!uploadId || !key || !partNumber) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Missing required parameters: uploadId, key, and partNumber are required'
-      });
+    // Companion sends upload details in the request body
+    const { name, size, mimeType, metadata, s3 } = req.body;
+    const s3Key = s3?.key; // Key where Companion uploaded the file
+
+    logger.info('[/s3-callback] Received callback from Companion');
+    logger.info('[/s3-callback] Body:', JSON.stringify(req.body, null, 2));
+
+    if (!metadata || !metadata.token || !s3Key) {
+      logger.error('[/s3-callback] Missing required metadata (token) or S3 key from Companion callback');
+      return res.status(400).json({ status: 'error', message: 'Missing required data from Companion' });
     }
 
-    // Validate the upload token
-    const uploadLink = await prisma.uploadLink.findUnique({
-      where: { token }
-    });
+    const token = metadata.token;
 
-    if (!uploadLink || uploadLink.expiresAt < new Date()) {
-      return res.status(403).json({
-        status: 'error',
-        message: 'Upload link is invalid or has expired'
-      });
-    }
-
-    // Generate presigned URL for the part upload
-    const url = await s3Service.getPresignedUrlForPart(
-      key as string,
-      uploadId as string,
-      parseInt(partNumber as string, 10)
-    );
-
-    res.json({
-      status: 'success',
-      url
-    });
-  } catch (error) {
-    console.error('Failed to generate part upload URL:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Failed to generate part upload URL'
-    });
-  }
-});
-
-// Complete multipart upload
-router.post('/s3-complete/:token', async (req: Request, res: Response) => {
-  try {
-    const { token } = req.params;
-    const { uploadId, key, parts } = req.body;
-    
-    if (!uploadId || !key || !parts) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Missing required parameters for completing multipart upload'
-      });
-    }
-
-    // Validate the upload token
+    // Validate the token
     const uploadLink = await prisma.uploadLink.findUnique({
       where: { token },
-      include: {
-        project: {
-          include: {
-            client: true
-          }
-        }
-      }
+      include: { project: { include: { client: true } } }
     });
 
-    if (!uploadLink || uploadLink.expiresAt < new Date()) {
-      return res.status(403).json({
-        status: 'error',
-        message: 'Upload link is invalid or has expired'
-      });
+    if (!uploadLink) {
+      logger.error(`[/s3-callback] Invalid token received: ${token}`);
+      // Optionally delete the orphaned file from S3
+      // await s3Service.deleteFile(s3Key);
+      return res.status(403).json({ status: 'error', message: 'Invalid upload token' });
     }
 
-    // *** ADD LOGGING HERE ***
-    logger.info(`[/s3-complete] Received key from client/companion: ${key}`);
-    logger.info(`[/s3-complete] Received uploadId: ${uploadId}`);
-    logger.info(`[/s3-complete] Received parts count: ${parts?.length}`);
-    // *** END LOGGING ***
+    // Check expiry and usage limits
+    if (uploadLink.expiresAt < new Date() || (uploadLink.maxUses !== null && uploadLink.usedCount >= uploadLink.maxUses)) {
+       logger.warn(`[/s3-callback] Expired or over-limit token used: ${token}`);
+       // Optionally delete the orphaned file from S3
+       // await s3Service.deleteFile(s3Key);
+       return res.status(403).json({ status: 'error', message: 'Upload link expired or limit reached' });
+    }
 
-    // Complete the multipart upload
-    const result = await s3Service.completeMultipartUpload(key, uploadId, parts);
-    
-    // Extract filename from the key - last part after the final slash
-    // Key should be in the correct format: CLIENT/PROJECT/FILENAME as generated by /s3-params
-    const keyParts = key.split('/');
-    const cleanFilename = keyParts.pop() || 'unknown'; // Assume key is correct, so filename is the last part
-    // Remove unused finalKey declaration, 'key' variable holds the correct value
-    const fileUrl = result.location; // Use the location returned by S3
-    
-    logger.info(`[/s3-complete] Completing multipart upload. Key: ${key}, UploadId: ${uploadId}, Parts: ${parts.length}`);
-    
-    // Complete the multipart upload in S3
-    // Remove 'const' as 'result' and 'fileUrl' are declared earlier in the scope if needed, or use different names.
-    // Let's assume 'result' and 'fileUrl' from the earlier block are sufficient or should be renamed.
-    // We'll use the 'result' from the s3Service call directly.
-    const completionResult = await s3Service.completeMultipartUpload(key, uploadId, parts);
-    const finalFileUrl = completionResult.location; // Use the location returned by S3, rename variable
-    
-    // Extract filename from the key - last part after the final slash
-    // Remove the redundant declaration below as keyParts and cleanFilename are already defined above
-    // const keyParts = key.split('/');
-    // const cleanFilename = keyParts.pop() || 'unknown'; 
-    
-    // --- Database Record Creation Moved Here ---
-    logger.info(`[/s3-complete] Creating database record for completed upload: ${key}`);
-    // TODO: Get actual file size from S3 after completion if needed, or estimate from parts.
-    // For now, using 0 as placeholder.
-    const estimatedSize = 0; // Placeholder - ideally get from S3 HeadObject or sum parts
+    // Generate a unique ID for tracking this specific upload instance
+    const trackerId = `s3-companion-${s3Key.replace(/\//g, '-')}`;
 
+    // Create the database record (initially with Companion's key)
+    // We'll use the s3FileProcessor later to rename and update the path/URL
     const uploadedFile = await prisma.uploadedFile.create({
       data: {
-        name: cleanFilename, // Use original variable name
-        path: key, // Use the key from the request (should be correct now)
-        size: estimatedSize, 
-        mimeType: s3Service.getContentTypeFromFileName(cleanFilename), // Use original variable name
-        hash: `s3-multipart-${uploadId}`, // Use uploadId for hash consistency
-        project: {
-          connect: { id: uploadLink.projectId }
-        },
-        status: 'completed',
+        name: metadata.name || name || 'unknown', // Use metadata name if available
+        path: s3Key, // Store Companion's key initially
+        size: size || 0,
+        mimeType: mimeType || 'application/octet-stream',
+        hash: `s3-companion-${uuidv4()}`, // Placeholder hash, could get ETag from S3 later if needed
+        project: { connect: { id: uploadLink.projectId } },
+        status: 'processing', // Mark as processing until renamed
         completedAt: new Date(),
         storage: 's3',
-        url: fileUrl
+        url: null // URL will be set after renaming
       }
     });
 
-    // Update the upload link usage count
+    // Increment usage count immediately
     await prisma.uploadLink.update({
       where: { id: uploadLink.id },
       data: { usedCount: { increment: 1 } }
     });
 
-    // Use the uploadTracker to mark the upload as complete
-    // This will handle the Telegram notification
-    const trackerId = `s3-direct-${key.replace(/\//g, '-')}`; // Use S3 key based ID
-    logger.info(`[/s3-complete] Marking upload ${trackerId} as complete via uploadTracker`);
-    
-    // Track the upload with complete status
-    uploadTracker.trackUpload({
-      id: trackerId,
-      size: uploadedFile.size || 0,
-      offset: uploadedFile.size || 0, // Ensure offset matches size for completion
-      metadata: {
-        filename: cleanFilename, // Use original variable name
-        filetype: uploadedFile.mimeType || '',
-        token: token,
-        clientName: uploadLink.project.client.name,
-        projectName: uploadLink.project.name,
-        storage: 's3'
-      },
-      isComplete: true, // Explicitly mark as complete
-      createdAt: new Date()
-    });
+    // Trigger the S3 file processor to rename/organize the file
+    // Pass the newly created file ID and the token
+    logger.info(`[/s3-callback] Triggering S3 file processing for file ID: ${uploadedFile.id}, S3 Key: ${s3Key}`);
+    s3FileProcessor.processFile(uploadedFile.id, token)
+      .then(success => {
+        if (success) {
+          logger.info(`[/s3-callback] S3 file processing successful for file ID: ${uploadedFile.id}`);
+          // Mark upload complete in tracker AFTER successful processing
+          uploadTracker.completeUpload(trackerId); 
+        } else {
+          logger.error(`[/s3-callback] S3 file processing failed for file ID: ${uploadedFile.id}`);
+          // Handle failure - maybe update status to 'failed'?
+          prisma.uploadedFile.update({ where: { id: uploadedFile.id }, data: { status: 'failed' } }).catch();
+        }
+      })
+      .catch(error => {
+        logger.error(`[/s3-callback] Error during S3 file processing for file ID: ${uploadedFile.id}`, error);
+        prisma.uploadedFile.update({ where: { id: uploadedFile.id }, data: { status: 'failed' } }).catch();
+      });
 
-    res.json({
-      status: 'success',
-      location: finalFileUrl, // Use renamed variable
-      key: key, // Use the original key variable
-      fileId: uploadedFile.id
-    });
+    // Respond to Companion immediately - processing happens async
+    res.status(200).json({ status: 'success', message: 'Upload received, processing started' });
+
   } catch (error) {
-    console.error('Failed to complete multipart upload:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Failed to complete multipart upload'
-    });
+    logger.error('[/s3-callback] Error processing Companion callback:', error);
+    res.status(500).json({ status: 'error', message: 'Internal server error processing callback' });
   }
 });
 
-// Abort multipart upload
-router.post('/s3-abort/:token', async (req: Request, res: Response) => {
-  try {
-    const { token } = req.params;
-    const { uploadId, key } = req.query;
-    
-    if (!uploadId || !key) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Missing required parameters: uploadId and key are required'
-      });
-    }
 
-    // Validate the upload token
-    const uploadLink = await prisma.uploadLink.findUnique({
-      where: { token }
-    });
-
-    if (!uploadLink || uploadLink.expiresAt < new Date()) {
-      return res.status(403).json({
-        status: 'error',
-        message: 'Upload link is invalid or has expired'
-      });
-    }
-
-    // Abort the multipart upload
-    await s3Service.abortMultipartUpload(key as string, uploadId as string);
-    
-    res.json({
-      status: 'success',
-      message: 'Multipart upload aborted successfully'
-    });
-  } catch (error) {
-    console.error('Failed to abort multipart upload:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Failed to abort multipart upload'
-    });
-  }
-});
-
-// Remove the /s3-callback endpoint as it's no longer needed with AwsS3 direct flow
-// router.post('/s3-callback/:token', ... );
-
-// Add an endpoint to trigger S3 filename cleanup
+// Add an endpoint to trigger S3 filename cleanup manually
 router.post('/cleanup-filenames', authenticateToken, async (_req: Request, res: Response) => {
   try {
     // Start the cleanup process using the imported processor

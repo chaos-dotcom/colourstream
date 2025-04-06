@@ -17,13 +17,13 @@ import {
 import { styled } from '@mui/material/styles';
 import { Dashboard } from '@uppy/react';
 import Uppy from '@uppy/core';
-// Import AwsS3Multipart for backend-driven multipart uploads
-import AwsS3Multipart from '@uppy/aws-s3-multipart'; 
+// Import AwsS3 for Companion-driven uploads
+import AwsS3 from '@uppy/aws-s3'; 
 import Dropbox from '@uppy/dropbox';
 import GoogleDrivePicker from '@uppy/google-drive-picker';
 import type { UppyFile } from '@uppy/core';
-// Import only the types that are actually exported
-import type { AwsS3UploadParameters, AwsS3Part } from '@uppy/aws-s3'; 
+// Remove AwsS3Multipart specific types
+// import type { AwsS3UploadParameters, AwsS3Part } from '@uppy/aws-s3'; // Keep this if AwsS3 needs it, remove if not. Let's assume AwsS3 doesn't expose these directly for config.
 // Base Uppy types (Meta, Body) removed as direct import caused issues
 import { v4 as uuidv4 } from 'uuid'; // Import uuid for fallback key generation
 import '@uppy/core/dist/style.min.css';
@@ -230,121 +230,48 @@ const UploadPortal: React.FC = () => {
             }
           });
 
-          // --- Configure AwsS3Multipart for backend signing (Always enabled for now) ---
-          console.log('Configuring AwsS3Multipart plugin for direct-to-S3 uploads via backend presigned URLs');
-          // Cast uppyInstance to 'any' for this specific use call to bypass complex type issues
-          (uppyInstance as any).use(AwsS3Multipart, { 
-            // Remove shouldUseMultipart - AwsS3Multipart handles this internally
-            
-            // Endpoint for initiating multipart uploads
-            createMultipartUpload: async (file: UppyFile<CustomFileMeta, Record<string, never>>) => {
-                const safeFilename = file.name || 'unknown_file';
-                console.log(`[createMultipartUpload] Initiating for file: ${safeFilename}`);
-                const response = await fetch(`${API_URL}/upload/s3-params/${token}?filename=${encodeURIComponent(safeFilename)}&multipart=true`);
-                if (!response.ok) {
-                  const errorData = await response.json().catch(() => ({ message: 'Failed to fetch S3 parameters' }));
-                  throw new Error(errorData.message || `Failed to get S3 parameters: ${response.statusText}`);
-                }
-                 console.log('[createMultipartUpload] Received multipart params from backend:', data);
-                 // Return key and uploadId as expected by AwsS3 plugin
-                 return {
-                   key: data.key,
-                   uploadId: data.uploadId,
-                 };
-              },
-              
-              // Remove getUploadParameters - AwsS3Multipart does not use it
-              
-              // Endpoint on your backend to get presigned URL for each part
-              // Use 'any' for opts and type assertion 'as any' to bypass complex type errors from AwsS3 plugin
-              signPart: (async (file: UppyFile<CustomFileMeta, Record<string, never>>, opts: any): Promise<AwsS3UploadParameters> => {
-                 console.log(`[signPart] Requesting signed URL for part: ${opts.partNumber}, key: ${opts.key}, uploadId: ${opts.uploadId}`);
-                 // Ensure opts.key is a string before encoding
-                 const encodedKey = encodeURIComponent(opts.key || '');
-                 const response = await fetch(`${API_URL}/upload/s3-part-params/${token}?uploadId=${opts.uploadId}&key=${encodedKey}&partNumber=${opts.partNumber}`);
-                 if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({ message: 'Failed to sign part' }));
-                    // Use opts.partNumber instead of partData.partNumber
-                    throw new Error(errorData.message || `Failed to sign part ${opts.partNumber}: ${response.statusText}`);
-                 }
-                 const data = await response.json();
-                 if (data.status !== 'success' || !data.url) {
-                    throw new Error(data.message || 'Backend failed to provide signed URL for part');
-                 }
-                 // Use opts.partNumber instead of partData.partNumber
-                 console.log(`[signPart] Received signed URL for part ${opts.partNumber}`);
-                 return { url: data.url };
-              }) as any, // Add type assertion here
-              // Endpoint on your backend to complete the multipart upload (only called if shouldUseMultipart is true)
-              // Use 'any' for opts and type assertion 'as any' to bypass complex type errors from AwsS3 plugin
-              completeMultipartUpload: (async (file: UppyFile<CustomFileMeta, Record<string, never>>, opts: any): Promise<{ location?: string }> => {
-                 console.log(`[completeMultipartUpload] Completing: key=${opts.key}, uploadId=${opts.uploadId}, parts=${opts.parts.length}`);
-                 const response = await fetch(`${API_URL}/upload/s3-complete/${token}`, {
-                    method: 'POST',
-                    signal: opts.signal, // Pass signal for potential cancellation
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ key: opts.key, uploadId: opts.uploadId, parts: opts.parts }),
-                 });
-                 if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({ message: 'Failed to complete multipart upload' }));
-                    throw new Error(errorData.message || `Failed to complete multipart upload: ${response.statusText}`);
-                 }
-                 const data = await response.json();
-                 if (data.status !== 'success') {
-                    throw new Error(data.message || 'Backend failed to complete multipart upload');
-                 }
-                 console.log('[completeMultipartUpload] Completed via backend:', data);
-                 // Return the location if available, otherwise null/undefined
-                 // This location is used by Uppy internally and in the success event
-                 return { location: data.location };
-              }) as any, // Add type assertion here
-              // Endpoint on your backend to abort the multipart upload (only called if shouldUseMultipart is true)
-              // Use 'any' for opts and type assertion 'as any' to bypass complex type errors from AwsS3 plugin
-              abortMultipartUpload: (async (file: UppyFile<CustomFileMeta, Record<string, never>>, opts: any): Promise<void> => {
-                 console.log(`[abortMultipartUpload] Aborting: key=${opts.key}, uploadId=${opts.uploadId}`);
-                 // Ensure key is a string before encoding
-                 const encodedKey = encodeURIComponent(opts.key || '');
-                 // Note: Uppy expects query params for abort, matching our backend
-                 const response = await fetch(`${API_URL}/upload/s3-abort/${token}?key=${encodedKey}&uploadId=${opts.uploadId}`, {
-                    method: 'POST', // Backend route uses POST
-                 });
-                 if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({ message: 'Failed to abort multipart upload' }));
-                    // Don't throw error here, Uppy handles cancellation gracefully
-                    console.error(errorData.message || `Failed to abort multipart upload: ${response.statusText}`);
-                 }
-                 console.log('[abortMultipartUpload] Aborted via backend');
-              }) as any, // Add type assertion here
-              limit: 6, // Number of concurrent part uploads
-              retryDelays: [0, 1000, 3000, 5000, 10000], // Retry delays for failed parts
-            }); // Remove the incorrect 'as any' cast from the options object
+          // --- Configure AwsS3 plugin to use Companion ---
+          console.log('Configuring AwsS3 plugin to use Companion for S3 uploads');
+          uppyInstance.use(AwsS3, {
+            // Point to your Companion instance
+            companionUrl: COMPANION_URL, 
+            // Companion handles multipart uploads internally based on its S3 config
+            // We don't need createMultipartUpload, signPart, etc. here
+            limit: 6, // Still useful to limit concurrent requests to Companion
+            retryDelays: [0, 1000, 3000, 5000, 10000], // Retry delays for failed parts
+            // getUploadParameters: (file) => {
+            //   // Optional: If you need to dynamically set S3 path or metadata via Companion
+            //   // This requires Companion to be configured to allow overriding these parameters
+            //   // For now, we rely on Companion's server-side config and metadata forwarding
+            //   console.log(`[getUploadParameters] Preparing file: ${file.name}`);
+            //   // Return an empty object or specific parameters if needed
+            //   return {}; 
+            // }
+          });
 
-          // --- Configure Companion-based providers conditionally ---
-          if (USE_COMPANION) {
-            console.log('Companion is enabled. Configuring Dropbox/Google Drive.');
-            // Add Dropbox support if enabled
-            if (ENABLE_DROPBOX) {
-              console.log('Enabling Dropbox integration');
-              uppyInstance.use(Dropbox, {
-                companionUrl: COMPANION_URL,
-              });
-            }
-
-            // Add Google Drive support if enabled
-            if (ENABLE_GOOGLE_DRIVE) {
-              console.log('Enabling Google Drive Picker integration');
-              uppyInstance.use(GoogleDrivePicker, {
-                companionUrl: COMPANION_URL,
-                clientId: GOOGLE_DRIVE_CLIENT_ID,
-                apiKey: GOOGLE_DRIVE_API_KEY,
-                appId: GOOGLE_DRIVE_APP_ID
-              });
-            }
-          } else {
-            console.log('Companion is disabled. Skipping Dropbox/Google Drive configuration.');
+          // --- Configure other Companion-based providers (Dropbox, Google Drive) ---
+          // These require Companion regardless of whether S3 uses it
+          console.log('Configuring Dropbox/Google Drive.');
+          // Add Dropbox support if enabled
+          if (ENABLE_DROPBOX) {
+            console.log('Enabling Dropbox integration');
+            uppyInstance.use(Dropbox, {
+              companionUrl: COMPANION_URL,
+            });
           }
 
-          // --- Event listeners (Keep existing ones) ---
+          // Add Google Drive support if enabled
+          if (ENABLE_GOOGLE_DRIVE) {
+            console.log('Enabling Google Drive Picker integration');
+            uppyInstance.use(GoogleDrivePicker, {
+              companionUrl: COMPANION_URL,
+              clientId: GOOGLE_DRIVE_CLIENT_ID,
+              apiKey: GOOGLE_DRIVE_API_KEY,
+              appId: GOOGLE_DRIVE_APP_ID
+            });
+          }
+          
+          // --- Event listeners ---
           // Log all events for uploads to help debug
           // Add types for file and response parameters
           uppyInstance.on('upload-success', (file: UppyFile<CustomFileMeta, Record<string, never>> | undefined, response: any) => { // Fix UppyFile generic
@@ -356,30 +283,16 @@ const UploadPortal: React.FC = () => {
               console.log(`[upload-success] Upload succeeded: ${file.name}`);
               console.log('[upload-success] Response details:', response);
 
-              // For AwsS3, the key is available in file.meta (where getUploadParameters puts it)
-              // or potentially in file.xhrUpload.key if it was a single part upload
-              // The location comes from the response body of completeMultipartUpload or the presigned URL response
-              const finalKey = file.meta?.key || (file as any).xhrUpload?.key || 'unknown-key'; // Access key safely
-              const finalLocation = response?.uploadURL || response?.location || 'unknown-location'; // Access location safely
+              // When using AwsS3 with Companion, the response typically contains the uploadURL
+              // which is the final S3 URL. Companion handles notifying the backend if configured.
+              const finalLocation = response?.uploadURL || 'unknown-location'; // Access location safely
+              console.log(`[upload-success] Final Location (from Companion): ${finalLocation}`);
 
-              console.log(`[upload-success] Final Key: ${finalKey}, Final Location: ${finalLocation}`);
-
-              // NOTE: We no longer need the /s3-callback endpoint.
-              // The database record creation is now handled by the /s3-complete endpoint for multipart
-              // or needs to be added for single-part uploads if not already handled.
-              // For now, we just log success here. The backend /s3-complete already logs and saves.
-
-              // Example of how you might manually call a different backend endpoint if needed for single-part tracking:
-              // if (!file.isRemote && !uppyInstance.plugins.s3?.opts?.shouldUseMultipart(file)) {
-              //   // This was a single-part upload, maybe call a specific endpoint?
-              //   fetch(`${API_URL}/upload/s3-single-complete/${token}`, { ... });
-              // }
+              // The backend callback triggered by Companion should handle database updates and file processing.
+              // No need to call /s3-callback or /s3-complete from here.
             });
 
-            // Remove the leftover block of code that was trying to extract key from uploadURL and call /s3-callback
-            // This block starts with "let key = `unknown/${Date.now()}.bin`;" and ends before "// Enhanced error handling for multipart uploads"
-
-            // Enhanced error handling for AwsS3 uploads (add types)
+            // Enhanced error handling for AwsS3 with Companion (add types)
             uppyInstance.on('upload-error', (file, error, response) => {
               console.error('MULTIPART UPLOAD ERROR:');
               console.error('File:', file?.name, file?.size, file?.type);
