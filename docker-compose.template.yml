@@ -443,59 +443,10 @@ services:
       - "traefik.http.routers.minio-console.tls.certresolver=myresolver"
       - "traefik.http.routers.minio-console.service=minio-console"
       - "traefik.http.services.minio-console.loadbalancer.server.port=9001"
-  # Add Uppy Companion service for handling large file uploads
-  companion:
-    image: transloadit/companion:latest
-    restart: unless-stopped
-    environment:
-      # Core Companion settings
-      COMPANION_ALLOW_LOCAL_URLS: "true"
-      COMPANION_CLIENT_ORIGINS: "https://upload.colourstream.${DOMAIN},https://live.colourstream.${DOMAIN}"
-
-      # S3 Connection settings using environment variables from .env file
-      COMPANION_AWS_KEY: "${S3_ACCESS_KEY}"
-      COMPANION_AWS_SECRET: "${S3_SECRET_KEY}"
-      COMPANION_AWS_BUCKET: "${S3_BUCKET}"
-      COMPANION_AWS_REGION: "${S3_REGION}"
-      # Point Companion directly to the internal MinIO service endpoint
-      COMPANION_AWS_ENDPOINT: "http://minio:9000" 
-      COMPANION_AWS_FORCE_PATH_STYLE: "true"
-
-      # Dropbox integration
-      COMPANION_DROPBOX_KEY: "${DROPBOX_KEY}"
-      COMPANION_DROPBOX_SECRET: "${DROPBOX_SECRET}"
-
-      # Google Drive integration
-      COMPANION_GOOGLE_SECRET: "${GOOGLE_DRIVE_SECRET}"
-
-      # Removed custom S3 key generator. Companion will now use the key provided by the backend /s3-params endpoint.
-      # COMPANION_S3_GET_KEY_NAME: "stripUuid"
-      # COMPANION_S3_KEY_MODULE_PATH: "/app/companion-s3-key-generator.js"
-
-      # Performance optimizations for large files
-      COMPANION_UPLOAD_TIMEOUT: 86400000 # 24 hours in milliseconds
-      COMPANION_STREAMING_UPLOAD: "true"
-      COMPANION_MAX_FILE_SIZE: "650000000000" # 650GB max file size
-
-      # Required file path setting
-      COMPANION_DATADIR: "/data"
-      # Redis for session storage (optional, can add later if needed)
-      COMPANION_PATH: "/companion"
-      COMPANION_DOMAIN: "upload.colourstream.${DOMAIN}"
-    volumes:
-      # Removed volume mount for custom S3 key generator script.
-      # - ./companion-s3-key-generator.js:/app/companion-s3-key-generator.js:ro
-      - companion_data:/data
-    networks:
-      - network
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.companion.rule=Host(`upload.colourstream.${DOMAIN}`) && PathPrefix(`/companion`)"
-      - "traefik.http.routers.companion.entrypoints=websecure"
-      - "traefik.http.routers.companion.tls=true"
-      - "traefik.http.routers.companion.tls.certresolver=myresolver"
-      - "traefik.http.routers.companion.service=companion"
-      - "traefik.http.services.companion.loadbalancer.server.port=3020"
+  
+  # Companion service removed as AwsS3 plugin now handles direct uploads via backend
+  # companion:
+  #   ... (rest of companion config commented out or deleted) ...
 
   createbuckets:
     image: minio/mc:latest

@@ -1026,8 +1026,8 @@ router.get('/s3-params/:token', async (req: Request, res: Response) => {
     const normalizedClientCode = clientCode.replace(/\s+/g, '_');
     const normalizedProjectName = projectName.replace(/\s+/g, '_');
     
-    // Create the key directly to ensure it matches what the frontend will use
-    const s3Key = `${normalizedClientCode}/${normalizedProjectName}/${cleanFilename}`;
+    // Create the key directly
+    const s3Key = s3Service.generateKey(clientCode, projectName, cleanFilename);
     
     logger.info(`Generated S3 key for upload: ${s3Key}`);
     
@@ -1039,20 +1039,25 @@ router.get('/s3-params/:token', async (req: Request, res: Response) => {
 
     // Handle multipart upload initialization or regular presigned URL
     if (multipart) {
+      // For AwsS3 plugin, initiate multipart and return key & uploadId
       const { uploadId, key } = await s3Service.createMultipartUpload(s3Key, filename);
-      
+      logger.info(`[/s3-params] Multipart initiated. Key: ${key}, UploadId: ${uploadId}`);
       res.json({
         status: 'success',
-        uploadId,
-        key
+        key: key, // The final S3 key
+        uploadId: uploadId // The ID for the multipart upload
       });
     } else {
+      // For AwsS3 plugin (single part), generate presigned PUT URL
       const url = await s3Service.generatePresignedUrl(s3Key);
-      
+      logger.info(`[/s3-params] Single part presigned URL generated. Key: ${s3Key}`);
       res.json({
         status: 'success',
-        url,
-        key: s3Key
+        method: 'PUT', // Required by AwsS3 plugin
+        url: url,      // The presigned URL
+        fields: {},    // No fields needed for PUT
+        headers: {},   // Headers might be needed depending on S3 config (like Content-Type)
+        key: s3Key     // Include the key for consistency
       });
     }
   } catch (error) {
@@ -1157,16 +1162,29 @@ router.post('/s3-complete/:token', async (req: Request, res: Response) => {
     const finalKey = key; // Use the key provided by the client directly
     const fileUrl = result.location; // Use the location returned by S3
     
-    logger.info(`Completing multipart upload with key: ${finalKey}, filename: ${cleanFilename}`);
+    logger.info(`[/s3-complete] Completing multipart upload. Key: ${key}, UploadId: ${uploadId}, Parts: ${parts.length}`);
     
-    // Create file record in database using the key provided by the client
+    // Complete the multipart upload in S3
+    const result = await s3Service.completeMultipartUpload(key, uploadId, parts);
+    const fileUrl = result.location; // Use the location returned by S3
+    
+    // Extract filename from the key - last part after the final slash
+    const keyParts = key.split('/');
+    const cleanFilename = keyParts.pop() || 'unknown'; 
+    
+    // --- Database Record Creation Moved Here ---
+    logger.info(`[/s3-complete] Creating database record for completed upload: ${key}`);
+    // TODO: Get actual file size from S3 after completion if needed, or estimate from parts.
+    // For now, using 0 as placeholder.
+    const estimatedSize = 0; // Placeholder - ideally get from S3 HeadObject or sum parts
+
     const uploadedFile = await prisma.uploadedFile.create({
       data: {
         name: cleanFilename, // Use the extracted filename
-        path: finalKey, // Use the key from the request
-        size: 0, // Size will be updated later if possible
-        mimeType: 'application/octet-stream', // MimeType will be updated later if possible
-        hash: `multipart-${uploadId}`,
+        path: key, // Use the key from the request (should be correct now)
+        size: estimatedSize, 
+        mimeType: s3Service.getContentTypeFromFileName(cleanFilename), // Get content type from filename
+        hash: `s3-multipart-${uploadId}`, // Use uploadId for hash consistency
         project: {
           connect: { id: uploadLink.projectId }
         },
@@ -1184,8 +1202,8 @@ router.post('/s3-complete/:token', async (req: Request, res: Response) => {
     });
 
     // Use the uploadTracker to mark the upload as complete
-    // This will handle the Telegram notification and avoid duplicates
-    const trackerId = `s3-multipart-${uploadedFile.id}`; // Use a consistent ID format
+    // This will handle the Telegram notification
+    const trackerId = `s3-direct-${key.replace(/\//g, '-')}`; // Use S3 key based ID
     logger.info(`[/s3-complete] Marking upload ${trackerId} as complete via uploadTracker`);
     
     // Track the upload with complete status

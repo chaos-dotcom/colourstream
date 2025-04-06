@@ -17,8 +17,10 @@ import {
 import { styled } from '@mui/material/styles';
 import { Dashboard } from '@uppy/react';
 import Uppy from '@uppy/core';
-import AwsS3 from '@uppy/aws-s3';
-import AwsS3Multipart from '@uppy/aws-s3-multipart';
+// Import AwsS3 instead of AwsS3Multipart
+import AwsS3 from '@uppy/aws-s3'; 
+// Keep AwsS3Multipart commented or removed if not needed for other flows
+// import AwsS3Multipart from '@uppy/aws-s3-multipart'; 
 import Dropbox from '@uppy/dropbox';
 import GoogleDrivePicker from '@uppy/google-drive-picker';
 import type { UppyFile } from '@uppy/core';
@@ -226,43 +228,112 @@ const UploadPortal: React.FC = () => {
 
           // Choose upload method based on configuration
           if (USE_COMPANION) {
-            console.log('Using AwsS3Multipart with Companion for large file uploads');
-            console.log('Companion URL configured as:', COMPANION_URL);
+            console.log('Using AwsS3 plugin for direct-to-S3 uploads via backend presigned URLs');
 
-            // Use the AWS S3 Multipart plugin with Companion for chunked uploads
-            // @ts-expect-error - Uppy plugins have complex typings that are difficult to match exactly
-            uppyInstance.use(AwsS3Multipart, {
-              endpoint: COMPANION_URL,
-              headers: {
-                'x-upload-token': token
-              },
-              // Ensure all S3 requests go through Companion instead of directly to MinIO
-              companionAllowedHosts: /.*/,  // Force all uploads through Companion
-              // Note: Companion is configured with COMPANION_AWS_FORCE_PATH_STYLE=false
-              // The companionUrl value needs the exact URL format that the companion server expects
-              companionUrl: COMPANION_URL, // Explicitly set this to match the endpoint
-              limit: 6, // Number of concurrent uploads
-              retryDelays: [0, 1000, 3000, 5000, 10000], // Retry delays for failed chunks
-              // For very large files, use large chunks to speed up upload
-              // This is larger than the default 5MB chunks
-              chunkSize: 96 * 1024 * 1024, // 50MB chunks
-              // Log progress for debugging
-              getChunkSize(file: any) {
-                // For smaller files, use smaller chunks
-                if (file.size && file.size < 100 * 1024 * 1024) {
-                  return 10 * 1024 * 1024; // 10MB chunks for files smaller than 100MB
+            // Use the AWS S3 plugin for direct uploads
+            // @ts-expect-error - Uppy plugins have complex typings
+            uppyInstance.use(AwsS3, {
+              // Determine if multipart should be used based on file size (Uppy default is > 100MB)
+              shouldUseMultipart: (file) => file.size > 100 * 1024 * 1024, 
+              
+              // Endpoint on your backend to get upload parameters (presigned URL or multipart details)
+              // This reuses the existing /s3-params endpoint logic
+              getUploadParameters: async (file) => {
+                // Determine if this file will use multipart based on the same logic
+                const isMultipart = file.size > 100 * 1024 * 1024;
+                console.log(`[getUploadParameters] File: ${file.name}, Size: ${file.size}, Multipart: ${isMultipart}`);
+                
+                const response = await fetch(`${API_URL}/upload/s3-params/${token}?filename=${encodeURIComponent(file.name)}&multipart=${isMultipart}`);
+                if (!response.ok) {
+                  const errorData = await response.json().catch(() => ({ message: 'Failed to fetch S3 parameters' }));
+                  throw new Error(errorData.message || `Failed to get S3 parameters: ${response.statusText}`);
                 }
-                // For medium files
-                if (file.size && file.size < 1024 * 1024 * 1024) {
-                  return 25 * 1024 * 1024; // 25MB chunks for files smaller than 1GB
+                const data = await response.json();
+                if (data.status !== 'success') {
+                   throw new Error(data.message || 'Backend failed to provide S3 parameters');
                 }
-                // For very large files (like your 600GB files)
-                return 50 * 1024 * 1024; // 50MB chunks for very large files
+                
+                console.log('[getUploadParameters] Received S3 params from backend:', data);
+
+                if (isMultipart) {
+                  // For multipart, return key and uploadId for Uppy AwsS3 to manage
+                  return {
+                    method: 'POST', // Method for initiating multipart, parts are PUT
+                    url: '', // URL is not needed here, Uppy uses signPart
+                    fields: {}, // No extra fields needed for S3 multipart init
+                    headers: {},
+                    key: data.key, 
+                    uploadId: data.uploadId, 
+                  };
+                } else {
+                  // For single part upload, return the presigned URL details
+                  return {
+                    method: 'PUT', // Single part uses PUT
+                    url: data.url, // The presigned URL from the backend
+                    fields: {}, // No extra fields needed for PUT
+                    headers: {
+                      // Required for S3 presigned PUT
+                      'Content-Type': file.type || 'application/octet-stream' 
+                    }, 
+                    key: data.key // Include the key for consistency
+                  };
+                }
               },
-              // Removed getKey function. Companion will get the key from the backend /s3-params endpoint.
+              // Endpoint on your backend to get presigned URL for each part (only called if shouldUseMultipart is true)
+              signPart: async (file, partData) => {
+                 console.log(`[signPart] Requesting signed URL for part: ${partData.partNumber}, key: ${partData.key}, uploadId: ${partData.uploadId}`);
+                 const response = await fetch(`${API_URL}/upload/s3-part-params/${token}?uploadId=${partData.uploadId}&key=${encodeURIComponent(partData.key)}&partNumber=${partData.partNumber}`);
+                 if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ message: 'Failed to sign part' }));
+                    throw new Error(errorData.message || `Failed to sign part ${partData.partNumber}: ${response.statusText}`);
+                 }
+                 const data = await response.json();
+                 if (data.status !== 'success' || !data.url) {
+                    throw new Error(data.message || 'Backend failed to provide signed URL for part');
+                 }
+                 console.log(`[signPart] Received signed URL for part ${partData.partNumber}`);
+                 return { url: data.url };
+              },
+              // Endpoint on your backend to complete the multipart upload (only called if shouldUseMultipart is true)
+              completeMultipartUpload: async (file, { key, uploadId, parts }) => {
+                 console.log(`[completeMultipartUpload] Completing: key=${key}, uploadId=${uploadId}, parts=${parts.length}`);
+                 const response = await fetch(`${API_URL}/upload/s3-complete/${token}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key, uploadId, parts }),
+                 });
+                 if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ message: 'Failed to complete multipart upload' }));
+                    throw new Error(errorData.message || `Failed to complete multipart upload: ${response.statusText}`);
+                 }
+                 const data = await response.json();
+                 if (data.status !== 'success') {
+                    throw new Error(data.message || 'Backend failed to complete multipart upload');
+                 }
+                 console.log('[completeMultipartUpload] Completed via backend:', data);
+                 // Return the location if available, otherwise null/undefined
+                 // This location is used by Uppy internally and in the success event
+                 return { location: data.location }; 
+              },
+              // Endpoint on your backend to abort the multipart upload (only called if shouldUseMultipart is true)
+              abortMultipartUpload: async (file, { key, uploadId }) => {
+                 console.log(`[abortMultipartUpload] Aborting: key=${key}, uploadId=${uploadId}`);
+                 // Note: Uppy expects query params for abort, matching our backend
+                 const response = await fetch(`${API_URL}/upload/s3-abort/${token}?key=${encodeURIComponent(key)}&uploadId=${uploadId}`, {
+                    method: 'POST', // Backend route uses POST
+                 });
+                 if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ message: 'Failed to abort multipart upload' }));
+                    // Don't throw error here, Uppy handles cancellation gracefully
+                    console.error(errorData.message || `Failed to abort multipart upload: ${response.statusText}`);
+                 }
+                 console.log('[abortMultipartUpload] Aborted via backend');
+              },
+              limit: 6, // Number of concurrent part uploads
+              retryDelays: [0, 1000, 3000, 5000, 10000], // Retry delays for failed parts
             });
 
-            // Add Dropbox support if enabled
+            // Add Dropbox support if enabled (Companion is still needed for non-S3 providers)
             if (ENABLE_DROPBOX) {
               console.log('Enabling Dropbox integration');
               uppyInstance.use(Dropbox, {
@@ -281,18 +352,36 @@ const UploadPortal: React.FC = () => {
               });
             }
 
-            // Log all events for multipart uploads to help debug
+            // Log all events for uploads to help debug
             uppyInstance.on('upload-success', (file, response) => {
               if (!file) {
-                console.error('No file information available in upload-success event');
+                console.error('[upload-success] No file information available.');
                 return;
               }
 
-              console.log('Multipart upload succeeded:', file.name);
-              console.log('Response details:', response);
+              console.log(`[upload-success] Upload succeeded: ${file.name}`);
+              console.log('[upload-success] Response details:', response);
 
-              // Extract the final S3 key from the uploadURL provided by the backend/S3
-              // The uploadURL typically looks like: https://s3-endpoint/bucket/CLIENT/PROJECT/FILENAME.ext
+              // For AwsS3, the response body from completeMultipartUpload (or the direct upload)
+              // should contain the location. The key is available in file.meta or file.s3UploadParameters.key
+              const finalKey = file.s3UploadParameters?.key || file.meta?.key || 'unknown-key';
+              const finalLocation = response?.uploadURL || response?.location || 'unknown-location';
+
+              console.log(`[upload-success] Final Key: ${finalKey}, Final Location: ${finalLocation}`);
+
+              // NOTE: We no longer need the /s3-callback endpoint.
+              // The database record creation is now handled by the /s3-complete endpoint for multipart
+              // or needs to be added for single-part uploads if not already handled.
+              // For now, we just log success here. The backend /s3-complete already logs and saves.
+
+              // Example of how you might manually call a different backend endpoint if needed for single-part tracking:
+              // if (!file.isRemote && !uppyInstance.plugins.s3?.opts?.shouldUseMultipart(file)) {
+              //   // This was a single-part upload, maybe call a specific endpoint?
+              //   fetch(`${API_URL}/upload/s3-single-complete/${token}`, { ... });
+              // }
+            });
+
+            // Enhanced error handling for AwsS3 uploads
               let key = `unknown/${Date.now()}.bin`; // Fallback key
               if (response.uploadURL) {
                 try {
