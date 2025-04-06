@@ -11,6 +11,8 @@ import { s3Service } from '../services/s3/s3Service';
 import { s3FileProcessor } from '../services/s3/s3FileProcessor'; // Corrected casing
 import { logger } from '../utils/logger';
 import { getTelegramBot } from '../services/telegram/telegramBot'; // Import the function
+import { CompletedPart } from '@aws-sdk/client-s3'; // Import type for parts
+
 const router = express.Router();
 const prisma = new PrismaClient();
 

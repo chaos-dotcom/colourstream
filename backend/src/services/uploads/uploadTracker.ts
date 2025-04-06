@@ -62,7 +62,7 @@ class UploadTracker {
       console.log('[TELEGRAM-DEBUG] Calling sendUploadNotification for upload:', uploadInfo.id);
       telegramBot.sendUploadNotification(updatedUpload)
         .then(success => console.log('[TELEGRAM-DEBUG] sendUploadNotification result:', success ? 'Success' : 'Failed'))
-        .catch(err => {
+        .catch((err: Error) => { // Type the error parameter
           console.error('[TELEGRAM-DEBUG] Failed to send upload notification to Telegram:', err);
           logger.error('Failed to send upload notification to Telegram:', err);
         });
@@ -98,7 +98,7 @@ class UploadTracker {
         // We'll use the same upload ID to ensure message editing occurs
         telegramBot.sendUploadNotification(completedUpload)
           .then(success => console.log('[TELEGRAM-DEBUG] sendUploadNotification result:', success ? 'Success' : 'Failed'))
-          .catch(err => {
+          .catch((err: Error) => { // Type the error parameter
             console.error('[TELEGRAM-DEBUG] Failed to send completion notification to Telegram:', err);
             logger.error('Failed to send completion notification to Telegram:', err);
           });

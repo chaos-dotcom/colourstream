@@ -144,6 +144,11 @@ interface UploadLinkResponse {
   expiresAt: string;
 }
 
+// Interface for the expected response from the completeMultipartUpload backend endpoint
+interface S3CompleteResponse {
+  location: string;
+}
+
 // Interface for custom Uppy file metadata
 interface CustomFileMeta {
   clientCode?: string;
@@ -151,7 +156,7 @@ interface CustomFileMeta {
   token?: string;
   key?: string; // The generated S3 key we add
   // Add index signature to satisfy Uppy's Meta constraint
-  [key: string]: any; 
+  [key: string]: any;
 }
 
 // Main upload portal for clients (standalone page not requiring authentication)
@@ -361,8 +366,7 @@ const UploadPortal: React.FC = () => {
           
           // --- Event listeners ---
           // Log all events for uploads to help debug
-          // Add types for file and response parameters
-          uppyInstance.on('upload-success', (file: UppyFile<CustomFileMeta, Record<string, never>> | undefined, response: any) => { // Fix UppyFile generic
+          uppyInstance.on('upload-success', (file: UppyFile<CustomFileMeta, Record<string, never>> | undefined, response: S3CompleteResponse | undefined) => {
               if (!file) {
                 console.error('[upload-success] No file information available.');
                 return;
@@ -378,8 +382,8 @@ const UploadPortal: React.FC = () => {
               // Store the final URL in the file metadata if needed
             });
 
-            // Enhanced error handling for AwsS3 with Companion (add types)
-            uppyInstance.on('upload-error', (file, error, response) => {
+            // Enhanced error handling for AwsS3 with backend signing
+            uppyInstance.on('upload-error', (file: UppyFile<CustomFileMeta, Record<string, never>> | undefined, error: Error, response: any) => {
               console.error('MULTIPART UPLOAD ERROR:');
               console.error('File:', file?.name, file?.size, file?.type);
               console.error('Error message:', error?.message);
@@ -540,8 +544,8 @@ const UploadPortal: React.FC = () => {
             }
           });
 
-          // Add file validation to block .turbosort files (add type)
-          uppyInstance.on('file-added', (file: UppyFile<CustomFileMeta, Record<string, never>>) => { // Fix UppyFile generic
+          // Add file validation to block .turbosort files
+          uppyInstance.on('file-added', (file: UppyFile<CustomFileMeta, Record<string, never>>) => {
             const fileName = file.name || '';
             if (fileName === '.turbosort' || fileName.toLowerCase().endsWith('.turbosort')) {
               setError('Files with .turbosort extension are not allowed');
@@ -565,8 +569,7 @@ const UploadPortal: React.FC = () => {
     return () => {
       // Add null check and use correct close method signature
       if (uppy) {
-        // Keep cast to any as a workaround for potential type issue with close method
-        (uppy as any).close();
+        uppy.close(); // Remove 'as any' cast
       }
     };
   // Removed useS3 dependency as it's not used anymore
