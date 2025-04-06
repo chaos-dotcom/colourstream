@@ -125,27 +125,6 @@ class UploadTracker {
   }
   
   /**
-   * Trigger S3 filename cleanup for UUID removal
-   * This runs asynchronously to avoid blocking the upload completion
-   */
-  private triggerS3Cleanup(id: string, token: string): void {
-    logger.info(`Triggering S3 filename cleanup after upload: ${id} with token: ${token}`);
-    console.log('[DEBUG] Starting S3 cleanup trigger with timeout');
-    
-    // Run cleanup in the background without awaiting to avoid blocking
-    setTimeout(async () => {
-      try {
-        console.log('[DEBUG] Executing S3 filename cleanup after timeout');
-        const processedCount = await processFilesByToken(token);
-        logger.info(`S3 filename cleanup completed for upload: ${id}, processed ${processedCount} files`);
-      } catch (error) {
-        console.error('[DEBUG] Error in S3 cleanup:', error);
-        logger.error(`S3 filename cleanup failed for upload ${id}:`, error);
-      }
-    }, 5000); // Wait 5 seconds to ensure all operations are complete
-  }
-  
-  /**
    * Get information about a specific upload
    */
   getUpload(id: string): UploadInfo | undefined {
