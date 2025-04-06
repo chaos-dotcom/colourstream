@@ -240,7 +240,7 @@ const UploadPortal: React.FC = () => {
             // Removed @ts-expect-error as types should be handled now
             uppyInstance.use(AwsS3, {
               // Determine if multipart should be used based on file size (Uppy default is > 100MB)
-              shouldUseMultipart: (file) => !!file.size && file.size > 100 * 1024 * 1024, // Add null check for file.size
+              shouldUseMultipart: (file: UppyFile<CustomFileMeta, Record<string, never>>) => !!file.size && file.size > 100 * 1024 * 1024, // Add explicit type and null check for file.size
               
               // Endpoint on your backend to get upload parameters (presigned URL or multipart details)
               // This reuses the existing /s3-params endpoint logic
