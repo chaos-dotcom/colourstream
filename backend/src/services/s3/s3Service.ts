@@ -85,12 +85,18 @@ export const s3Service = {
       // The caller is responsible for generating the correct key using `generateKey`.
       logger.debug(`Creating multipart upload for key: ${key}`);
 
+      const contentType = this.getContentTypeFromFileName(filename);
+      logger.debug(`Determined ContentType: ${contentType} for filename: ${filename}`);
+
       // Use the provided key directly for the multipart upload
-      const command = new CreateMultipartUploadCommand({
+      const commandInput = {
         Bucket: bucket,
         Key: key, // Use the provided key directly
-        ContentType: this.getContentTypeFromFileName(filename)
-      });
+        ContentType: contentType
+      };
+      logger.debug('Sending CreateMultipartUploadCommand with input:', commandInput); // Log command input before sending
+
+      const command = new CreateMultipartUploadCommand(commandInput);
 
       const response = await s3Client.send(command);
       
