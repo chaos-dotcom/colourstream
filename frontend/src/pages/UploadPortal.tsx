@@ -232,7 +232,7 @@ const UploadPortal: React.FC = () => {
 
           // --- Configure AwsS3Multipart for backend signing (Always enabled for now) ---
           console.log('Configuring AwsS3Multipart plugin for direct-to-S3 uploads via backend presigned URLs');
-          // Use 'as any' to bypass strict type checking for AwsS3Multipart plugin
+          // Use 'as any' directly on the plugin constructor to bypass strict type checking
           uppyInstance.use(AwsS3Multipart as any, { 
             // Remove shouldUseMultipart - AwsS3Multipart handles this internally
             
@@ -317,7 +317,7 @@ const UploadPortal: React.FC = () => {
               }) as any, // Add type assertion here
               limit: 6, // Number of concurrent part uploads
               retryDelays: [0, 1000, 3000, 5000, 10000], // Retry delays for failed parts
-            } as any); // Add type assertion here to bypass complex type errors
+            }); // Remove the incorrect 'as any' cast from the options object
 
           // --- Configure Companion-based providers conditionally ---
           if (USE_COMPANION) {
