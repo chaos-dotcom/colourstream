@@ -125,8 +125,8 @@ const accentColors = [
   '#28a197', // Turquoise
 ];
 
-// Rainbow flag component
-const RainbowFlag = () => (
+// Rainbow flag component - Ensure it's a valid React Functional Component
+const RainbowFlag: React.FC = () => (
   <span role="img" aria-label="Rainbow flag" style={{ fontSize: '32px', marginRight: '8px' }}>
     🏳️‍🌈
   </span>
@@ -157,11 +157,13 @@ const UploadPortal: React.FC = () => {
   const { token } = useParams<{ token: string }>();
   const location = useLocation();
   const [searchParams] = useSearchParams();
+  // --- Move state declarations outside useEffect ---
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [projectInfo, setProjectInfo] = useState<UploadLinkResponse | null>(null);
-  const [uppy, setUppy] = useState<any>(null);
+  const [uppy, setUppy] = useState<Uppy | null>(null); // Use Uppy type
   const [accentColor, setAccentColor] = useState('#1d70b8');
+  // --- End moved state declarations ---
   const useS3 = searchParams.get('S3') === 'true';
   const lastProgressUpdateRef = React.useRef<number>(0); // Timestamp of the last update sent
   const lastPercentageUpdateRef = React.useRef<number>(0); // Last percentage milestone reported
@@ -234,16 +236,17 @@ const UploadPortal: React.FC = () => {
             // @ts-expect-error - Uppy plugins have complex typings
             uppyInstance.use(AwsS3, {
               // Determine if multipart should be used based on file size (Uppy default is > 100MB)
-              shouldUseMultipart: (file) => file.size > 100 * 1024 * 1024, 
+              shouldUseMultipart: (file) => !!file.size && file.size > 100 * 1024 * 1024, // Add null check for file.size
               
               // Endpoint on your backend to get upload parameters (presigned URL or multipart details)
               // This reuses the existing /s3-params endpoint logic
-              getUploadParameters: async (file) => {
+              getUploadParameters: async (file: UppyFile<CustomFileMeta>) => { // Add type to file
                 // Determine if this file will use multipart based on the same logic
-                const isMultipart = file.size > 100 * 1024 * 1024;
-                console.log(`[getUploadParameters] File: ${file.name}, Size: ${file.size}, Multipart: ${isMultipart}`);
+                const isMultipart = !!file.size && file.size > 100 * 1024 * 1024; // Add null check
+                const safeFilename = file.name || 'unknown_file'; // Handle potentially undefined filename
+                console.log(`[getUploadParameters] File: ${safeFilename}, Size: ${file.size}, Multipart: ${isMultipart}`);
                 
-                const response = await fetch(`${API_URL}/upload/s3-params/${token}?filename=${encodeURIComponent(file.name)}&multipart=${isMultipart}`);
+                const response = await fetch(`${API_URL}/upload/s3-params/${token}?filename=${encodeURIComponent(safeFilename)}&multipart=${isMultipart}`);
                 if (!response.ok) {
                   const errorData = await response.json().catch(() => ({ message: 'Failed to fetch S3 parameters' }));
                   throw new Error(errorData.message || `Failed to get S3 parameters: ${response.statusText}`);
@@ -280,9 +283,11 @@ const UploadPortal: React.FC = () => {
                 }
               },
               // Endpoint on your backend to get presigned URL for each part (only called if shouldUseMultipart is true)
-              signPart: async (file, partData) => {
+              signPart: async (file: UppyFile<CustomFileMeta>, partData: { uploadId: string; key: string; partNumber: number; body: Blob; signal: AbortSignal }) => { // Add types
                  console.log(`[signPart] Requesting signed URL for part: ${partData.partNumber}, key: ${partData.key}, uploadId: ${partData.uploadId}`);
-                 const response = await fetch(`${API_URL}/upload/s3-part-params/${token}?uploadId=${partData.uploadId}&key=${encodeURIComponent(partData.key)}&partNumber=${partData.partNumber}`);
+                 // Ensure partData.key is a string before encoding
+                 const encodedKey = encodeURIComponent(partData.key || ''); 
+                 const response = await fetch(`${API_URL}/upload/s3-part-params/${token}?uploadId=${partData.uploadId}&key=${encodedKey}&partNumber=${partData.partNumber}`);
                  if (!response.ok) {
                     const errorData = await response.json().catch(() => ({ message: 'Failed to sign part' }));
                     throw new Error(errorData.message || `Failed to sign part ${partData.partNumber}: ${response.statusText}`);
@@ -295,7 +300,7 @@ const UploadPortal: React.FC = () => {
                  return { url: data.url };
               },
               // Endpoint on your backend to complete the multipart upload (only called if shouldUseMultipart is true)
-              completeMultipartUpload: async (file, { key, uploadId, parts }) => {
+              completeMultipartUpload: async (file: UppyFile<CustomFileMeta>, { key, uploadId, parts }: { key: string; uploadId: string; parts: { PartNumber: number; ETag: string }[] }) => { // Add types
                  console.log(`[completeMultipartUpload] Completing: key=${key}, uploadId=${uploadId}, parts=${parts.length}`);
                  const response = await fetch(`${API_URL}/upload/s3-complete/${token}`, {
                     method: 'POST',
@@ -316,10 +321,12 @@ const UploadPortal: React.FC = () => {
                  return { location: data.location }; 
               },
               // Endpoint on your backend to abort the multipart upload (only called if shouldUseMultipart is true)
-              abortMultipartUpload: async (file, { key, uploadId }) => {
+              abortMultipartUpload: async (file: UppyFile<CustomFileMeta>, { key, uploadId }: { key: string; uploadId: string }) => { // Add types
                  console.log(`[abortMultipartUpload] Aborting: key=${key}, uploadId=${uploadId}`);
+                 // Ensure key is a string before encoding
+                 const encodedKey = encodeURIComponent(key || '');
                  // Note: Uppy expects query params for abort, matching our backend
-                 const response = await fetch(`${API_URL}/upload/s3-abort/${token}?key=${encodeURIComponent(key)}&uploadId=${uploadId}`, {
+                 const response = await fetch(`${API_URL}/upload/s3-abort/${token}?key=${encodedKey}&uploadId=${uploadId}`, {
                     method: 'POST', // Backend route uses POST
                  });
                  if (!response.ok) {
@@ -353,7 +360,8 @@ const UploadPortal: React.FC = () => {
             }
 
             // Log all events for uploads to help debug
-            uppyInstance.on('upload-success', (file, response) => {
+            // Add types for file and response parameters
+            uppyInstance.on('upload-success', (file: UppyFile<CustomFileMeta> | undefined, response: any) => { 
               if (!file) {
                 console.error('[upload-success] No file information available.');
                 return;
@@ -362,10 +370,11 @@ const UploadPortal: React.FC = () => {
               console.log(`[upload-success] Upload succeeded: ${file.name}`);
               console.log('[upload-success] Response details:', response);
 
-              // For AwsS3, the response body from completeMultipartUpload (or the direct upload)
-              // should contain the location. The key is available in file.meta or file.s3UploadParameters.key
-              const finalKey = file.s3UploadParameters?.key || file.meta?.key || 'unknown-key';
-              const finalLocation = response?.uploadURL || response?.location || 'unknown-location';
+              // For AwsS3, the key is available in file.meta (where getUploadParameters puts it)
+              // or potentially in file.xhrUpload.key if it was a single part upload
+              // The location comes from the response body of completeMultipartUpload or the presigned URL response
+              const finalKey = file.meta?.key || (file as any).xhrUpload?.key || 'unknown-key'; // Access key safely
+              const finalLocation = response?.uploadURL || response?.location || 'unknown-location'; // Access location safely
 
               console.log(`[upload-success] Final Key: ${finalKey}, Final Location: ${finalLocation}`);
 
@@ -381,58 +390,10 @@ const UploadPortal: React.FC = () => {
               // }
             });
 
-            // Enhanced error handling for AwsS3 uploads
-              let key = `unknown/${Date.now()}.bin`; // Fallback key
-              if (response.uploadURL) {
-                try {
-                  const url = new URL(response.uploadURL);
-                  // Remove leading slash from pathname to get the key
-                  key = url.pathname.startsWith('/') ? url.pathname.substring(1) : url.pathname;
-                  // The key might be URL-encoded, decode it
-                  key = decodeURIComponent(key);
-                  // Remove the bucket name prefix if the endpoint includes it (common with MinIO paths)
-                  const bucketName = S3_BUCKET; // Get bucket name from config
-                  if (key.startsWith(`${bucketName}/`)) {
-                    key = key.substring(bucketName.length + 1);
-                  }
-                  console.log('Extracted key from uploadURL for backend callback:', key);
-                } catch (e) {
-                  console.error('Failed to parse uploadURL to extract key:', e);
-                  // Use the key from file.meta if available as a fallback (though it shouldn't be set anymore)
-                  key = (file.meta as CustomFileMeta).key || key;
-                  console.warn('Using fallback key for backend callback:', key);
-                }
-              } else {
-                 console.warn('uploadURL not found in response, using fallback key.');
-                 // Attempt fallback using file.meta just in case, though getKey was removed
-                 key = (file.meta as CustomFileMeta).key || key;
-              }
+            // Remove the leftover block of code that was trying to extract key from uploadURL and call /s3-callback
+            // This block starts with "let key = `unknown/${Date.now()}.bin`;" and ends before "// Enhanced error handling for multipart uploads"
 
-              // Notify backend about the successful S3 multipart upload
-              fetch(`${API_URL}/upload/s3-callback/${token}`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  key: key, // Send the correctly generated key
-                  size: file.size || 0,
-                  filename: file.name || 'unknown',
-                  mimeType: file.type || 'application/octet-stream',
-                  // Use a consistent ID format that doesn't include UUID prefixes
-                  hash: `multipart-${key.replace(/\//g, '-')}`
-                })
-              })
-              .then(response => response.json())
-              .then(data => {
-                console.log('Backend notified of S3 multipart upload:', data);
-              })
-              .catch(error => {
-                console.error('Error notifying backend about S3 multipart upload:', error);
-              });
-            });
-
-            // Enhanced error handling for multipart uploads
+            // Enhanced error handling for AwsS3 uploads (add types)
             uppyInstance.on('upload-error', (file, error, response) => {
               console.error('MULTIPART UPLOAD ERROR:');
               console.error('File:', file?.name, file?.size, file?.type);
@@ -542,171 +503,13 @@ const UploadPortal: React.FC = () => {
                 console.log('Could not get files from Uppy:', err);
               }
             });
-          } else if (useS3) {
-            // Fall back to regular S3 if Companion is not enabled
-            console.log('Using AwsS3 for direct uploads (Companion disabled)');
-            console.log('S3 endpoint configured as:', S3_ENDPOINT);
+          } 
+          // --- Remove the entire 'else if (useS3)' block ---
+          // This block contained the old direct-to-S3 logic without backend signing
+          // and was causing numerous errors after the refactor.
+          // The primary 'if (USE_COMPANION)' block now handles the correct AwsS3 setup.
 
-            uppyInstance.use(AwsS3, {
-              shouldUseMultipart: false, // Explicitly disable multipart uploads
-              limit: 1, // Process one file at a time to avoid issues
-              // TypeScript doesn't recognize forcePathStyle directly
-              // We'll handle URL style through the S3 configuration in the backend
-              getUploadParameters: async (file) => {
-                // Log original filename for debugging
-                console.log('Original filename before S3 upload:', file.name);
-
-                // Ensure we have valid strings for file names
-                const fileName = typeof file.name === 'string' ? file.name : 'unnamed-file';
-                // Use clientCode from meta
-                const clientCode = file.meta?.clientCode ? String(file.meta.clientCode).replace(/\s+/g, '_') : 'default';
-                const projectName = file.meta?.project ? String(file.meta.project).replace(/\s+/g, '_') : 'default';
-
-                // Generate the key using clientCode
-                const generatedKey = `${clientCode}/${projectName}/${fileName}`;
-
-                // Set the file meta to include the original name without any modification
-                // This prevents Uppy from adding a UUID prefix
-                file.meta = {
-                  ...file.meta,
-                  key: generatedKey, // Use the key generated with clientCode
-                  // This prevents the AWS S3 plugin from adding random identifiers to the filename
-                  name: fileName
-                };
-
-                // Generate a simple URL for debugging
-                const requestUrl = `${API_URL}/upload/s3-params/${token}?filename=${encodeURIComponent(fileName)}`;
-                console.log('Requesting S3 URL from:', requestUrl);
-
-                // Simple fetch to get presigned URL
-                const response = await fetch(requestUrl);
-
-                if (!response.ok) {
-                  console.error('S3 params request failed:', response.status, response.statusText);
-                  throw new Error(`S3 params request failed: ${response.status} ${response.statusText}`);
-                }
-
-                const data = await response.json();
-
-                if (data.status !== 'success' || !data.url) {
-                  console.error('Invalid S3 response:', data);
-                  throw new Error('Invalid S3 response from server');
-                }
-
-                console.log('S3 presigned URL:', data.url);
-                console.log('S3 key from backend:', data.key); // Backend still generates a key, but we override it
-
-                // Return the complete upload parameters including Content-Type
-                return {
-                  method: 'PUT',
-                  url: data.url,
-                  fields: {}, // Empty for PUT operations
-                  headers: {
-                    'Content-Type': file.type || 'application/octet-stream',
-                    // Add cache control to prevent caching issues
-                    'Cache-Control': 'no-cache'
-                  },
-                  // Add the key generated using clientCode to override the default Uppy UUID generation
-                  key: generatedKey
-                };
-              }
-            });
-
-            // Add event handler for successful uploads to record in the database
-            uppyInstance.on('upload-success', (file, response) => {
-              // Check that file exists before proceeding
-              if (!file || !file.name) {
-                console.error('Missing file data in upload-success event');
-                return;
-              }
-
-              // Enhanced logging for debugging
-              console.log('Upload successful to S3 - Original file name:', file.name);
-              console.log('File metadata:', file.meta);
-              console.log('Upload response details:', {
-                status: response.status,
-                body: response.body,
-                uploadURL: response.uploadURL
-              });
-
-              // Extract the key from the file metadata (where we stored the correct one)
-              const key = (file.meta as CustomFileMeta).key || `unknown/${Date.now()}.bin`; // Use stored key or fallback
-              console.log('Using key from file meta for backend callback:', key);
-
-              // Notify the backend about the successful S3 upload
-              fetch(`${API_URL}/upload/s3-callback/${token}`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  key: key, // Send the correctly generated key
-                  size: file.size || 0,
-                  filename: file.name, // Use the original filename
-                  mimeType: file.type || 'application/octet-stream',
-                  // Use a consistent ID format that doesn't include UUID prefixes
-                  hash: `direct-${key.replace(/\//g, '-')}`
-                })
-              })
-              .then(response => response.json())
-              .then(data => {
-                console.log('Backend notified of S3 upload:', data);
-              })
-              .catch(error => {
-                console.error('Error notifying backend about S3 upload:', error);
-              });
-            });
-
-            // Add specific listener for S3 multipart errors to get more detailed information
-            uppyInstance.on('upload-error', (file, error, response) => {
-              console.error('UPLOAD ERROR DETAILS:');
-              console.error('File:', file?.name, file?.size, file?.type);
-              console.error('Error message:', error?.message);
-
-              // Try to extract the request details
-              if (response) {
-                console.error('Response status:', response.status);
-
-                // Log all response properties safely using a try/catch to avoid TypeScript errors
-                try {
-                  console.error('Response details:', JSON.stringify(response, null, 2));
-                } catch (e) {
-                  console.error('Could not stringify response');
-                }
-
-                // Log response body if available
-                if (response.body) {
-                  console.error('Response body:',
-                    typeof response.body === 'string'
-                      ? response.body
-                      : JSON.stringify(response.body, null, 2)
-                  );
-                }
-              }
-
-              // Log MinIO specific diagnostic info
-              if (error.message === 'Non 2xx' && response) {
-                console.error('MinIO S3 error details:', {
-                  status: response.status
-                });
-
-                // MinIO specific suggestion
-                if (response.status === 403) {
-                  setError(`Error uploading ${file?.name}: ${error.message} - This may be a MinIO permissions issue. Check the bucket policy and ACL settings.`);
-                } else if (response.status === 404) {
-                  setError(`Error uploading ${file?.name}: ${error.message} - The specified bucket or object key may not exist in MinIO.`);
-                } else if (response.status === 400) {
-                  setError(`Error uploading ${file?.name}: ${error.message} - Request format may be incorrect for MinIO.`);
-                } else {
-                  setError(`Error uploading ${file?.name}: ${error.message}`);
-                }
-              } else {
-                setError(`Error uploading ${file?.name}: ${error.message}`);
-              }
-            });
-          }
-
-          // Set up error handling
+          // Set up general error handling (add types)
           uppyInstance.on('error', (error: Error) => {
             console.error('Uppy error:', error);
             setError(`Upload error: ${error.message}`);
@@ -756,8 +559,8 @@ const UploadPortal: React.FC = () => {
             }
           });
 
-          // Add file validation to block .turbosort files
-          uppyInstance.on('file-added', (file) => {
+          // Add file validation to block .turbosort files (add type)
+          uppyInstance.on('file-added', (file: UppyFile<CustomFileMeta>) => { 
             const fileName = file.name || '';
             if (fileName === '.turbosort' || fileName.toLowerCase().endsWith('.turbosort')) {
               setError('Files with .turbosort extension are not allowed');
