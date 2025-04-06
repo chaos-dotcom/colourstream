@@ -257,20 +257,63 @@ const UploadPortal: React.FC = () => {
               // Or return dummy data:
               // return { method: 'POST', url: '', fields: {}, headers: {} };
             },
-            // Force multipart for all files to ensure backend signing flow is used
-            shouldUseMultipart: (_file) => true,
-            // Increase concurrent uploads aggressively to hide signing latency
-            limit: 1500,
-            // Decrease chunk size further for faster signing/upload cycles
+            // Force multipart for files > 5MB (S3 minimum part size)
+            shouldUseMultipart: (file) => file.size > 5 * 1024 * 1024,
+            // Adjust concurrency based on network/backend capacity, not signing latency
+            limit: 10,
+            // Use a larger chunk size now that signing overhead is removed
             getChunkSize: (file) => {
-              // 16 MB chunk size
-              return 5 * 1024 * 1024;
+              // 64 MB chunk size (S3 minimum is 5MB)
+              return 64 * 1024 * 1024;
             },
 
             // --- Use Temporary Credentials for Signing (Backend Endpoint Required) ---
+            getTemporarySecurityCredentials: async (options) => {
+              console.log('[AwsS3] Requesting temporary credentials...');
+              // Fetch credentials from your new backend endpoint
+              // The backend endpoint MUST return data in the format expected by Uppy:
+              // { credentials: { AccessKeyId, SecretAccessKey, SessionToken, Expiration }, bucket, region }
+              // Pass the upload token in a header or query param for authorization on the backend
+              try {
+                // Get the token from the file metadata if possible, or from component state/props
+                // This assumes 'token' is available in the scope. Adjust if needed.
+                const currentToken = token; // Using the token from useParams hook
+                if (!currentToken) {
+                  throw new Error('Upload token is not available for fetching credentials.');
+                }
 
+                const response = await fetch(`${API_URL}/upload/s3/sts-token`, {
+                  method: 'GET', // Or POST if you prefer
+                  headers: {
+                    // Add authorization using the upload token
+                    'Authorization': `Bearer ${currentToken}`
+                  },
+                  signal: options?.signal, // Pass the abort signal
+                });
 
+                if (!response.ok) {
+                  const errorText = await response.text();
+                  console.error('[AwsS3] Failed to fetch temporary credentials:', response.status, errorText);
+                  throw new Error(`Failed to fetch temporary credentials: ${response.status} ${errorText}`);
+                }
 
+                const data = await response.json();
+                console.log('[AwsS3] Received temporary credentials response:', data);
+
+                // Validate the structure of the response from the backend
+                if (!data || !data.data || !data.data.credentials || !data.data.bucket || !data.data.region) {
+                   console.error('[AwsS3] Invalid temporary credentials structure received from backend:', data);
+                   throw new Error('Invalid temporary credentials structure received from backend.');
+                }
+
+                // Return the data part which contains { credentials, bucket, region }
+                return data.data;
+              } catch (error) {
+                console.error('[AwsS3] Error in getTemporarySecurityCredentials:', error);
+                // Re-throw the error so Uppy knows the operation failed
+                throw error;
+              }
+            },
           });
 
           // --- Configure Companion-based providers (Dropbox, Google Drive) ---
