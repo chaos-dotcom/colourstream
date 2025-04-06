@@ -79,9 +79,13 @@ const getConfig = (key: keyof RuntimeConfig): string => {
       return envValue || 'uploads';
     // Companion configuration defaults
     case 'COMPANION_URL':
-      return envValue || 'https://upload.colourstream.johnrogerscolour.co.uk/companion';
+      // Use VITE_COMPANION_URL from env if available, otherwise default based on current domain
+      return envValue || `https://companion.${window.location.hostname.replace(/^[^.]+\./, '')}`;
     case 'COMPANION_AWS_ENDPOINT':
-      return envValue || 'https://upload.colourstream.johnrogerscolour.co.uk/companion';
+      // This might need adjustment depending on how Companion is configured for S3
+      // If Companion talks directly to MinIO internally, this might not be needed by the frontend.
+      // If the frontend needs to talk to Companion's S3 endpoint, this should point to Companion's public URL.
+      return envValue || getConfig('COMPANION_URL'); // Default to COMPANION_URL if not set
     case 'USE_COMPANION':
       return envValue || 'true';
     // Provider configuration defaults
@@ -116,7 +120,7 @@ export const S3_ENDPOINT = getConfig('S3_ENDPOINT');
 export const S3_REGION = getConfig('S3_REGION');
 export const S3_BUCKET = getConfig('S3_BUCKET');
 // Export Companion configuration
-export const COMPANION_URL = getConfig('COMPANION_URL');
+export const COMPANION_URL = getConfig('COMPANION_URL'); // Ensure this uses the getConfig function
 export const COMPANION_AWS_ENDPOINT = getConfig('COMPANION_AWS_ENDPOINT');
 export const USE_COMPANION = getConfig('USE_COMPANION') === 'true';
 // Export Provider configuration
@@ -142,7 +146,7 @@ if (typeof window !== 'undefined') {
     S3_ENDPOINT,
     S3_REGION,
     S3_BUCKET,
-    COMPANION_URL,
+    COMPANION_URL, // Add COMPANION_URL here (already present, just ensuring consistency)
     COMPANION_AWS_ENDPOINT,
     USE_COMPANION,
     ENABLE_DROPBOX,
@@ -168,7 +172,7 @@ export default {
   S3_ENDPOINT,
   S3_REGION,
   S3_BUCKET,
-  COMPANION_URL,
+  COMPANION_URL, // Add COMPANION_URL here (already present, just ensuring consistency)
   COMPANION_AWS_ENDPOINT,
   USE_COMPANION,
   ENABLE_DROPBOX,
