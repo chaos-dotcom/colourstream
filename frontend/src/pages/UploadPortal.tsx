@@ -286,8 +286,9 @@ const UploadPortal: React.FC = () => {
                 }
               },
               // Endpoint on your backend to get presigned URL for each part (only called if shouldUseMultipart is true)
-              // Use CustomFileMeta and ensure parameter structure matches AwsS3 expectations
-              signPart: async (file: UppyFile<CustomFileMeta, Record<string, never>>, partData: { uploadId: string; key: string; partNumber: number; body: Blob; signal?: AbortSignal }): Promise<{ url: string; headers?: Record<string, string> }> => { 
+              // Use base UppyFile type in signature
+              signPart: async (file: UppyFile, partData: { uploadId: string; key: string; partNumber: number; body: Blob; signal?: AbortSignal }): Promise<{ url: string; headers?: Record<string, string> }> => { 
+                 // Access custom meta if needed: const customMeta = file.meta as CustomFileMeta;
                  console.log(`[signPart] Requesting signed URL for part: ${partData.partNumber}, key: ${partData.key}, uploadId: ${partData.uploadId}`);
                  // Ensure partData.key is a string before encoding
                  const encodedKey = encodeURIComponent(partData.key || ''); 
@@ -304,8 +305,9 @@ const UploadPortal: React.FC = () => {
                  return { url: data.url };
               },
               // Endpoint on your backend to complete the multipart upload (only called if shouldUseMultipart is true)
-              // Use CustomFileMeta and ensure parameter structure matches AwsS3 expectations
-              completeMultipartUpload: async (file: UppyFile<CustomFileMeta, Record<string, never>>, { key, uploadId, parts, signal }: { key: string; uploadId: string; parts: AwsS3Part[]; signal?: AbortSignal }): Promise<{ location?: string }> => { 
+              // Use base UppyFile type in signature
+              completeMultipartUpload: async (file: UppyFile, { key, uploadId, parts, signal }: { key: string; uploadId: string; parts: AwsS3Part[]; signal?: AbortSignal }): Promise<{ location?: string }> => { 
+                 // Access custom meta if needed: const customMeta = file.meta as CustomFileMeta;
                  console.log(`[completeMultipartUpload] Completing: key=${key}, uploadId=${uploadId}, parts=${parts.length}`);
                  const response = await fetch(`${API_URL}/upload/s3-complete/${token}`, {
                     method: 'POST',
@@ -327,8 +329,9 @@ const UploadPortal: React.FC = () => {
                  return { location: data.location }; 
               },
               // Endpoint on your backend to abort the multipart upload (only called if shouldUseMultipart is true)
-              // Use CustomFileMeta and ensure parameter structure matches AwsS3 expectations
-              abortMultipartUpload: async (file: UppyFile<CustomFileMeta, Record<string, never>>, { key, uploadId, signal }: { key: string; uploadId?: string; signal?: AbortSignal }): Promise<void> => { 
+              // Use base UppyFile type in signature
+              abortMultipartUpload: async (file: UppyFile, { key, uploadId, signal }: { key: string; uploadId?: string; signal?: AbortSignal }): Promise<void> => { 
+                 // Access custom meta if needed: const customMeta = file.meta as CustomFileMeta;
                  console.log(`[abortMultipartUpload] Aborting: key=${key}, uploadId=${uploadId}`);
                  // Ensure key is a string before encoding
                  const encodedKey = encodeURIComponent(key || '');
