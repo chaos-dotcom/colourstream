@@ -8,6 +8,7 @@ import xxhash from 'xxhash-wasm';
 import { authenticateToken } from '../middleware/auth';
 import { uploadTracker } from '../services/uploads/uploadTracker';
 import { s3Service } from '../services/s3/s3Service';
+import { s3FileProcessor } from '../services/s3/s3fileProcessor'; // Import the S3 file processor
 import { logger } from '../utils/logger';
 import { getTelegramBot } from '../services/telegram/telegramBot'; // Import the function
 const router = express.Router();
@@ -1373,8 +1374,8 @@ router.post('/s3-callback/:token', async (req: Request, res: Response) => {
 // Add an endpoint to trigger S3 filename cleanup
 router.post('/cleanup-filenames', authenticateToken, async (_req: Request, res: Response) => {
   try {
-    // Start the cleanup process
-    await fixS3Filenames();
+    // Start the cleanup process using the imported processor
+    await s3FileProcessor.processAllFiles();
     
     res.json({
       status: 'success',
