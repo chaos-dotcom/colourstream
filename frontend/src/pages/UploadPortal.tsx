@@ -236,23 +236,10 @@ const UploadPortal: React.FC = () => {
           uppyInstance.use(AwsS3, {
             // Point to your Companion instance
             companionUrl: COMPANION_URL,
-            // Remove explicitly disabled multipart functions; Companion handles this automatically when companionUrl is set
-            // createMultipartUpload: false, // Removed
-            // signPart: false, // Removed
-            // completeMultipartUpload: false, // Removed
-            // abortMultipartUpload: false, // Removed
-            // Companion handles multipart uploads internally based on its S3 config
-            limit: 6, // Still useful to limit concurrent requests to Companion
-            retryDelays: [0, 1000, 3000, 5000, 10000], // Retry delays for failed parts
-            // getUploadParameters: (file) => {
-            //   // Optional: If you need to dynamically set S3 path or metadata via Companion
-            //   // This requires Companion to be configured to allow overriding these parameters
-            //   // For now, we rely on Companion's server-side config and metadata forwarding
-            //   console.log(`[getUploadParameters] Preparing file: ${file.name}`);
-            //   // Return an empty object or specific parameters if needed
-            //   return {};
-            // }
-          } as any); // Add 'as any' here
+            // Remove other options like limit and retryDelays, relying solely on Companion
+            // limit: 6, // Removed
+            // retryDelays: [0, 1000, 3000, 5000, 10000], // Removed
+          } as any); // Keep 'as any' for now due to potential type definition issues
 
           // --- Configure other Companion-based providers (Dropbox, Google Drive) ---
           // These require Companion regardless of whether S3 uses it
