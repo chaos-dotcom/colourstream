@@ -287,8 +287,8 @@ const UploadPortal: React.FC = () => {
                 }
               },
               // Endpoint on your backend to get presigned URL for each part (only called if shouldUseMultipart is true)
-              // Use 'any' for opts to bypass complex type errors from AwsS3 plugin
-              signPart: async (file: UppyFile<CustomFileMeta, Record<string, never>>, opts: any): Promise<AwsS3UploadParameters> => {
+              // Use 'any' for opts and type assertion 'as any' to bypass complex type errors from AwsS3 plugin
+              signPart: (async (file: UppyFile<CustomFileMeta, Record<string, never>>, opts: any): Promise<AwsS3UploadParameters> => {
                  console.log(`[signPart] Requesting signed URL for part: ${opts.partNumber}, key: ${opts.key}, uploadId: ${opts.uploadId}`);
                  // Ensure opts.key is a string before encoding
                  const encodedKey = encodeURIComponent(opts.key || '');
@@ -305,10 +305,10 @@ const UploadPortal: React.FC = () => {
                  // Use opts.partNumber instead of partData.partNumber
                  console.log(`[signPart] Received signed URL for part ${opts.partNumber}`);
                  return { url: data.url };
-              },
+              }) as any, // Add type assertion here
               // Endpoint on your backend to complete the multipart upload (only called if shouldUseMultipart is true)
-              // Use 'any' for opts to bypass complex type errors from AwsS3 plugin
-              completeMultipartUpload: async (file: UppyFile<CustomFileMeta, Record<string, never>>, opts: any): Promise<{ location?: string }> => {
+              // Use 'any' for opts and type assertion 'as any' to bypass complex type errors from AwsS3 plugin
+              completeMultipartUpload: (async (file: UppyFile<CustomFileMeta, Record<string, never>>, opts: any): Promise<{ location?: string }> => {
                  console.log(`[completeMultipartUpload] Completing: key=${opts.key}, uploadId=${opts.uploadId}, parts=${opts.parts.length}`);
                  const response = await fetch(`${API_URL}/upload/s3-complete/${token}`, {
                     method: 'POST',
@@ -327,11 +327,11 @@ const UploadPortal: React.FC = () => {
                  console.log('[completeMultipartUpload] Completed via backend:', data);
                  // Return the location if available, otherwise null/undefined
                  // This location is used by Uppy internally and in the success event
-                 return { location: data.location }; 
-              },
+                 return { location: data.location };
+              }) as any, // Add type assertion here
               // Endpoint on your backend to abort the multipart upload (only called if shouldUseMultipart is true)
-              // Use 'any' for opts to bypass complex type errors from AwsS3 plugin
-              abortMultipartUpload: async (file: UppyFile<CustomFileMeta, Record<string, never>>, opts: any): Promise<void> => {
+              // Use 'any' for opts and type assertion 'as any' to bypass complex type errors from AwsS3 plugin
+              abortMultipartUpload: (async (file: UppyFile<CustomFileMeta, Record<string, never>>, opts: any): Promise<void> => {
                  console.log(`[abortMultipartUpload] Aborting: key=${opts.key}, uploadId=${opts.uploadId}`);
                  // Ensure key is a string before encoding
                  const encodedKey = encodeURIComponent(opts.key || '');
@@ -345,7 +345,7 @@ const UploadPortal: React.FC = () => {
                     console.error(errorData.message || `Failed to abort multipart upload: ${response.statusText}`);
                  }
                  console.log('[abortMultipartUpload] Aborted via backend');
-              },
+              }) as any, // Add type assertion here
               limit: 6, // Number of concurrent part uploads
               retryDelays: [0, 1000, 3000, 5000, 10000], // Retry delays for failed parts
             });
