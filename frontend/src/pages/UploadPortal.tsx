@@ -348,7 +348,7 @@ const UploadPortal: React.FC = () => {
               }) as any, // Add type assertion here
               limit: 6, // Number of concurrent part uploads
               retryDelays: [0, 1000, 3000, 5000, 10000], // Retry delays for failed parts
-            });
+            } as any); // Add type assertion here to bypass complex type errors
 
             // Add Dropbox support if enabled (Companion is still needed for non-S3 providers)
             if (ENABLE_DROPBOX) {
