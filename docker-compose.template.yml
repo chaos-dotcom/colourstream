@@ -407,6 +407,8 @@ services:
       MINIO_IDENTITY_OPENID_CLIENT_ID: ${MINIO_IDENTITY_OPENID_CLIENT_ID}
       MINIO_IDENTITY_OPENID_CLIENT_SECRET: ${MINIO_IDENTITY_OPENID_CLIENT_SECRET}
       MINIO_BROWSER_REDIRECT_URL: ${MINIO_BROWSER_REDIRECT_URL}
+      # Set CORS allow origin via environment variable (more reliable)
+      MINIO_API_CORS_ALLOW_ORIGIN: "*" # Or restrict to "https://upload.colourstream.${DOMAIN}"
       # PocketID-specific OIDC settings
       MINIO_IDENTITY_OPENID_CLAIM_NAME: "groups"
       MINIO_IDENTITY_OPENID_DISPLAY_NAME: "name"
@@ -524,29 +526,8 @@ services:
       # /usr/bin/mc anonymous set readwrite myminio/$S3_BUCKET;
       # echo "Anonymous policy command finished.";
       
-      # Configure CORS directly using admin config set (legacy method, better for private buckets)
-      echo "Setting up CORS configuration for bucket $S3_BUCKET using admin config set...";
-      echo '{
-        "CORSRules": [
-          {
-            "AllowedHeaders": ["*"],
-            "AllowedMethods": ["GET", "PUT", "POST", "DELETE"],
-            "AllowedOrigins": ["*"],
-            "ExposeHeaders": ["ETag", "Content-Length", "Content-Type"],
-            "MaxAgeSeconds": 3600
-          }
-      # Directly use the admin config set method
-      /usr/bin/mc admin config set myminio api cors_allow_origin="*"
-      /usr/bin/mc admin config set myminio cors AllowedOrigins="*" \
-                                                AllowedMethods="GET,PUT,POST,DELETE,HEAD" \
-                                                AllowedHeaders="*" \
-                                                ExposeHeaders="ETag,Content-Length,Content-Type" \
-                                                MaxAgeSeconds=3600;
-      echo "CORS configuration command finished. Restarting MinIO service...";
-      /usr/bin/mc admin service restart myminio;
-      echo "MinIO service restart command finished.";
-      
-      echo "Bucket setup and CORS configuration process completed for bucket $S3_BUCKET.";
+      # CORS will be configured via MinIO environment variables now.
+      echo "Bucket setup process completed for bucket $S3_BUCKET.";
       exit 0; # Exit successfully
       '
     networks:
