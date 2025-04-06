@@ -251,37 +251,40 @@ const UploadPortal: React.FC = () => {
                   const errorData = await response.json().catch(() => ({ message: 'Failed to fetch S3 parameters' }));
                   throw new Error(errorData.message || `Failed to get S3 parameters: ${response.statusText}`);
                 }
+                 console.log('[createMultipartUpload] Received multipart params from backend:', data);
+                 // Return key and uploadId as expected by AwsS3 plugin
+                 return {
+                   key: data.key,
+                   uploadId: data.uploadId,
+                 };
+              },
+              
+              // Endpoint for getting single-part presigned URLs (called when shouldUseMultipart is false)
+              getUploadParameters: async (file: UppyFile<CustomFileMeta, Record<string, never>>) => {
+                const safeFilename = file.name || 'unknown_file';
+                console.log(`[getUploadParameters] Getting single-part URL for file: ${safeFilename}`);
+                const response = await fetch(`${API_URL}/upload/s3-params/${token}?filename=${encodeURIComponent(safeFilename)}&multipart=false`);
+                if (!response.ok) {
+                  const errorData = await response.json().catch(() => ({ message: 'Failed to fetch S3 parameters' }));
+                  throw new Error(errorData.message || `Failed to get S3 parameters: ${response.statusText}`);
+                }
                 const data = await response.json();
                 if (data.status !== 'success') {
                    throw new Error(data.message || 'Backend failed to provide S3 parameters');
                 }
-                
-                console.log('[getUploadParameters] Received S3 params from backend:', data);
-
-                if (isMultipart) {
-                  // For multipart, return key and uploadId for Uppy AwsS3 to manage
-                  return {
-                    method: 'POST', // Method for initiating multipart, parts are PUT
-                    url: '', // URL is not needed here, Uppy uses signPart
-                    fields: {}, // No extra fields needed for S3 multipart init
-                    headers: {},
-                    key: data.key, 
-                    uploadId: data.uploadId, 
-                  };
-                } else {
-                  // For single part upload, return the presigned URL details
-                  return {
-                    method: 'PUT', // Single part uses PUT
-                    url: data.url, // The presigned URL from the backend
-                    fields: {}, // No extra fields needed for PUT
-                    headers: {
-                      // Required for S3 presigned PUT
-                      'Content-Type': file.type || 'application/octet-stream' 
-                    }, 
-                    key: data.key // Include the key for consistency
-                  };
-                }
+                console.log('[getUploadParameters] Received single-part params from backend:', data);
+                // Return the presigned URL details for PUT request
+                return {
+                  method: 'PUT',
+                  url: data.url,
+                  fields: {},
+                  headers: {
+                    'Content-Type': file.type || 'application/octet-stream'
+                  },
+                  key: data.key // Include the key for consistency
+                };
               },
+              
               // Endpoint on your backend to get presigned URL for each part (only called if shouldUseMultipart is true)
               // Use 'any' for opts and type assertion 'as any' to bypass complex type errors from AwsS3 plugin
               signPart: (async (file: UppyFile<CustomFileMeta, Record<string, never>>, opts: any): Promise<AwsS3UploadParameters> => {
