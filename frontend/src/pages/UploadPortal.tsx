@@ -24,8 +24,8 @@ import AwsS3 from '@uppy/aws-s3';
 import Dropbox from '@uppy/dropbox';
 import GoogleDrivePicker from '@uppy/google-drive-picker';
 import type { UppyFile } from '@uppy/core';
-// Import specific types needed for AwsS3 plugin options
-import type { AwsS3UploadParameters, SignPartOptions, AwsS3Part, UploadResultWithSignal } from '@uppy/aws-s3'; 
+// Import only the types that are actually exported
+import type { AwsS3UploadParameters, AwsS3Part } from '@uppy/aws-s3'; 
 import { v4 as uuidv4 } from 'uuid'; // Import uuid for fallback key generation
 import '@uppy/core/dist/style.min.css';
 import '@uppy/dashboard/dist/style.min.css';
@@ -151,6 +151,8 @@ interface CustomFileMeta {
   project?: string;
   token?: string;
   key?: string; // The generated S3 key we add
+  // Add index signature to satisfy Uppy's Meta constraint
+  [key: string]: any; 
 }
 
 // Main upload portal for clients (standalone page not requiring authentication)
@@ -284,10 +286,11 @@ const UploadPortal: React.FC = () => {
                 }
               },
               // Endpoint on your backend to get presigned URL for each part (only called if shouldUseMultipart is true)
-              signPart: async (file: UppyFile<CustomFileMeta, Record<string, never>>, partData: SignPartOptions): Promise<AwsS3UploadParameters> => { // Use correct types
+              // Adjust signature to match expected parameters from AwsS3 plugin
+              signPart: async (file: UppyFile<CustomFileMeta, Record<string, never>>, partData: { uploadId: string; key: string; partNumber: number; body: Blob; signal?: AbortSignal }): Promise<AwsS3UploadParameters> => { 
                  console.log(`[signPart] Requesting signed URL for part: ${partData.partNumber}, key: ${partData.key}, uploadId: ${partData.uploadId}`);
                  // Ensure partData.key is a string before encoding
-                 const encodedKey = encodeURIComponent(partData.key || '');
+                 const encodedKey = encodeURIComponent(partData.key || ''); 
                  const response = await fetch(`${API_URL}/upload/s3-part-params/${token}?uploadId=${partData.uploadId}&key=${encodedKey}&partNumber=${partData.partNumber}`);
                  if (!response.ok) {
                     const errorData = await response.json().catch(() => ({ message: 'Failed to sign part' }));
@@ -301,7 +304,8 @@ const UploadPortal: React.FC = () => {
                  return { url: data.url };
               },
               // Endpoint on your backend to complete the multipart upload (only called if shouldUseMultipart is true)
-              completeMultipartUpload: async (file: UppyFile<CustomFileMeta, Record<string, never>>, { key, uploadId, parts, signal }: { key: string; uploadId: string; parts: AwsS3Part[]; signal: AbortSignal }): Promise<{ location?: string }> => { // Use correct types
+              // Adjust signature to match expected parameters from AwsS3 plugin
+              completeMultipartUpload: async (file: UppyFile<CustomFileMeta, Record<string, never>>, { key, uploadId, parts, signal }: { key: string; uploadId: string; parts: AwsS3Part[]; signal?: AbortSignal }): Promise<{ location?: string }> => { 
                  console.log(`[completeMultipartUpload] Completing: key=${key}, uploadId=${uploadId}, parts=${parts.length}`);
                  const response = await fetch(`${API_URL}/upload/s3-complete/${token}`, {
                     method: 'POST',
@@ -323,7 +327,8 @@ const UploadPortal: React.FC = () => {
                  return { location: data.location }; 
               },
               // Endpoint on your backend to abort the multipart upload (only called if shouldUseMultipart is true)
-              abortMultipartUpload: async (file: UppyFile<CustomFileMeta, Record<string, never>>, { key, uploadId, signal }: UploadResultWithSignal): Promise<void> => { // Use correct types
+              // Adjust signature to match expected parameters from AwsS3 plugin
+              abortMultipartUpload: async (file: UppyFile<CustomFileMeta, Record<string, never>>, { key, uploadId, signal }: { key: string; uploadId?: string; signal?: AbortSignal }): Promise<void> => { 
                  console.log(`[abortMultipartUpload] Aborting: key=${key}, uploadId=${uploadId}`);
                  // Ensure key is a string before encoding
                  const encodedKey = encodeURIComponent(key || '');
@@ -587,7 +592,8 @@ const UploadPortal: React.FC = () => {
     return () => {
       // Add null check and use correct close method signature
       if (uppy) {
-        uppy.close({ reason: 'unmount' }); 
+        // Uppy's close method doesn't take arguments according to latest types
+        uppy.close(); 
       }
     };
   }, [token, useS3]);
