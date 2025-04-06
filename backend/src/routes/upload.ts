@@ -8,7 +8,6 @@ import xxhash from 'xxhash-wasm';
 import { authenticateToken } from '../middleware/auth';
 import { uploadTracker } from '../services/uploads/uploadTracker';
 import { s3Service } from '../services/s3/s3Service';
-import { fixS3Filenames } from '../scripts/fix-s3-filenames';
 import { logger } from '../utils/logger';
 import { getTelegramBot } from '../services/telegram/telegramBot'; // Import the function
 const router = express.Router();
