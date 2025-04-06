@@ -24,7 +24,8 @@ import AwsS3 from '@uppy/aws-s3';
 import Dropbox from '@uppy/dropbox';
 import GoogleDrivePicker from '@uppy/google-drive-picker';
 import type { UppyFile } from '@uppy/core';
-import type { AwsS3UploadParameters } from '@uppy/aws-s3';
+// Import specific types needed for AwsS3 plugin options
+import type { AwsS3UploadParameters, SignPartOptions, AwsS3Part, UploadResultWithSignal } from '@uppy/aws-s3'; 
 import { v4 as uuidv4 } from 'uuid'; // Import uuid for fallback key generation
 import '@uppy/core/dist/style.min.css';
 import '@uppy/dashboard/dist/style.min.css';
@@ -161,7 +162,7 @@ const UploadPortal: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [projectInfo, setProjectInfo] = useState<UploadLinkResponse | null>(null);
-  const [uppy, setUppy] = useState<Uppy | null>(null); // Use Uppy type
+  const [uppy, setUppy] = useState<Uppy<CustomFileMeta, Record<string, never>> | null>(null); // Use correct Uppy generic type
   const [accentColor, setAccentColor] = useState('#1d70b8');
   // --- End moved state declarations ---
   const useS3 = searchParams.get('S3') === 'true';
@@ -233,14 +234,14 @@ const UploadPortal: React.FC = () => {
             console.log('Using AwsS3 plugin for direct-to-S3 uploads via backend presigned URLs');
 
             // Use the AWS S3 plugin for direct uploads
-            // @ts-expect-error - Uppy plugins have complex typings
+            // Removed @ts-expect-error as types should be handled now
             uppyInstance.use(AwsS3, {
               // Determine if multipart should be used based on file size (Uppy default is > 100MB)
               shouldUseMultipart: (file) => !!file.size && file.size > 100 * 1024 * 1024, // Add null check for file.size
               
               // Endpoint on your backend to get upload parameters (presigned URL or multipart details)
               // This reuses the existing /s3-params endpoint logic
-              getUploadParameters: async (file: UppyFile<CustomFileMeta>) => { // Add type to file
+              getUploadParameters: async (file: UppyFile<CustomFileMeta, Record<string, never>>) => { // Fix UppyFile generic
                 // Determine if this file will use multipart based on the same logic
                 const isMultipart = !!file.size && file.size > 100 * 1024 * 1024; // Add null check
                 const safeFilename = file.name || 'unknown_file'; // Handle potentially undefined filename
@@ -283,10 +284,10 @@ const UploadPortal: React.FC = () => {
                 }
               },
               // Endpoint on your backend to get presigned URL for each part (only called if shouldUseMultipart is true)
-              signPart: async (file: UppyFile<CustomFileMeta>, partData: { uploadId: string; key: string; partNumber: number; body: Blob; signal: AbortSignal }) => { // Add types
+              signPart: async (file: UppyFile<CustomFileMeta, Record<string, never>>, partData: SignPartOptions): Promise<AwsS3UploadParameters> => { // Use correct types
                  console.log(`[signPart] Requesting signed URL for part: ${partData.partNumber}, key: ${partData.key}, uploadId: ${partData.uploadId}`);
                  // Ensure partData.key is a string before encoding
-                 const encodedKey = encodeURIComponent(partData.key || ''); 
+                 const encodedKey = encodeURIComponent(partData.key || '');
                  const response = await fetch(`${API_URL}/upload/s3-part-params/${token}?uploadId=${partData.uploadId}&key=${encodedKey}&partNumber=${partData.partNumber}`);
                  if (!response.ok) {
                     const errorData = await response.json().catch(() => ({ message: 'Failed to sign part' }));
@@ -300,10 +301,11 @@ const UploadPortal: React.FC = () => {
                  return { url: data.url };
               },
               // Endpoint on your backend to complete the multipart upload (only called if shouldUseMultipart is true)
-              completeMultipartUpload: async (file: UppyFile<CustomFileMeta>, { key, uploadId, parts }: { key: string; uploadId: string; parts: { PartNumber: number; ETag: string }[] }) => { // Add types
+              completeMultipartUpload: async (file: UppyFile<CustomFileMeta, Record<string, never>>, { key, uploadId, parts, signal }: { key: string; uploadId: string; parts: AwsS3Part[]; signal: AbortSignal }): Promise<{ location?: string }> => { // Use correct types
                  console.log(`[completeMultipartUpload] Completing: key=${key}, uploadId=${uploadId}, parts=${parts.length}`);
                  const response = await fetch(`${API_URL}/upload/s3-complete/${token}`, {
                     method: 'POST',
+                    signal, // Pass signal for potential cancellation
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ key, uploadId, parts }),
                  });
@@ -321,7 +323,7 @@ const UploadPortal: React.FC = () => {
                  return { location: data.location }; 
               },
               // Endpoint on your backend to abort the multipart upload (only called if shouldUseMultipart is true)
-              abortMultipartUpload: async (file: UppyFile<CustomFileMeta>, { key, uploadId }: { key: string; uploadId: string }) => { // Add types
+              abortMultipartUpload: async (file: UppyFile<CustomFileMeta, Record<string, never>>, { key, uploadId, signal }: UploadResultWithSignal): Promise<void> => { // Use correct types
                  console.log(`[abortMultipartUpload] Aborting: key=${key}, uploadId=${uploadId}`);
                  // Ensure key is a string before encoding
                  const encodedKey = encodeURIComponent(key || '');
@@ -361,7 +363,7 @@ const UploadPortal: React.FC = () => {
 
             // Log all events for uploads to help debug
             // Add types for file and response parameters
-            uppyInstance.on('upload-success', (file: UppyFile<CustomFileMeta> | undefined, response: any) => { 
+            uppyInstance.on('upload-success', (file: UppyFile<CustomFileMeta, Record<string, never>> | undefined, response: any) => { // Fix UppyFile generic
               if (!file) {
                 console.error('[upload-success] No file information available.');
                 return;
@@ -516,7 +518,7 @@ const UploadPortal: React.FC = () => {
           });
 
           // Add types to upload-error handler parameters
-          uppyInstance.on('upload-error', (file: UppyFile<CustomFileMeta> | undefined, error: Error, response: any) => { 
+          uppyInstance.on('upload-error', (file: UppyFile<CustomFileMeta, Record<string, never>> | undefined, error: Error, response: any) => { // Fix UppyFile generic
             if (file) {
               console.error('File error:', file.name, error); // Log filename safely
               console.error('Upload error response:', response);
@@ -561,7 +563,7 @@ const UploadPortal: React.FC = () => {
           });
 
           // Add file validation to block .turbosort files (add type)
-          uppyInstance.on('file-added', (file: UppyFile<CustomFileMeta>) => { 
+          uppyInstance.on('file-added', (file: UppyFile<CustomFileMeta, Record<string, never>>) => { // Fix UppyFile generic
             const fileName = file.name || '';
             if (fileName === '.turbosort' || fileName.toLowerCase().endsWith('.turbosort')) {
               setError('Files with .turbosort extension are not allowed');
@@ -583,8 +585,9 @@ const UploadPortal: React.FC = () => {
 
     // Clean up Uppy instance on unmount
     return () => {
+      // Add null check and use correct close method signature
       if (uppy) {
-        uppy.close();
+        uppy.close({ reason: 'unmount' }); 
       }
     };
   }, [token, useS3]);
