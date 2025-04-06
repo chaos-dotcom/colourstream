@@ -138,6 +138,7 @@ export const s3Service = {
       const externalUrl = url.replace(internalEndpoint, externalEndpoint);
       
       logger.info(`Generated presigned URL for part ${partNumber} of upload ${uploadId}`);
+      logger.debug(`[getPresignedUrlForPart] Final URL returned: ${externalUrl}`); // Log the final URL
       
       return externalUrl;
     } catch (error) {
