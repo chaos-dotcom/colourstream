@@ -86,3 +86,7 @@ template_comparison_report.md
 scripts/template_checker/reports/
 
 /templates
+.aider*
+
+/backend/dist
+/backend/dist/*

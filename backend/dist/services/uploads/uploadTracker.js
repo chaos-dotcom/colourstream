@@ -3,7 +3,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.uploadTracker = void 0;
 const logger_1 = require("../../utils/logger");
 const telegramBot_1 = require("../telegram/telegramBot");
-const fix_s3_filenames_1 = require("../../scripts/fix-s3-filenames");
 class UploadTracker {
     constructor() {
         this.uploads = new Map();
@@ -83,30 +82,20 @@ class UploadTracker {
             }
             logger_1.logger.info(`Upload completed: ${id}`);
             // If this is an S3 upload, trigger cleanup to fix UUIDs in filenames
-            if (((_a = upload.metadata) === null || _a === void 0 ? void 0 : _a.storage) === 's3') {
-                this.triggerS3Cleanup(id);
-            }
+            console.log('[DEBUG] Upload metadata:', upload.metadata);
+            console.log('[DEBUG] Storage value:', (_a = upload.metadata) === null || _a === void 0 ? void 0 : _a.storage);
+            // Disable automatic S3 cleanup trigger for new uploads, as the key should be correct initially.
+            // The cleanup script can be run manually if needed for legacy files.
+            // if (upload.metadata?.storage === 's3' && upload.metadata?.token) {
+            //   console.log('[DEBUG] Will trigger S3 cleanup for upload:', id);
+            //   this.triggerS3Cleanup(id, upload.metadata.token);
+            // } else {
+            //   console.log('[DEBUG] Skipping S3 cleanup for upload:', id, 'as storage is not s3 or token is missing');
+            // }
         }
         else {
             logger_1.logger.warn(`Attempted to complete unknown upload: ${id}`);
         }
-    }
-    /**
-     * Trigger S3 filename cleanup for UUID removal
-     * This runs asynchronously to avoid blocking the upload completion
-     */
-    triggerS3Cleanup(id) {
-        logger_1.logger.info(`Triggering S3 filename cleanup after upload: ${id}`);
-        // Run cleanup in the background without awaiting to avoid blocking
-        setTimeout(async () => {
-            try {
-                await (0, fix_s3_filenames_1.fixS3Filenames)();
-                logger_1.logger.info(`S3 filename cleanup completed for upload: ${id}`);
-            }
-            catch (error) {
-                logger_1.logger.error(`S3 filename cleanup failed for upload ${id}:`, error);
-            }
-        }, 5000); // Wait 5 seconds to ensure all operations are complete
     }
     /**
      * Get information about a specific upload

@@ -10,7 +10,7 @@ import { URL } from 'url'; // Import URL for parsing
 // Initialize S3 client with MinIO configuration
 const s3Client = new S3Client({
   region: process.env.S3_REGION || 'us-east-1',
-  endpoint: process.env.S3_ENDPOINT || 'http://minio:9000',
+  endpoint: process.env.S3_PUBLIC_ENDPOINT || 'http://minio:9000',
   credentials: {
     accessKeyId: process.env.S3_ACCESS_KEY || 'minioadmin',
     secretAccessKey: process.env.S3_SECRET_KEY || 'minioadmin',
@@ -21,7 +21,7 @@ const s3Client = new S3Client({
 // Log S3 client configuration on startup
 logger.info('S3 Client Initialized:', {
   region: process.env.S3_REGION || 'us-east-1',
-  endpoint: process.env.S3_ENDPOINT || 'http://minio:9000',
+  endpoint: process.env.S3_PUBLIC_ENDPOINT || 'http://minio:9000',
   bucket: process.env.S3_BUCKET || 'uploads',
   // Explicitly log the forcePathStyle setting
   forcePathStyle: (s3Client.config as any).forcePathStyle ?? false
@@ -547,7 +547,7 @@ export const s3Service = {
 // Helper function to replace the S3 endpoint in a URL
 function replaceS3Endpoint(url: string): string {
   const externalEndpoint = process.env.S3_PUBLIC_ENDPOINT || 'https://s3.colourstream.johnrogerscolour.co.uk';
-  const internalEndpoint = process.env.S3_ENDPOINT || 'http://minio:9000';
+  const internalEndpoint = process.env.S3_PUBLIC_ENDPOINT || 'http://minio:9000';
 
   // Use a more robust replacement method that handles potential protocol differences
   // and ensures we only replace the host and port part.

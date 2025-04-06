@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.s3Service = void 0;
+exports.s3Service = exports.s3Bucket = void 0;
 const client_s3_1 = require("@aws-sdk/client-s3");
 const lib_storage_1 = require("@aws-sdk/lib-storage");
 const s3_request_presigner_1 = require("@aws-sdk/s3-request-presigner");
@@ -17,7 +17,16 @@ const s3Client = new client_s3_1.S3Client({
     forcePathStyle: true, // This is required for MinIO and most S3-compatible storage
 });
 const bucket = process.env.S3_BUCKET || 'uploads';
+// Export the bucket name for use in other modules
+exports.s3Bucket = bucket;
 exports.s3Service = {
+    /**
+     * Get the bucket name
+     * @returns {string} - The S3 bucket name
+     */
+    getBucket() {
+        return bucket;
+    },
     /**
      * Generate a presigned URL for direct upload to S3
      * @param {string} key - The key (path) to store the file in S3
@@ -26,9 +35,12 @@ exports.s3Service = {
      */
     async generatePresignedUrl(key, expiresIn = 3600) {
         try {
+            // Ensure the key provided follows the 'client/project/filename' structure.
+            // The caller is responsible for generating the correct key using `generateKey`.
+            logger_1.logger.debug(`Generating presigned URL for S3 key: ${key}`);
             const command = new client_s3_1.PutObjectCommand({
                 Bucket: bucket,
-                Key: key,
+                Key: key, // Use the provided key directly
             });
             const url = await (0, s3_request_presigner_1.getSignedUrl)(s3Client, command, { expiresIn });
             logger_1.logger.info(`Generated presigned URL for S3 key: ${key}`);
@@ -53,9 +65,13 @@ exports.s3Service = {
      */
     async createMultipartUpload(key, filename) {
         try {
+            // Ensure the key provided follows the 'client/project/filename' structure.
+            // The caller is responsible for generating the correct key using `generateKey`.
+            logger_1.logger.debug(`Creating multipart upload for key: ${key}`);
+            // Use the provided key directly for the multipart upload
             const command = new client_s3_1.CreateMultipartUploadCommand({
                 Bucket: bucket,
-                Key: key,
+                Key: key, // Use the provided key directly
                 ContentType: this.getContentTypeFromFileName(filename)
             });
             const response = await s3Client.send(command);
@@ -85,9 +101,12 @@ exports.s3Service = {
             if (partNumber < 1 || partNumber > 10000) {
                 throw new Error('Part number must be between 1 and 10000');
             }
+            // Ensure the key provided follows the 'client/project/filename' structure.
+            // The caller is responsible for generating the correct key using `generateKey`.
+            logger_1.logger.debug(`Generating presigned URL for part ${partNumber} for key: ${key}`);
             const command = new client_s3_1.UploadPartCommand({
                 Bucket: bucket,
-                Key: key,
+                Key: key, // Use the provided key directly
                 UploadId: uploadId,
                 PartNumber: partNumber
             });
@@ -114,6 +133,9 @@ exports.s3Service = {
      */
     async completeMultipartUpload(key, uploadId, parts) {
         try {
+            // Ensure the key provided follows the 'client/project/filename' structure.
+            // The caller is responsible for generating the correct key using `generateKey`.
+            logger_1.logger.debug(`Completing multipart upload for key: ${key}`);
             // Sort parts by part number
             const sortedParts = [...parts].sort((a, b) => a.PartNumber - b.PartNumber);
             // Create the MultipartUpload parts array in the format AWS expects
@@ -150,9 +172,12 @@ exports.s3Service = {
      */
     async abortMultipartUpload(key, uploadId) {
         try {
+            // Ensure the key provided follows the 'client/project/filename' structure.
+            // The caller is responsible for generating the correct key using `generateKey`.
+            logger_1.logger.debug(`Aborting multipart upload for key: ${key}, uploadId: ${uploadId}`);
             const command = new client_s3_1.AbortMultipartUploadCommand({
                 Bucket: bucket,
-                Key: key,
+                Key: key, // Use the provided key directly
                 UploadId: uploadId
             });
             await s3Client.send(command);
@@ -210,6 +235,9 @@ exports.s3Service = {
      */
     async uploadFile(fileContent, key, contentType, metadata = {}) {
         try {
+            // Ensure the key provided follows the 'client/project/filename' structure.
+            // The caller is responsible for generating the correct key using `generateKey`.
+            logger_1.logger.debug(`Uploading file to S3 key: ${key}`);
             // If fileContent is a Buffer, convert it to a Readable stream
             const body = Buffer.isBuffer(fileContent)
                 ? stream_1.Readable.from(fileContent)
@@ -225,8 +253,9 @@ exports.s3Service = {
                 },
             });
             await upload.done();
-            // Generate the URL for the uploaded file
-            const fileUrl = `${process.env.S3_ENDPOINT}/${bucket}/${key}`;
+            // Generate the URL for the uploaded file using the public endpoint
+            const s3Endpoint = process.env.S3_PUBLIC_ENDPOINT || 'https://s3.colourstream.johnrogerscolour.co.uk';
+            const fileUrl = `${s3Endpoint}/${bucket}/${key}`;
             logger_1.logger.info(`File uploaded to S3: ${fileUrl}`);
             return fileUrl;
         }
@@ -242,9 +271,12 @@ exports.s3Service = {
      */
     async getFile(key) {
         try {
+            // Ensure the key provided follows the 'client/project/filename' structure.
+            // The caller is responsible for generating the correct key using `generateKey`.
+            logger_1.logger.debug(`Getting file from S3 key: ${key}`);
             const command = new client_s3_1.GetObjectCommand({
                 Bucket: bucket,
-                Key: key,
+                Key: key, // Use the provided key directly
             });
             const response = await s3Client.send(command);
             // Check if we have a valid response with a Body
@@ -270,21 +302,60 @@ exports.s3Service = {
         }
     },
     /**
+     * Get the content of a file from S3
+     * @param {string} key - The key (path) of the file in S3
+     * @returns {Promise<Buffer|null>} - The file content as a Buffer, or null if not found
+     */
+    async getFileContent(key) {
+        try {
+            // Ensure the key provided follows the 'client/project/filename' structure.
+            // The caller is responsible for generating the correct key using `generateKey`.
+            logger_1.logger.debug(`Getting file content from S3 key: ${key}`);
+            const command = new client_s3_1.GetObjectCommand({
+                Bucket: bucket,
+                Key: key, // Use the provided key directly
+            });
+            const response = await s3Client.send(command);
+            if (!response.Body) {
+                return null;
+            }
+            // Convert the response body to a buffer
+            const chunks = [];
+            const stream = response.Body;
+            return new Promise((resolve, reject) => {
+                stream.on('data', (chunk) => chunks.push(chunk));
+                stream.on('end', () => resolve(Buffer.concat(chunks)));
+                stream.on('error', reject);
+            });
+        }
+        catch (error) {
+            // Check if the error is a NoSuchKey error, which means the file doesn't exist
+            if ((error === null || error === void 0 ? void 0 : error.name) === 'NoSuchKey') {
+                return null;
+            }
+            logger_1.logger.error(`Error getting file content from S3 for key ${key}:`, error);
+            throw new Error(`Failed to get file content from S3: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    },
+    /**
      * Delete a file from S3
      * @param {string} key - The key (path) of the file in S3
      * @returns {Promise<void>}
      */
     async deleteFile(key) {
         try {
+            // Ensure the key provided follows the 'client/project/filename' structure.
+            // The caller is responsible for generating the correct key using `generateKey`.
+            logger_1.logger.debug(`Deleting file from S3 key: ${key}`);
             const command = new client_s3_1.DeleteObjectCommand({
                 Bucket: bucket,
-                Key: key,
+                Key: key, // Use the provided key directly
             });
             await s3Client.send(command);
             logger_1.logger.info(`File deleted from S3: ${key}`);
         }
         catch (error) {
-            logger_1.logger.error(`Error deleting file from S3 (${key}):`, error);
+            logger_1.logger.error(`Error deleting file from S3 for key ${key}:`, error);
             throw new Error(`Failed to delete file from S3: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     },
@@ -299,9 +370,11 @@ exports.s3Service = {
         // Normalize the client code and project name (replace spaces with underscores)
         const normalizedClientCode = (clientCode === null || clientCode === void 0 ? void 0 : clientCode.replace(/\s+/g, '_')) || 'default';
         const normalizedProjectName = (projectName === null || projectName === void 0 ? void 0 : projectName.replace(/\s+/g, '_')) || 'default';
-        // Strip out any UUID patterns from the filename (assumes standard UUID format)
-        // This regex matches UUIDs in formats like: prefix-uuid-filename.ext or uuid-filename.ext
-        const filenameWithoutUuid = filename.replace(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-)/gi, '');
+        // Strip out any UUID patterns from the filename
+        // This regex matches UUIDs in formats like:
+        // - f53671c2-f356-417a-b14e-1c1b6476d723-Protape-Ltd-t-a-DataStores-50879.pdf
+        // - prefix-uuid-filename.ext or uuid-filename.ext
+        const filenameWithoutUuid = filename.replace(/^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-)/gi, '');
         // Ensure the filename is valid for S3 but preserve the original name as much as possible
         // Only replace characters that are invalid for S3 keys
         const safeName = filenameWithoutUuid.replace(/[\/\\:*?"<>|]/g, '_');
@@ -319,7 +392,8 @@ exports.s3Service = {
             // Skip if source and destination are the same
             if (sourceKey === destinationKey) {
                 logger_1.logger.info(`Key already cleaned: ${sourceKey}`);
-                return `${process.env.S3_ENDPOINT}/${bucket}/${sourceKey}`;
+                const s3Endpoint = process.env.S3_PUBLIC_ENDPOINT || 'https://s3.colourstream.johnrogerscolour.co.uk';
+                return `${s3Endpoint}/${bucket}/${sourceKey}`;
             }
             logger_1.logger.info(`Renaming S3 object: ${sourceKey} -> ${destinationKey}`);
             // Copy the object to the new key
@@ -333,14 +407,58 @@ exports.s3Service = {
                 Bucket: bucket,
                 Key: sourceKey
             }));
-            // Generate the URL for the renamed file
-            const fileUrl = `${process.env.S3_ENDPOINT}/${bucket}/${destinationKey}`;
+            // Generate the URL for the renamed file using the public endpoint
+            const s3Endpoint = process.env.S3_PUBLIC_ENDPOINT || 'https://s3.colourstream.johnrogerscolour.co.uk';
+            const fileUrl = `${s3Endpoint}/${bucket}/${destinationKey}`;
             logger_1.logger.info(`Successfully renamed S3 object to: ${fileUrl}`);
             return fileUrl;
         }
         catch (error) {
             logger_1.logger.error(`Error renaming object in S3 from ${sourceKey} to ${destinationKey}:`, error);
             throw new Error(`Failed to rename object in S3: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    },
+    /**
+     * Check if a file exists in S3
+     * @param {string} key - The key (path) of the file in S3
+     * @returns {Promise<boolean>} - Whether the file exists
+     */
+    async fileExists(key) {
+        var _a, _b;
+        try {
+            // Ensure the key provided follows the 'client/project/filename' structure.
+            // The caller is responsible for generating the correct key using `generateKey`.
+            logger_1.logger.debug(`Checking if file exists in S3: ${key}`);
+            const command = new client_s3_1.GetObjectCommand({
+                Bucket: bucket,
+                Key: key, // Use the provided key directly
+            });
+            try {
+                await s3Client.send(command);
+                logger_1.logger.info(`File exists in S3: ${key}`);
+                return true;
+            }
+            catch (error) {
+                // If the error is a NoSuchKey error, the file doesn't exist
+                if ((error === null || error === void 0 ? void 0 : error.name) === 'NoSuchKey' || (error === null || error === void 0 ? void 0 : error.Code) === 'NoSuchKey') {
+                    logger_1.logger.info(`File does not exist in S3: ${key} (NoSuchKey)`);
+                    return false;
+                }
+                // Check for other error types that might indicate the file doesn't exist
+                if (((_a = error === null || error === void 0 ? void 0 : error.message) === null || _a === void 0 ? void 0 : _a.includes('does not exist')) ||
+                    ((_b = error === null || error === void 0 ? void 0 : error.message) === null || _b === void 0 ? void 0 : _b.includes('not found'))) {
+                    logger_1.logger.info(`File does not exist in S3: ${key} (error message)`);
+                    return false;
+                }
+                // For other errors, log and return false to be safe
+                logger_1.logger.error(`Error checking if file exists in S3 for key ${key}:`, error);
+                return false;
+            }
+        }
+        catch (error) {
+            // Catch any other errors and return false to be safe
+            logger_1.logger.error(`Unexpected error checking if file exists in S3 for key ${key}:`, error);
+            return false;
         }
     }
 };

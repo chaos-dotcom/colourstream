@@ -7,6 +7,7 @@ const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const morgan_1 = __importDefault(require("morgan"));
 const routes_1 = __importDefault(require("./routes"));
+// Removed unused import: import { handleCompanionWebhook } from './controllers/companionWebhookController';
 const app = (0, express_1.default)();
 // Middleware
 app.use((0, cors_1.default)());
