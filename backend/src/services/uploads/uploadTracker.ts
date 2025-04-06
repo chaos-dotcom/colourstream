@@ -1,6 +1,6 @@
 import { logger } from '../../utils/logger';
 import { getTelegramBot } from '../telegram/telegramBot';
-import { fixS3Filenames } from '../../scripts/fix-s3-filenames';
+import { processFilesByToken } from '../../scripts/fix-s3-filenames';
 
 interface UploadInfo {
   id: string;
@@ -111,11 +111,11 @@ class UploadTracker {
       console.log('[DEBUG] Upload metadata:', upload.metadata);
       console.log('[DEBUG] Storage value:', upload.metadata?.storage);
       
-      if (upload.metadata?.storage === 's3') {
+      if (upload.metadata?.storage === 's3' && upload.metadata?.token) {
         console.log('[DEBUG] Will trigger S3 cleanup for upload:', id);
-        this.triggerS3Cleanup(id);
+        this.triggerS3Cleanup(id, upload.metadata.token);
       } else {
-        console.log('[DEBUG] Skipping S3 cleanup for upload:', id, 'as storage is not s3');
+        console.log('[DEBUG] Skipping S3 cleanup for upload:', id, 'as storage is not s3 or token is missing');
       }
     } else {
       logger.warn(`Attempted to complete unknown upload: ${id}`);
@@ -126,16 +126,16 @@ class UploadTracker {
    * Trigger S3 filename cleanup for UUID removal
    * This runs asynchronously to avoid blocking the upload completion
    */
-  private triggerS3Cleanup(id: string): void {
-    logger.info(`Triggering S3 filename cleanup after upload: ${id}`);
+  private triggerS3Cleanup(id: string, token: string): void {
+    logger.info(`Triggering S3 filename cleanup after upload: ${id} with token: ${token}`);
     console.log('[DEBUG] Starting S3 cleanup trigger with timeout');
     
     // Run cleanup in the background without awaiting to avoid blocking
     setTimeout(async () => {
       try {
         console.log('[DEBUG] Executing S3 filename cleanup after timeout');
-        await fixS3Filenames();
-        logger.info(`S3 filename cleanup completed for upload: ${id}`);
+        const processedCount = await processFilesByToken(token);
+        logger.info(`S3 filename cleanup completed for upload: ${id}, processed ${processedCount} files`);
       } catch (error) {
         console.error('[DEBUG] Error in S3 cleanup:', error);
         logger.error(`S3 filename cleanup failed for upload ${id}:`, error);
@@ -187,4 +187,4 @@ class UploadTracker {
 }
 
 // Singleton instance
-export const uploadTracker = new UploadTracker(); 
+export const uploadTracker = new UploadTracker();
