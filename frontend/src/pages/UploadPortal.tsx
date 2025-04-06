@@ -287,26 +287,28 @@ const UploadPortal: React.FC = () => {
                 }
               },
               // Endpoint on your backend to get presigned URL for each part (only called if shouldUseMultipart is true)
-              // Revert to CustomFileMeta and use 'any' for opts to bypass complex type errors
-              signPart: async (file: UppyFile<CustomFileMeta, Record<string, never>>, opts: any): Promise<AwsS3UploadParameters> => { 
+              // Use 'any' for opts to bypass complex type errors from AwsS3 plugin
+              signPart: async (file: UppyFile<CustomFileMeta, Record<string, never>>, opts: any): Promise<AwsS3UploadParameters> => {
                  console.log(`[signPart] Requesting signed URL for part: ${opts.partNumber}, key: ${opts.key}, uploadId: ${opts.uploadId}`);
                  // Ensure opts.key is a string before encoding
-                 const encodedKey = encodeURIComponent(opts.key || ''); 
+                 const encodedKey = encodeURIComponent(opts.key || '');
                  const response = await fetch(`${API_URL}/upload/s3-part-params/${token}?uploadId=${opts.uploadId}&key=${encodedKey}&partNumber=${opts.partNumber}`);
                  if (!response.ok) {
                     const errorData = await response.json().catch(() => ({ message: 'Failed to sign part' }));
-                    throw new Error(errorData.message || `Failed to sign part ${partData.partNumber}: ${response.statusText}`);
+                    // Use opts.partNumber instead of partData.partNumber
+                    throw new Error(errorData.message || `Failed to sign part ${opts.partNumber}: ${response.statusText}`);
                  }
                  const data = await response.json();
                  if (data.status !== 'success' || !data.url) {
                     throw new Error(data.message || 'Backend failed to provide signed URL for part');
                  }
-                 console.log(`[signPart] Received signed URL for part ${partData.partNumber}`);
+                 // Use opts.partNumber instead of partData.partNumber
+                 console.log(`[signPart] Received signed URL for part ${opts.partNumber}`);
                  return { url: data.url };
               },
               // Endpoint on your backend to complete the multipart upload (only called if shouldUseMultipart is true)
-              // Revert to CustomFileMeta and use 'any' for opts to bypass complex type errors
-              completeMultipartUpload: async (file: UppyFile<CustomFileMeta, Record<string, never>>, opts: any): Promise<{ location?: string }> => { 
+              // Use 'any' for opts to bypass complex type errors from AwsS3 plugin
+              completeMultipartUpload: async (file: UppyFile<CustomFileMeta, Record<string, never>>, opts: any): Promise<{ location?: string }> => {
                  console.log(`[completeMultipartUpload] Completing: key=${opts.key}, uploadId=${opts.uploadId}, parts=${opts.parts.length}`);
                  const response = await fetch(`${API_URL}/upload/s3-complete/${token}`, {
                     method: 'POST',
@@ -328,8 +330,8 @@ const UploadPortal: React.FC = () => {
                  return { location: data.location }; 
               },
               // Endpoint on your backend to abort the multipart upload (only called if shouldUseMultipart is true)
-              // Revert to CustomFileMeta and use 'any' for opts to bypass complex type errors
-              abortMultipartUpload: async (file: UppyFile<CustomFileMeta, Record<string, never>>, opts: any): Promise<void> => { 
+              // Use 'any' for opts to bypass complex type errors from AwsS3 plugin
+              abortMultipartUpload: async (file: UppyFile<CustomFileMeta, Record<string, never>>, opts: any): Promise<void> => {
                  console.log(`[abortMultipartUpload] Aborting: key=${opts.key}, uploadId=${opts.uploadId}`);
                  // Ensure key is a string before encoding
                  const encodedKey = encodeURIComponent(opts.key || '');
