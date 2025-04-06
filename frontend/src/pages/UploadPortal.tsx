@@ -246,9 +246,9 @@ const UploadPortal: React.FC = () => {
             //   // For now, we rely on Companion's server-side config and metadata forwarding
             //   console.log(`[getUploadParameters] Preparing file: ${file.name}`);
             //   // Return an empty object or specific parameters if needed
-            //   return {}; 
+            //   return {};
             // }
-          });
+          } as any); // Add 'as any' here
 
           // --- Configure other Companion-based providers (Dropbox, Google Drive) ---
           // These require Companion regardless of whether S3 uses it
