@@ -81,11 +81,7 @@ const getConfig = (key: keyof RuntimeConfig): string => {
     case 'COMPANION_URL':
       // Use VITE_COMPANION_URL from env if available, otherwise default based on current domain
       return envValue || `https://companion.${window.location.hostname.replace(/^[^.]+\./, '')}`;
-    case 'COMPANION_AWS_ENDPOINT':
-      // This might need adjustment depending on how Companion is configured for S3
-      // If Companion talks directly to MinIO internally, this might not be needed by the frontend.
-      // If the frontend needs to talk to Companion's S3 endpoint, this should point to Companion's public URL.
-      return envValue || getConfig('COMPANION_URL'); // Default to COMPANION_URL if not set
+    // Removed case for 'COMPANION_AWS_ENDPOINT' as it's no longer in RuntimeConfig
     case 'USE_COMPANION':
       return envValue || 'true';
     // Provider configuration defaults
