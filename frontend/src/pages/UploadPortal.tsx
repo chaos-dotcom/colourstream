@@ -26,8 +26,7 @@ import GoogleDrivePicker from '@uppy/google-drive-picker';
 import type { UppyFile } from '@uppy/core';
 // Import only the types that are actually exported
 import type { AwsS3UploadParameters, AwsS3Part } from '@uppy/aws-s3'; 
-// Import base Uppy types for function signatures
-import type { Meta, Body } from '@uppy/core'; 
+// Base Uppy types (Meta, Body) removed as direct import caused issues
 import { v4 as uuidv4 } from 'uuid'; // Import uuid for fallback key generation
 import '@uppy/core/dist/style.min.css';
 import '@uppy/dashboard/dist/style.min.css';
@@ -288,9 +287,8 @@ const UploadPortal: React.FC = () => {
                 }
               },
               // Endpoint on your backend to get presigned URL for each part (only called if shouldUseMultipart is true)
-              // Use Uppy's base Meta/Body types and match expected 'opts' structure
-              signPart: async (file: UppyFile<Meta, Body>, opts: { uploadId: string; key: string; partNumber: number; body: Blob; signal?: AbortSignal }): Promise<AwsS3UploadParameters> => { 
-                 // Access custom meta if needed: const customMeta = file.meta as CustomFileMeta;
+              // Revert to CustomFileMeta and use 'any' for opts to bypass complex type errors
+              signPart: async (file: UppyFile<CustomFileMeta, Record<string, never>>, opts: any): Promise<AwsS3UploadParameters> => { 
                  console.log(`[signPart] Requesting signed URL for part: ${opts.partNumber}, key: ${opts.key}, uploadId: ${opts.uploadId}`);
                  // Ensure opts.key is a string before encoding
                  const encodedKey = encodeURIComponent(opts.key || ''); 
@@ -307,9 +305,8 @@ const UploadPortal: React.FC = () => {
                  return { url: data.url };
               },
               // Endpoint on your backend to complete the multipart upload (only called if shouldUseMultipart is true)
-              // Use Uppy's base Meta/Body types and match expected 'opts' structure
-              completeMultipartUpload: async (file: UppyFile<Meta, Body>, opts: { key: string; uploadId: string; parts: AwsS3Part[]; signal?: AbortSignal }): Promise<{ location?: string }> => { 
-                 // Access custom meta if needed: const customMeta = file.meta as CustomFileMeta;
+              // Revert to CustomFileMeta and use 'any' for opts to bypass complex type errors
+              completeMultipartUpload: async (file: UppyFile<CustomFileMeta, Record<string, never>>, opts: any): Promise<{ location?: string }> => { 
                  console.log(`[completeMultipartUpload] Completing: key=${opts.key}, uploadId=${opts.uploadId}, parts=${opts.parts.length}`);
                  const response = await fetch(`${API_URL}/upload/s3-complete/${token}`, {
                     method: 'POST',
@@ -331,9 +328,8 @@ const UploadPortal: React.FC = () => {
                  return { location: data.location }; 
               },
               // Endpoint on your backend to abort the multipart upload (only called if shouldUseMultipart is true)
-              // Use Uppy's base Meta/Body types and match expected 'opts' structure
-              abortMultipartUpload: async (file: UppyFile<Meta, Body>, opts: { key: string; uploadId?: string; signal?: AbortSignal }): Promise<void> => { 
-                 // Access custom meta if needed: const customMeta = file.meta as CustomFileMeta;
+              // Revert to CustomFileMeta and use 'any' for opts to bypass complex type errors
+              abortMultipartUpload: async (file: UppyFile<CustomFileMeta, Record<string, never>>, opts: any): Promise<void> => { 
                  console.log(`[abortMultipartUpload] Aborting: key=${opts.key}, uploadId=${opts.uploadId}`);
                  // Ensure key is a string before encoding
                  const encodedKey = encodeURIComponent(opts.key || '');
@@ -597,7 +593,7 @@ const UploadPortal: React.FC = () => {
     return () => {
       // Add null check and use correct close method signature
       if (uppy) {
-        // Keep cast to any as a workaround for potential type issue
+        // Keep cast to any as a workaround for potential type issue with close method
         (uppy as any).close(); 
       }
     };
