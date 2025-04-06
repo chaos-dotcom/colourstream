@@ -5,6 +5,7 @@ import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Readable } from 'stream';
 import { logger } from '../../utils/logger';
+import { URL } from 'url'; // Import URL for parsing
 
 // Initialize S3 client with MinIO configuration
 const s3Client = new S3Client({
@@ -49,16 +50,11 @@ export const s3Service = {
       });
 
       const url = await getSignedUrl(s3Client, command, { expiresIn });
-      logger.info(`Generated presigned URL for S3 key: ${key}`);
+      logger.info(`Generated raw presigned URL for S3 key: ${key}`);
       
-      // Replace internal minio:9000 with external S3 endpoint if needed
-      const externalEndpoint = process.env.S3_PUBLIC_ENDPOINT || 'https://s3.colourstream.johnrogerscolour.co.uk';
-      const internalEndpoint = process.env.S3_ENDPOINT || 'http://minio:9000';
-      
-      // Replace the internal URL with the external URL
-      const externalUrl = url.replace(internalEndpoint, externalEndpoint);
-      
-      logger.info(`Converted internal URL to external URL: ${externalUrl}`);
+      // Replace internal endpoint with external one using the helper function
+      const externalUrl = replaceS3Endpoint(url);
+      logger.info(`Final presigned URL: ${externalUrl}`);
       
       return externalUrl;
     } catch (error) {
@@ -130,12 +126,8 @@ export const s3Service = {
 
       const url = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
       
-      // Replace internal minio:9000 with external S3 endpoint if needed
-      const externalEndpoint = process.env.S3_PUBLIC_ENDPOINT || 'https://s3.colourstream.johnrogerscolour.co.uk';
-      const internalEndpoint = process.env.S3_ENDPOINT || 'http://minio:9000';
-      
-      // Replace the internal URL with the external URL
-      const externalUrl = url.replace(internalEndpoint, externalEndpoint);
+      // Replace internal endpoint with external one using the helper function
+      const externalUrl = replaceS3Endpoint(url);
       
       logger.info(`Generated presigned URL for part ${partNumber} of upload ${uploadId}`);
       logger.debug(`[getPresignedUrlForPart] Final URL returned: ${externalUrl}`); // Log the final URL
@@ -147,8 +139,8 @@ export const s3Service = {
     }
   },
 
-  /**
-   * Complete a multipart upload
+  // --- Helper function to replace S3 endpoint ---
+  
    * @param {string} key - The key (path) of the file in S3
    * @param {string} uploadId - The upload ID for the multipart upload
    * @param {CompletedPart[]} parts - The parts to include in the completed upload (using AWS SDK type)
@@ -535,5 +527,39 @@ export const s3Service = {
     }
   }
 };
+
+// Helper function to replace the S3 endpoint in a URL
+function replaceS3Endpoint(url: string): string {
+  const externalEndpoint = process.env.S3_PUBLIC_ENDPOINT || 'https://s3.colourstream.johnrogerscolour.co.uk';
+  const internalEndpoint = process.env.S3_ENDPOINT || 'http://minio:9000';
+
+  // Use a more robust replacement method that handles potential protocol differences
+  // and ensures we only replace the host and port part.
+  try {
+    const internalUrl = new URL(internalEndpoint); // e.g., http://minio:9000
+    const externalUrl = new URL(externalEndpoint); // e.g., https://s3.colourstream...
+
+    const urlObject = new URL(url); // The URL returned by getSignedUrl
+
+    // Check if the hostname and port match the internal endpoint
+    if (urlObject.hostname === internalUrl.hostname && urlObject.port === internalUrl.port) {
+      urlObject.protocol = externalUrl.protocol;
+      urlObject.hostname = externalUrl.hostname;
+      urlObject.port = externalUrl.port || ''; // Use external port or default (e.g., 443 for https)
+      
+      const replacedUrl = urlObject.toString();
+      logger.debug(`Replaced internal endpoint: ${url} -> ${replacedUrl}`);
+      return replacedUrl;
+    } else {
+       logger.debug(`URL did not match internal endpoint, returning original: ${url}`);
+       return url; // Return original if it doesn't match internal endpoint
+    }
+  } catch (e) {
+    logger.error(`Error parsing or replacing URL endpoints: ${e}. Original URL: ${url}`);
+    // Fallback to simple string replacement if URL parsing fails
+    return url.replace(internalEndpoint, externalEndpoint);
+  }
+}
+
 
 export default s3Service;
