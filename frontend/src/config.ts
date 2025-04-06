@@ -15,7 +15,7 @@ interface RuntimeConfig {
   S3_REGION: string;
   S3_BUCKET: string;
   // Companion configuration
-  COMPANION_URL: string;
+  COMPANION_URL: string; // Ensure this key is defined
   COMPANION_AWS_ENDPOINT: string;
   USE_COMPANION: string;
   // Provider configuration
