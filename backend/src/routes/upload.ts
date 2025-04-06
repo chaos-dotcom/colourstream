@@ -1007,17 +1007,31 @@ router.get('/s3-params/:token', async (req: Request, res: Response) => {
       });
     }
 
+    // Clean the filename by removing UUIDs
+    // This regex matches UUIDs in formats like:
+    // - f53671c2-f356-417a-b14e-1c1b6476d723-Protape-Ltd-t-a-DataStores-50879.pdf
+    // - prefix-uuid-filename.ext or uuid-filename.ext
+    const uuidRegex = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-)/gi;
+    const cleanFilename = filename.replace(uuidRegex, '');
+    
     // Generate S3 key for this file - using the clean $CLIENT/$PROJECT/FILENAME structure
-    const s3Key = s3Service.generateKey(
-      uploadLink.project.client.code || 'default',
-      uploadLink.project.name,
-      filename
-    );
+    const clientCode = uploadLink.project.client.code || 'default';
+    const projectName = uploadLink.project.name || 'default';
+    
+    // Normalize the client code and project name (replace spaces with underscores)
+    const normalizedClientCode = clientCode.replace(/\s+/g, '_');
+    const normalizedProjectName = projectName.replace(/\s+/g, '_');
+    
+    // Create the key directly to ensure it matches what the frontend will use
+    const s3Key = `${normalizedClientCode}/${normalizedProjectName}/${cleanFilename}`;
+    
+    logger.info(`Generated S3 key for upload: ${s3Key}`);
     
     // Enhanced logging for debugging filename issues
-    console.log(`File upload request - Original filename: "${filename}"`);
-    console.log(`Generated S3 key: "${s3Key}" for file: "${filename}"`);
-    console.log(`Client code: "${uploadLink.project.client.code || 'default'}", Project name: "${uploadLink.project.name}"`);
+    logger.info(`File upload request - Original filename: "${filename}"`);
+    logger.info(`Cleaned filename: "${cleanFilename}"`);
+    logger.info(`Generated S3 key: "${s3Key}" for file: "${filename}"`);
+    logger.info(`Client code: "${uploadLink.project.client.code || 'default'}", Project name: "${uploadLink.project.name}"`);
 
     // Handle multipart upload initialization or regular presigned URL
     if (multipart) {
@@ -1128,13 +1142,50 @@ router.post('/s3-complete/:token', async (req: Request, res: Response) => {
     
     // Extract filename from the key - last part after the final slash
     // Should be in format: CLIENT/PROJECT/FILENAME
-    const filename = key.split('/').pop() || 'unknown';
+    const keyParts = key.split('/');
+    const filename = keyParts.pop() || 'unknown';
+    
+    // Clean the filename by removing UUIDs
+    const uuidRegex = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-)/gi;
+    const cleanFilename = filename.replace(uuidRegex, '');
+    
+    // Check if the key follows the client/project/filename pattern
+    const correctPatternRegex = /^[^\/]+\/[^\/]+\/[^\/]+$/;
+    
+    // If the key doesn't follow the pattern, generate a new one
+    let finalKey = key;
+    let fileUrl = result.location;
+    
+    if (!correctPatternRegex.test(key)) {
+      // Generate a new key with the client/project/filename structure
+      const clientCode = uploadLink.project.client.code || 'default';
+      const projectName = uploadLink.project.name || 'default';
+      
+      // Normalize the client code and project name (replace spaces with underscores)
+      const normalizedClientCode = clientCode.replace(/\s+/g, '_');
+      const normalizedProjectName = projectName.replace(/\s+/g, '_');
+      
+      // Create the key directly
+      finalKey = `${normalizedClientCode}/${normalizedProjectName}/${cleanFilename}`;
+      
+      logger.info(`Generated new S3 key for multipart upload: ${finalKey} (original: ${key})`);
+      
+      // Rename the file in S3
+      try {
+        fileUrl = await s3Service.renameObject(key, finalKey);
+        logger.info(`Renamed multipart upload from ${key} to ${finalKey}`);
+      } catch (error) {
+        logger.error(`Failed to rename multipart upload from ${key} to ${finalKey}:`, error);
+        // Continue with the original key if rename fails
+        finalKey = key;
+      }
+    }
     
     // Create file record in database
     const uploadedFile = await prisma.uploadedFile.create({
       data: {
-        name: filename,
-        path: key,
+        name: cleanFilename,
+        path: finalKey,
         size: 0, // Size will be updated when we can retrieve it
         mimeType: 'application/octet-stream',
         hash: `multipart-${uploadId}`,
@@ -1144,7 +1195,7 @@ router.post('/s3-complete/:token', async (req: Request, res: Response) => {
         status: 'completed',
         completedAt: new Date(),
         storage: 's3',
-        url: result.location
+        url: fileUrl
       }
     });
 
@@ -1154,9 +1205,32 @@ router.post('/s3-complete/:token', async (req: Request, res: Response) => {
       data: { usedCount: { increment: 1 } }
     });
 
+    // Use the uploadTracker to mark the upload as complete
+    // This will handle the Telegram notification and avoid duplicates
+    const trackerId = `s3-multipart-${uploadedFile.id}`; // Use a consistent ID format
+    logger.info(`[/s3-complete] Marking upload ${trackerId} as complete via uploadTracker`);
+    
+    // Track the upload with complete status
+    uploadTracker.trackUpload({
+      id: trackerId,
+      size: uploadedFile.size || 0,
+      offset: uploadedFile.size || 0, // Ensure offset matches size for completion
+      metadata: {
+        filename: uploadedFile.name,
+        filetype: uploadedFile.mimeType || '',
+        token: token,
+        clientName: uploadLink.project.client.name,
+        projectName: uploadLink.project.name,
+        storage: 's3'
+      },
+      isComplete: true, // Explicitly mark as complete
+      createdAt: new Date()
+    });
+
     res.json({
       status: 'success',
-      location: result.location,
+      location: fileUrl,
+      key: finalKey,
       fileId: uploadedFile.id
     });
   } catch (error) {
@@ -1241,43 +1315,65 @@ router.post('/s3-callback/:token', async (req: Request, res: Response) => {
       });
     }
 
-    // Check if filename contains a UUID pattern
-    const uuidRegex = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-)/gi;
-    const hasUuid = uuidRegex.test(key);
+    // Extract client and project information
+    const clientCode = uploadLink.project.client.code || 'default';
+    const projectName = uploadLink.project.name || 'default';
     
-    // Generate a clean key without UUIDs if needed
-    let cleanKey = key;
-    let cleanFilename = filename;
+    // Clean the filename by removing UUIDs
+    // This regex matches UUIDs in formats like:
+    // - f53671c2-f356-417a-b14e-1c1b6476d723-Protape-Ltd-t-a-DataStores-50879.pdf
+    // - prefix-uuid-filename.ext or uuid-filename.ext
+    const uuidRegex = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-)/gi;
+    const cleanFilename = filename.replace(uuidRegex, '');
     
-    if (hasUuid) {
-      // Extract client and project information
-      const clientCode = uploadLink.project.client.code || 'default';
-      const projectName = uploadLink.project.name || 'default';
+    // Generate clean key with the standard structure
+    let cleanKey = s3Service.generateKey(clientCode, projectName, cleanFilename);
+    
+    // Rename the file in S3 if needed
+    let fileUrl = '';
+    try {
+      // Check if the key already follows the client/project/filename pattern
+      const correctPatternRegex = /^[^\/]+\/[^\/]+\/[^\/]+$/;
       
-      // Clean the filename by removing UUIDs
-      cleanFilename = filename.replace(uuidRegex, '');
-      
-      // Generate clean key with the standard structure
-      cleanKey = `${clientCode}/${projectName}/${cleanFilename}`;
-      
-      // Rename the file in S3
-      try {
-        // If key already has UUID prefix, rename it in S3
-        if (key !== cleanKey) {
-          await s3Service.renameObject(key, cleanKey);
-          logger.info(`Renamed file in S3: ${key} -> ${cleanKey}`);
+      // If key already has UUID prefix or doesn't follow the client/project/filename pattern, rename it in S3
+      if (key !== cleanKey && correctPatternRegex.test(cleanKey)) {
+        try {
+          // Check if the file exists at the original key
+          const fileExists = await s3Service.fileExists(key);
+          
+          if (fileExists) {
+            fileUrl = await s3Service.renameObject(key, cleanKey);
+            logger.info(`Renamed file in S3: ${key} -> ${cleanKey}`);
+          } else {
+            logger.warn(`File does not exist at path ${key} in S3, updating database only`);
+            // Generate the URL for the uploaded file
+            const s3Endpoint = process.env.S3_PUBLIC_ENDPOINT || 'https://s3.colourstream.johnrogerscolour.co.uk';
+            const s3Bucket = s3Service.getBucket();
+            fileUrl = `${s3Endpoint}/${s3Bucket}/${cleanKey}`;
+          }
+        } catch (error) {
+          logger.error(`Error checking if file exists at ${key}:`, error);
+          // Generate the URL for the uploaded file
+          const s3Endpoint = process.env.S3_PUBLIC_ENDPOINT || 'https://s3.colourstream.johnrogerscolour.co.uk';
+          const s3Bucket = s3Service.getBucket();
+          fileUrl = `${s3Endpoint}/${s3Bucket}/${cleanKey}`;
         }
-      } catch (renameError) {
-        logger.error('Failed to rename file in S3:', renameError);
-        // Continue with original key if rename fails
-        cleanKey = key;
+      } else {
+        // Generate the URL for the uploaded file
+        const s3Endpoint = process.env.S3_PUBLIC_ENDPOINT || 'https://s3.colourstream.johnrogerscolour.co.uk';
+        const s3Bucket = s3Service.getBucket();
+        fileUrl = `${s3Endpoint}/${s3Bucket}/${cleanKey}`;
       }
+    } catch (renameError) {
+      logger.error('Failed to rename file in S3:', renameError);
+      // Continue with original key if rename fails
+      cleanKey = key;
+      
+      // Generate the URL for the uploaded file
+      const s3Endpoint = process.env.S3_ENDPOINT || 'http://minio:9000';
+      const s3Bucket = process.env.S3_BUCKET || 'uploads';
+      fileUrl = `${s3Endpoint}/${s3Bucket}/${cleanKey}`;
     }
-
-    // Generate the URL for the uploaded file
-    const s3Endpoint = process.env.S3_ENDPOINT || 'http://minio:9000';
-    const s3Bucket = process.env.S3_BUCKET || 'uploads';
-    const fileUrl = `${s3Endpoint}/${s3Bucket}/${cleanKey}`;
     
     // Record the upload in the database
     const uploadedFile = await prisma.uploadedFile.create({
@@ -1303,32 +1399,34 @@ router.post('/s3-callback/:token', async (req: Request, res: Response) => {
       data: { usedCount: { increment: 1 } }
     });
 
-    // NOTE: Tracking is handled by the /api/upload/progress endpoint.
-    // Final completion notification will be sent from here.
-    const telegramBot = getTelegramBot();
-    if (telegramBot) {
-      const uploadId = req.body.hash || `s3-${uploadedFile.id}`; // Try to use hash from body if available, fallback
-      logger.info(`[/s3-callback] Sending final completion notification for ${uploadId}`);
-      const finalUploadInfo = {
-        id: uploadId,
-        size: uploadedFile.size,
-        offset: uploadedFile.size, // Ensure offset matches size for completion
-        metadata: {
-          filename: uploadedFile.name,
-          filetype: uploadedFile.mimeType || '',
-          token: token,
-          clientName: uploadLink.project.client.name,
-          projectName: uploadLink.project.name,
-          storage: 's3'
-        },
-        isComplete: true // Explicitly mark as complete
-      };
-      telegramBot.sendUploadNotification(finalUploadInfo).catch((err: any) => {
-         logger.error(`[/s3-callback] Error sending final Telegram notification for ${uploadId}:`, err);
-      });
-    } else {
-       logger.error('[/s3-callback] Telegram bot not initialized, cannot send final notification.');
-    }
+    // Use the uploadTracker to mark the upload as complete
+    // This will handle the Telegram notification and avoid duplicates
+    // Use a consistent ID format that doesn't include UUID prefixes
+    const trackerId = `s3-direct-${uploadedFile.id}`; // Use a consistent ID format
+    logger.info(`[/s3-callback] Marking upload ${trackerId} as complete via uploadTracker`);
+    
+    // Import the uploadTracker
+    const { uploadTracker } = require('../services/uploads/uploadTracker');
+    
+    // Track the upload with complete status
+    uploadTracker.trackUpload({
+      id: trackerId,
+      size: uploadedFile.size,
+      offset: uploadedFile.size, // Ensure offset matches size for completion
+      metadata: {
+        filename: uploadedFile.name,
+        filetype: uploadedFile.mimeType || '',
+        token: token,
+        clientName: uploadLink.project.client.name,
+        projectName: uploadLink.project.name,
+        storage: 's3'
+      },
+      isComplete: true, // Explicitly mark as complete
+      createdAt: new Date()
+    });
+    
+    // We don't need to process files here as the uploadTracker will handle it
+    // This avoids duplicate processing and duplicate Telegram notifications
     res.json({
       status: 'success',
       data: uploadedFile
