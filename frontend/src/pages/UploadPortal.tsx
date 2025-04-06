@@ -330,7 +330,8 @@ const UploadPortal: React.FC = () => {
                   size: file.size || 0,
                   filename: file.name || 'unknown',
                   mimeType: file.type || 'application/octet-stream',
-                  hash: 's3-multipart-' + file.id
+                  // Use a consistent ID format that doesn't include UUID prefixes
+                  hash: `multipart-${key.replace(/\//g, '-')}`
                 })
               })
               .then(response => response.json())
@@ -554,7 +555,8 @@ const UploadPortal: React.FC = () => {
                   size: file.size || 0,
                   filename: file.name, // Use the original filename
                   mimeType: file.type || 'application/octet-stream',
-                  hash: 's3-' + file.id
+                  // Use a consistent ID format that doesn't include UUID prefixes
+                  hash: `direct-${key.replace(/\//g, '-')}`
                 })
               })
               .then(response => response.json())
