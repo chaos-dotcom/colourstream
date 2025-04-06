@@ -1181,15 +1181,9 @@ router.post('/s3/multipart/abort', async (req: Request<{}, {}, AbortMultipartBod
 
 // Endpoint for Companion to notify backend after successful S3 upload
 router.post('/s3-callback', async (req: Request, res: Response) => {
-// router.post('/s3-complete/:token', ... );
-// router.post('/s3-abort/:token', ... );
-// --- End remove backend signing endpoints ---
-
-// Endpoint for Companion to notify backend after successful S3 upload
-router.post('/s3-callback', async (req: Request, res: Response) => {
   try {
     // Correct logic starts here: Access data directly from Companion's request body
-    const { name, size, mimeType, metadata, s3 } = req.body; 
+    const { name, size, mimeType, metadata, s3 } = req.body;
     const s3Key = s3?.key; // Key where Companion uploaded the file
 
     logger.info('[/s3-callback] Received callback from Companion');
