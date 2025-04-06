@@ -230,16 +230,13 @@ const UploadPortal: React.FC = () => {
             }
           });
 
-          // Choose upload method based on configuration
-          if (USE_COMPANION) {
-            console.log('Using AwsS3 plugin for direct-to-S3 uploads via backend presigned URLs');
-
-            // Use the AWS S3 Multipart plugin for direct uploads with backend signing
-            uppyInstance.use(AwsS3Multipart, {
-              // Remove shouldUseMultipart - AwsS3Multipart handles this internally
-              
-              // Endpoint for initiating multipart uploads
-              createMultipartUpload: async (file: UppyFile<CustomFileMeta, Record<string, never>>) => {
+          // --- Configure AwsS3Multipart for backend signing (Always enabled for now) ---
+          console.log('Configuring AwsS3Multipart plugin for direct-to-S3 uploads via backend presigned URLs');
+          uppyInstance.use(AwsS3Multipart, {
+            // Remove shouldUseMultipart - AwsS3Multipart handles this internally
+            
+            // Endpoint for initiating multipart uploads
+            createMultipartUpload: async (file: UppyFile<CustomFileMeta, Record<string, never>>) => {
                 const safeFilename = file.name || 'unknown_file';
                 console.log(`[createMultipartUpload] Initiating for file: ${safeFilename}`);
                 const response = await fetch(`${API_URL}/upload/s3-params/${token}?filename=${encodeURIComponent(safeFilename)}&multipart=true`);
@@ -321,7 +318,10 @@ const UploadPortal: React.FC = () => {
               retryDelays: [0, 1000, 3000, 5000, 10000], // Retry delays for failed parts
             } as any); // Add type assertion here to bypass complex type errors
 
-            // Add Dropbox support if enabled (Companion is still needed for non-S3 providers)
+          // --- Configure Companion-based providers conditionally ---
+          if (USE_COMPANION) {
+            console.log('Companion is enabled. Configuring Dropbox/Google Drive.');
+            // Add Dropbox support if enabled
             if (ENABLE_DROPBOX) {
               console.log('Enabling Dropbox integration');
               uppyInstance.use(Dropbox, {
@@ -339,10 +339,14 @@ const UploadPortal: React.FC = () => {
                 appId: GOOGLE_DRIVE_APP_ID
               });
             }
+          } else {
+            console.log('Companion is disabled. Skipping Dropbox/Google Drive configuration.');
+          }
 
-            // Log all events for uploads to help debug
-            // Add types for file and response parameters
-            uppyInstance.on('upload-success', (file: UppyFile<CustomFileMeta, Record<string, never>> | undefined, response: any) => { // Fix UppyFile generic
+          // --- Event listeners (Keep existing ones) ---
+          // Log all events for uploads to help debug
+          // Add types for file and response parameters
+          uppyInstance.on('upload-success', (file: UppyFile<CustomFileMeta, Record<string, never>> | undefined, response: any) => { // Fix UppyFile generic
               if (!file) {
                 console.error('[upload-success] No file information available.');
                 return;
@@ -484,11 +488,6 @@ const UploadPortal: React.FC = () => {
                 console.log('Could not get files from Uppy:', err);
               }
             });
-          } 
-          // --- Remove the entire 'else if (useS3)' block ---
-          // This block contained the old direct-to-S3 logic without backend signing
-          // and was causing numerous errors after the refactor.
-          // The primary 'if (USE_COMPANION)' block now handles the correct AwsS3 setup.
 
           // Set up general error handling (add types)
           uppyInstance.on('error', (error: Error) => { // Keep existing type
@@ -567,10 +566,11 @@ const UploadPortal: React.FC = () => {
       // Add null check and use correct close method signature
       if (uppy) {
         // Keep cast to any as a workaround for potential type issue with close method
-        (uppy as any).close(); 
+        (uppy as any).close();
       }
     };
-  }, [token, useS3]);
+  // Removed useS3 dependency as it's not used anymore
+  }, [token]);
 
   const renderHeader = () => (
     <StyledAppBar position="static">
