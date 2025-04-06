@@ -1172,8 +1172,9 @@ router.post('/s3-complete/:token', async (req: Request, res: Response) => {
     const finalFileUrl = completionResult.location; // Use the location returned by S3, rename variable
     
     // Extract filename from the key - last part after the final slash
-    const keyParts = key.split('/');
-    const cleanFilename = keyParts.pop() || 'unknown'; 
+    // Remove the redundant declaration below as keyParts and cleanFilename are already defined above
+    // const keyParts = key.split('/');
+    // const cleanFilename = keyParts.pop() || 'unknown'; 
     
     // --- Database Record Creation Moved Here ---
     logger.info(`[/s3-complete] Creating database record for completed upload: ${key}`);
