@@ -430,16 +430,16 @@ services:
       - "traefik.http.routers.minio-api.tls.certresolver=myresolver" # Add cert resolver
       - "traefik.http.routers.minio-api.service=minio-api"
       - "traefik.http.services.minio-api.loadbalancer.server.port=9000"
-      # Re-add CORS middleware with refined settings using Traefik v3 camelCase syntax
+      # Re-add CORS middleware with VERY PERMISSIVE settings for debugging
       - "traefik.http.routers.minio-api.middlewares=minio-cors-headers@docker" 
-      # Refined CORS middleware definition for Traefik v3
-      - "traefik.http.middlewares.minio-cors-headers.headers.accessControlAllowMethods=GET,OPTIONS,PUT,POST,DELETE,HEAD" # Ensure PUT and OPTIONS are present
-      - "traefik.http.middlewares.minio-cors-headers.headers.accessControlAllowHeaders=*" # Allow all headers for debugging
-      - "traefik.http.middlewares.minio-cors-headers.headers.accessControlAllowOriginList=https://upload.colourstream.${DOMAIN},http://localhost:3000" # Be specific + localhost
+      # Permissive CORS middleware definition for Traefik v3 (DEBUGGING ONLY)
+      - "traefik.http.middlewares.minio-cors-headers.headers.accessControlAllowMethods=GET,OPTIONS,PUT,POST,DELETE,HEAD" 
+      - "traefik.http.middlewares.minio-cors-headers.headers.accessControlAllowHeaders=*" # Allow ANY header
+      - "traefik.http.middlewares.minio-cors-headers.headers.accessControlAllowOriginList=*" # Allow ANY origin (less secure)
       - "traefik.http.middlewares.minio-cors-headers.headers.accessControlMaxAge=3600"
       - "traefik.http.middlewares.minio-cors-headers.headers.addVaryHeader=true"
       - "traefik.http.middlewares.minio-cors-headers.headers.accessControlAllowCredentials=true"
-      - "traefik.http.middlewares.minio-cors-headers.headers.accessControlExposeHeaders=ETag,Content-Length,Content-Type,X-Amz-Request-Id" # Crucially expose ETag
+      - "traefik.http.middlewares.minio-cors-headers.headers.accessControlExposeHeaders=ETag,Content-Length,Content-Type,X-Amz-Request-Id" # Expose ETag
       # Console endpoint
       - "traefik.http.routers.minio-console.rule=Host(`s3-console.colourstream.${DOMAIN}`)"
       - "traefik.http.routers.minio-console.entrypoints=websecure"
