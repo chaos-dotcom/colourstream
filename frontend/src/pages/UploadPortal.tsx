@@ -242,23 +242,11 @@ const UploadPortal: React.FC = () => {
             }
           });
 
-          // --- Configure AwsS3 plugin for direct uploads with backend signing ---
-          // console.log('Configuring AwsS3 plugin for direct S3 uploads via backend signing'); // Removed confusing log
+          // --- Configure AwsS3 plugin for direct uploads using temporary credentials ---
           uppyInstance.use(AwsS3, {
-            // Required for non-multipart uploads, even if primarily using multipart
-            getUploadParameters: (file) => {
-              // This function should ideally ask the backend for parameters
-              // for non-multipart uploads. Since we force multipart for large files
-              // and handle signing via the other functions, we can throw or return
-              // dummy data here, but it must exist to satisfy types.
-              console.warn('[AwsS3] getUploadParameters called unexpectedly for file:', file.name);
-              // Throwing an error might be safer if this path shouldn't be hit
-              throw new Error('getUploadParameters should not be called in this configuration');
-              // Or return dummy data:
-              // return { method: 'POST', url: '', fields: {}, headers: {} };
-            },
             // Force multipart for files > 5MB (S3 minimum part size)
-            shouldUseMultipart: (file) => file.size > 5 * 1024 * 1024,
+            // Add null check for file.size
+            shouldUseMultipart: (file) => (file.size ?? 0) > 5 * 1024 * 1024,
             // Adjust concurrency based on network/backend capacity, not signing latency
             limit: 10,
             // Use a larger chunk size now that signing overhead is removed
