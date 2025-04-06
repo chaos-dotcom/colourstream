@@ -17,13 +17,13 @@ import {
 import { styled } from '@mui/material/styles';
 import { Dashboard } from '@uppy/react';
 import Uppy from '@uppy/core';
-// Remove AwsS3 import - Companion handles S3 uploads server-side
-// import AwsS3 from '@uppy/aws-s3'; 
+// Use the standard AwsS3 plugin
+import AwsS3 from '@uppy/aws-s3'; 
 import Dropbox from '@uppy/dropbox';
 import GoogleDrivePicker from '@uppy/google-drive-picker';
 import type { UppyFile } from '@uppy/core';
-// Remove AwsS3Multipart specific types
-// import type { AwsS3UploadParameters, AwsS3Part } from '@uppy/aws-s3'; // Keep this if AwsS3 needs it, remove if not. Let's assume AwsS3 doesn't expose these directly for config.
+// Import types needed for AwsS3 configuration
+import type { AwsS3Part } from '@uppy/aws-s3'; // Use type from aws-s3
 // Base Uppy types (Meta, Body) removed as direct import caused issues
 import { v4 as uuidv4 } from 'uuid'; // Import uuid for fallback key generation
 import '@uppy/core/dist/style.min.css';
@@ -371,13 +371,11 @@ const UploadPortal: React.FC = () => {
               console.log(`[upload-success] Upload succeeded: ${file.name}`);
               console.log('[upload-success] Response details:', response);
 
-              // When using AwsS3 with Companion, the response typically contains the uploadURL
-              // which is the final S3 URL. Companion handles notifying the backend if configured.
-              const finalLocation = response?.uploadURL || 'unknown-location'; // Access location safely
-              console.log(`[upload-success] Final Location (from Companion): ${finalLocation}`);
+              // When using AwsS3 with backend signing, the response from completeMultipartUpload contains the location
+              const finalLocation = response?.location || 'unknown-location'; // Access location safely
+              console.log(`[upload-success] Final Location (from backend completeMultipartUpload): ${finalLocation}`);
 
-              // The backend callback triggered by Companion should handle database updates and file processing.
-              // No need to call /s3-callback or /s3-complete from here.
+              // Store the final URL in the file metadata if needed
             });
 
             // Enhanced error handling for AwsS3 with Companion (add types)
