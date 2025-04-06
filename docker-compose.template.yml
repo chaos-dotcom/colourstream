@@ -430,7 +430,10 @@ services:
       - "traefik.http.routers.minio-api.tls.certresolver=myresolver" # Add cert resolver
       - "traefik.http.routers.minio-api.service=minio-api"
       - "traefik.http.services.minio-api.loadbalancer.server.port=9000"
-      - "traefik.http.middlewares.minio-cors-headers.headers.accesscontrolallowmethods=GET,OPTIONS,PUT,POST,DELETE,HEAD" # Explicitly allow PUT
+      # Removed CORS middleware - rely on MinIO bucket CORS settings
+      # - "traefik.http.routers.minio-api.middlewares=minio-cors-headers" 
+      # Associated middleware definitions are kept in case they are used elsewhere or needed later
+      - "traefik.http.middlewares.minio-cors-headers.headers.accesscontrolallowmethods=GET,OPTIONS,PUT,POST,DELETE,HEAD" 
       - "traefik.http.middlewares.minio-cors-headers.headers.accesscontrolallowheaders=*"
       - "traefik.http.middlewares.minio-cors-headers.headers.accesscontrolalloworiginlist=*"
       - "traefik.http.middlewares.minio-cors-headers.headers.accesscontrolmaxage=3600"

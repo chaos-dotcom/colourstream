@@ -291,8 +291,16 @@ const UploadPortal: React.FC = () => {
             
             // Function to get presigned URLs for parts
             signPart: async (file, partData) => {
-              console.log('[AwsS3] signPart called for:', file.name, 'partNumber:', partData.partNumber);
-              const response = await fetch(`${API_URL}/upload/s3/multipart/sign-part`, { // Changed endpoint name
+              console.log('[AwsS3] signPart called for:', file.name, 'partNumber:', partData.partNumber, 'UploadID:', partData.uploadId);
+              const requestBody = {
+                key: file.meta.key, // Use the key stored in meta
+                uploadId: partData.uploadId,
+                partNumber: partData.partNumber,
+                metadata: file.meta // Send all file metadata
+              };
+              console.log('[AwsS3] signPart request body:', JSON.stringify(requestBody)); // Log request body
+              
+              const response = await fetch(`${API_URL}/upload/s3/multipart/sign-part`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -308,9 +316,14 @@ const UploadPortal: React.FC = () => {
                 throw new Error(`Failed to sign part: ${response.status} ${errorText}`);
               }
               const data = await response.json();
-              console.log('[AwsS3] signPart response:', data);
+              console.log('[AwsS3] signPart raw response data:', data); // Log raw response
+              if (data?.status !== 'success' || !data?.data?.url) {
+                 console.error('[AwsS3] signPart backend response indicates failure or missing URL:', data);
+                 throw new Error(`Backend failed to provide valid signed URL: ${data?.message || 'Unknown backend error'}`);
+              }
+              console.log('[AwsS3] signPart successful, returning URL:', data.data.url);
               // Expected response: { url: string }
-              return data.data; 
+              return data.data;
             },
 
             // Function to abort multipart upload
