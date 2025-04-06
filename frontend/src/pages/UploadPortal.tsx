@@ -524,7 +524,11 @@ const UploadPortal: React.FC = () => {
           uppyInstance.on('upload-error', (file: UppyFile<CustomFileMeta, Record<string, never>> | undefined, error: Error, response?: Record<string, any>) => {
             if (file) {
               console.error('File error:', file.name, error); // Log filename safely
-              console.error('Upload error response:', response);
+              if (response) {
+                console.error('Upload error response:', response);
+              } else {
+                console.error('Upload error response: undefined (Error might have occurred before response was received or response object was not attached to error)');
+              }
               // Try to extract more meaningful error details
               let errorMessage = error.message;
               if (response && response.status) {
