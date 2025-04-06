@@ -378,29 +378,6 @@ services:
       - "traefik.http.middlewares.sio.headers.customrequestheaders.X-Forwarded-Proto=https"
       - "traefik.http.routers.mirotalk-ws.middlewares=sio"
 
-#  coturn:
-#    image: coturn/coturn
-#    container_name: colourstream-coturn
-#    restart: always
-#    volumes:
-#      - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
-#      - ./certs/certs/video.colourstream.${DOMAIN}.crt:/certs/video.colourstream.${DOMAIN}.crt:ro
-#      - ./certs/private/video.colourstream.${DOMAIN}.key:/certs/video.colourstream.${DOMAIN}.key:ro
-#    ports:
-#      - "3480:3480"
-#      - "3480:3480/udp"
-#      - "5350:5350"
-#      - "5350:5350/udp"
-#      - "30000-31000:30000-31000/udp"
-#    networks:
-#      - network
-#    labels:
-#      - "traefik.enable=true"
-#      - "traefik.tcp.routers.coturn.rule=HostSNI(`*`)"
-#      - "traefik.tcp.routers.coturn.entrypoints=websecure"
-#      - "traefik.tcp.routers.coturn.service=coturn"
-#      - "traefik.tcp.services.coturn.loadbalancer.server.port=3480"
-
   minio:
     image: minio/minio:latest
     container_name: colourstream-minio
