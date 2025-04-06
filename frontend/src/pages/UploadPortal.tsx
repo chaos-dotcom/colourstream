@@ -232,7 +232,8 @@ const UploadPortal: React.FC = () => {
 
           // --- Configure AwsS3Multipart for backend signing (Always enabled for now) ---
           console.log('Configuring AwsS3Multipart plugin for direct-to-S3 uploads via backend presigned URLs');
-          uppyInstance.use(AwsS3Multipart, {
+          // Use 'as any' to bypass strict type checking for AwsS3Multipart plugin
+          uppyInstance.use(AwsS3Multipart as any, { 
             // Remove shouldUseMultipart - AwsS3Multipart handles this internally
             
             // Endpoint for initiating multipart uploads
