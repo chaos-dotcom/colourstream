@@ -969,9 +969,218 @@ router.get('/upload-links-all', authenticateToken, async (req: Request, res: Res
   }
 });
 
-// --- Remove backend signing endpoints ---
-// router.get('/s3-params/:token', ... ); 
-// router.get('/s3-part-params/:token', ... );
+// --- Interfaces for Backend Signing Request Bodies ---
+interface CreateMultipartBody {
+  filename: string;
+  contentType: string;
+  metadata: Record<string, any>; // Includes token, clientCode, project, etc.
+}
+
+interface SignPartBody {
+  key: string;
+  uploadId: string;
+  partNumber: number;
+  metadata: Record<string, any>;
+}
+
+interface CompleteMultipartBody {
+  key: string;
+  uploadId: string;
+  parts: CompletedPart[]; // Use the imported type
+  metadata: Record<string, any>;
+}
+
+interface AbortMultipartBody {
+  key: string;
+  uploadId: string;
+  metadata: Record<string, any>;
+}
+
+// --- NEW: Backend signing endpoints for AwsS3 plugin ---
+// These endpoints are called by the @uppy/aws-s3 plugin when configured
+// for backend signing. They handle the S3 interactions securely.
+
+// 1. Create Multipart Upload
+router.post('/s3/multipart/create', async (req: Request<{}, {}, CreateMultipartBody>, res: Response) => {
+  try {
+    const { filename, contentType, metadata } = req.body;
+    const token = metadata?.token; // Extract token from metadata
+
+    if (!token || !filename || !contentType) {
+      logger.error('[/s3/multipart/create] Missing filename, contentType, or token in metadata');
+      return res.status(400).json({ status: 'error', message: 'Missing required fields (filename, contentType, token)' });
+    }
+
+    // Validate token and get project/client info
+    const uploadLink = await prisma.uploadLink.findUnique({
+      where: { token },
+      include: { project: { include: { client: true } } }
+    });
+
+    if (!uploadLink) {
+      logger.error(`[/s3/multipart/create] Invalid token: ${token}`);
+      return res.status(403).json({ status: 'error', message: 'Invalid upload token' });
+    }
+
+    // Generate the S3 key using the validated client/project info
+    const s3Key = s3Service.generateKey(
+      uploadLink.project.client.code || 'default',
+      uploadLink.project.name,
+      filename
+    );
+
+    logger.info(`[/s3/multipart/create] Request for key: ${s3Key}`);
+
+    const { uploadId, key } = await s3Service.createMultipartUpload(s3Key, filename);
+
+    res.json({
+      status: 'success',
+      data: { key, uploadId } // Return the generated key and uploadId
+    });
+  } catch (error) {
+    logger.error('[/s3/multipart/create] Error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to create multipart upload' });
+  }
+});
+
+// 2. Sign Part URL
+router.post('/s3/multipart/sign-part', async (req: Request<{}, {}, SignPartBody>, res: Response) => {
+  try {
+    const { key, uploadId, partNumber, metadata } = req.body;
+    const token = metadata?.token; // Extract token
+
+    if (!key || !uploadId || !partNumber || !token) {
+       logger.error('[/s3/multipart/sign-part] Missing key, uploadId, partNumber, or token');
+       return res.status(400).json({ status: 'error', message: 'Missing required fields (key, uploadId, partNumber, token)' });
+    }
+
+    // Optional: Validate token again for extra security
+    const uploadLink = await prisma.uploadLink.findUnique({ where: { token } });
+    if (!uploadLink) {
+      logger.error(`[/s3/multipart/sign-part] Invalid token: ${token}`);
+      return res.status(403).json({ status: 'error', message: 'Invalid upload token' });
+    }
+
+    logger.info(`[/s3/multipart/sign-part] Request for key: ${key}, part: ${partNumber}`);
+    const url = await s3Service.getPresignedUrlForPart(key, uploadId, partNumber);
+
+    res.json({
+      status: 'success',
+      data: { url } // Return the presigned URL for the part
+    });
+  } catch (error) {
+    logger.error('[/s3/multipart/sign-part] Error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to sign part URL' });
+  }
+});
+
+// 3. Complete Multipart Upload
+router.post('/s3/multipart/complete', async (req: Request<{}, {}, CompleteMultipartBody>, res: Response) => {
+  try {
+    const { key, uploadId, parts, metadata } = req.body;
+    const token = metadata?.token; // Extract token
+
+    if (!key || !uploadId || !parts || !token) {
+      logger.error('[/s3/multipart/complete] Missing key, uploadId, parts, or token');
+      return res.status(400).json({ status: 'error', message: 'Missing required fields (key, uploadId, parts, token)' });
+    }
+
+    // Validate token and get project/client info
+    const uploadLink = await prisma.uploadLink.findUnique({
+      where: { token },
+      include: { project: { include: { client: true } } }
+    });
+
+    if (!uploadLink) {
+      logger.error(`[/s3/multipart/complete] Invalid token: ${token}`);
+      return res.status(403).json({ status: 'error', message: 'Invalid upload token' });
+    }
+
+    logger.info(`[/s3/multipart/complete] Request for key: ${key}, parts: ${parts.length}`);
+
+    // Complete the upload in S3
+    const { location } = await s3Service.completeMultipartUpload(key, uploadId, parts);
+
+    // --- Database record creation after successful S3 completion ---
+    // Get file info from metadata (assuming Uppy sends it)
+    const filename = metadata?.name || key.split('/').pop() || 'unknown';
+    const mimeType = metadata?.type || s3Service.getContentTypeFromFileName(filename);
+    // We don't have the exact size here without another S3 call, use 0 or estimate if needed
+    const size = metadata?.size || 0;
+
+    // Create the database record
+    const uploadedFile = await prisma.uploadedFile.create({
+      data: {
+        name: filename,
+        path: key, // Store the S3 key as the path
+        size: size,
+        mimeType: mimeType,
+        hash: `s3-multipart-${uploadId}`, // Use uploadId or ETag if available from complete response
+        project: { connect: { id: uploadLink.projectId } },
+        status: 'completed',
+        completedAt: new Date(),
+        storage: 's3',
+        url: location // Store the final S3 URL
+      }
+    });
+
+    // Increment usage count
+    await prisma.uploadLink.update({
+      where: { id: uploadLink.id },
+      data: { usedCount: { increment: 1 } }
+    });
+
+    // Track completion
+    uploadTracker.completeUpload(`s3-multipart-${uploadId}`); // Use a consistent ID format
+
+    logger.info(`[/s3/multipart/complete] Successfully completed and recorded file: ${key}, DB ID: ${uploadedFile.id}`);
+
+    res.json({
+      status: 'success',
+      data: { location } // Return the final location URL
+    });
+
+  } catch (error) {
+    logger.error('[/s3/multipart/complete] Error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to complete multipart upload' });
+  }
+});
+
+// 4. Abort Multipart Upload
+router.post('/s3/multipart/abort', async (req: Request<{}, {}, AbortMultipartBody>, res: Response) => {
+  try {
+    const { key, uploadId, metadata } = req.body;
+    const token = metadata?.token; // Extract token
+
+    if (!key || !uploadId || !token) {
+      logger.error('[/s3/multipart/abort] Missing key, uploadId, or token');
+      return res.status(400).json({ status: 'error', message: 'Missing required fields (key, uploadId, token)' });
+    }
+
+    // Optional: Validate token
+    const uploadLink = await prisma.uploadLink.findUnique({ where: { token } });
+    if (!uploadLink) {
+      logger.error(`[/s3/multipart/abort] Invalid token: ${token}`);
+      // Don't necessarily fail the abort if token is invalid, just log
+    }
+
+    logger.info(`[/s3/multipart/abort] Request for key: ${key}`);
+    await s3Service.abortMultipartUpload(key, uploadId);
+
+    res.json({
+      status: 'success',
+      message: 'Multipart upload aborted successfully'
+    });
+  } catch (error) {
+    logger.error('[/s3/multipart/abort] Error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to abort multipart upload' });
+  }
+});
+// --- End NEW backend signing endpoints ---
+
+
+// Endpoint for Companion to notify backend after successful S3 upload
+router.post('/s3-callback', async (req: Request, res: Response) => {
 // router.post('/s3-complete/:token', ... );
 // router.post('/s3-abort/:token', ... );
 // --- End remove backend signing endpoints ---
