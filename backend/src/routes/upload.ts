@@ -1289,10 +1289,6 @@ router.post('/s3-callback/:token', async (req: Request, res: Response) => {
       });
     }
 
-    // Extract client and project information
-    const clientCode = uploadLink.project.client.code || 'default';
-    const projectName = uploadLink.project.name || 'default';
-    
     // Clean the filename by removing UUIDs
     // This regex matches UUIDs in formats like:
     // - f53671c2-f356-417a-b14e-1c1b6476d723-Protape-Ltd-t-a-DataStores-50879.pdf
