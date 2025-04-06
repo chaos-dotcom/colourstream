@@ -438,8 +438,9 @@ services:
       - "traefik.http.routers.minio-api.tls.certresolver=myresolver" # Add cert resolver
       - "traefik.http.routers.minio-api.service=minio-api"
       - "traefik.http.services.minio-api.loadbalancer.server.port=9000"
+      - "traefik.http.services.minio-api.loadbalancer.passHostHeader=true" # Ensure original Host header is passed to MinIO
       # Re-add CORS middleware with VERY PERMISSIVE settings for debugging
-      - "traefik.http.routers.minio-api.middlewares=minio-cors-headers@docker" 
+      - "traefik.http.routers.minio-api.middlewares=minio-cors-headers@docker"
       # Permissive CORS middleware definition for Traefik v3 (DEBUGGING ONLY)
       - "traefik.http.middlewares.minio-cors-headers.headers.accessControlAllowMethods=GET,OPTIONS,PUT,POST,DELETE,HEAD" 
       - "traefik.http.middlewares.minio-cors-headers.headers.accessControlAllowHeaders=*" # Allow ANY header
