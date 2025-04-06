@@ -1300,26 +1300,25 @@ router.post('/s3-callback/:token', async (req: Request, res: Response) => {
     const uuidRegex = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-)/gi;
     const cleanFilename = filename.replace(uuidRegex, '');
     
-    // Generate clean key with the standard structure
-    const cleanKey = s3Service.generateKey(clientCode, projectName, cleanFilename);
+    // *** Use the key received from the callback, not the regenerated one ***
+    const actualS3Key = key; 
     
-    // Generate the expected URL based on the clean key
+    // Generate the URL based on the actual key received from the upload process
     const s3Endpoint = process.env.S3_PUBLIC_ENDPOINT || 'https://s3.colourstream.johnrogerscolour.co.uk';
     const s3Bucket = s3Service.getBucket();
-    const fileUrl = `${s3Endpoint}/${s3Bucket}/${cleanKey}`;
+    const fileUrl = `${s3Endpoint}/${s3Bucket}/${actualS3Key}`; 
     
-    logger.info(`Recording S3 callback for key: ${cleanKey}, filename: ${cleanFilename}`);
+    logger.info(`Recording S3 callback. Received key: ${actualS3Key}, filename: ${cleanFilename}`);
     
-    // Record the upload in the database using the generated clean key
-    // We assume the upload happened correctly to the key provided in the presigned URL (/s3-params)
-    // which should match cleanKey. No rename needed here.
+    // Record the upload in the database using the key received from the callback
+    // This reflects the actual location in S3, even if it's incorrect (e.g., UUID prefix).
     const uploadedFile = await prisma.uploadedFile.create({
       data: {
         name: cleanFilename, // Use the cleaned filename
-        path: cleanKey, // Use the generated clean key
+        path: actualS3Key, // Use the key received from the callback
         size: size ? parseFloat(size.toString()) : 0,
         mimeType: mimeType || 'application/octet-stream', // Use provided mimeType or default
-        hash: hash || 'unknown',
+        hash: hash || 'unknown', // Use hash provided by callback if available
         project: {
           connect: { id: uploadLink.projectId }
         },
@@ -1338,8 +1337,8 @@ router.post('/s3-callback/:token', async (req: Request, res: Response) => {
 
     // Use the uploadTracker to mark the upload as complete
     // This will handle the Telegram notification and avoid duplicates
-    // Use an ID format based on the S3 key for better correlation
-    const trackerId = `s3-direct-${cleanKey.replace(/\//g, '-')}`; // Use S3 key based ID
+    // Use an ID format based on the actual S3 key for better correlation
+    const trackerId = `s3-direct-${actualS3Key.replace(/\//g, '-')}`; // Use actual S3 key based ID
     logger.info(`[/s3-callback] Marking upload ${trackerId} as complete via uploadTracker`);
     
     // Import the uploadTracker
