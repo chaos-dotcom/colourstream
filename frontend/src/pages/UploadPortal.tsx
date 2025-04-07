@@ -248,9 +248,9 @@ const UploadPortal: React.FC = () => {
           if (useTusd) {
             console.log('Configuring Uppy with Tus plugin');
             // --- Configure Tus plugin ---
-            // Use the public URL configured in Traefik (ensure HTTPS)
-            const tusdEndpoint = 'https://tusd.colourstream.johnrogerscolour.co.uk/files/files'; // Replace with your actual public Tusd URL
-            
+            // Use the public URL configured in Traefik (ensure HTTPS) - Pointing to root now
+            const tusdEndpoint = 'https://tusd.colourstream.johnrogerscolour.co.uk/'; // Removed /files/ path
+
             uppyInstance.use(Tus, {
               endpoint: tusdEndpoint,
               retryDelays: [0, 1000, 3000, 5000],
