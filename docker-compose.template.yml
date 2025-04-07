@@ -523,12 +523,29 @@ services:
     restart: "no"
 tusd:
      image: tusproject/tusd:latest
-     ports:
-       - "1080:1080" # Expose tusd port
+     container_name: colourstream-tusd # Added container name for clarity
+     restart: always # Added restart policy
+     expose: # Use expose instead of ports if only Traefik needs access
+       - 1080
      volumes:
        - ./tusd-data:/srv/tusd-data # Map a local directory for file storage
-     command: -base-path /files/ -upload-dir /srv/tusd-data
-     # Add other tusd flags as needed (e.g., -max-size)
+     command: -base-path /files/ -upload-dir /srv/tusd-data -max-size 640000000000 # Added max size matching frontend
+     networks: # Added network definition
+       - network
+     labels:
+       - "traefik.enable=true"
+       # HTTP Router (for redirection)
+       - "traefik.http.routers.tusd-http.rule=Host(`tusd.colourstream.${DOMAIN}`) && PathPrefix(`/files/`)"
+       - "traefik.http.routers.tusd-http.entrypoints=web"
+       - "traefik.http.routers.tusd-http.middlewares=redirect-to-https@docker" # Optional: Redirect HTTP to HTTPS
+       # HTTPS Router
+       - "traefik.http.routers.tusd-https.rule=Host(`tusd.colourstream.${DOMAIN}`) && PathPrefix(`/files/`)"
+       - "traefik.http.routers.tusd-https.entrypoints=websecure"
+       - "traefik.http.routers.tusd-https.tls=true"
+       - "traefik.http.routers.tusd-https.tls.certresolver=myresolver"
+       - "traefik.http.routers.tusd-https.service=tusd-service"
+       # Service Definition
+       - "traefik.http.services.tusd-service.loadbalancer.server.port=1080" # Tusd internal port
 
 
 volumes:
