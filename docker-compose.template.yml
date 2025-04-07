@@ -529,7 +529,7 @@ tusd:
        - 1080
      volumes:
        - ./tusd-data:/srv/tusd-data # Map a local directory for file storage
-     command: -base-path /files/ -upload-dir /srv/tusd-data -max-size 640000000000 # Added max size matching frontend
+     command: -port 1080 -base-path /files/ -upload-dir /srv/tusd-data -max-size 640000000000 # Added -port 1080 and max size
      networks: # Added network definition
        - network
      labels:
