@@ -542,12 +542,12 @@ tusd:
        - "640000000000"
        - "-behind-proxy"
        - "-disable-cors" # Disable tusd's internal CORS handling, Traefik handles it
-       # --- Temporarily disable hooks for debugging HEAD 404 ---
-       # - "-hooks-http" 
-       # - "http://backend:5001/api/upload/tus-hook" 
-       # - "-hooks-enabled-events" 
-       # - "post-finish" 
-       # --- End temporarily disabled hooks ---
+       # --- Re-enable hooks ---
+       - "-hooks-http" 
+       - "http://backend:5001/api/upload/tus-hook" 
+       - "-hooks-enabled-events" 
+       - "post-finish" 
+       # --- End re-enabled hooks ---
      networks: # Added network definition
        - network
      labels:
