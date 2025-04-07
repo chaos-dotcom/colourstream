@@ -17,20 +17,64 @@ echo "---------------------------------------" >&2
 # Tusd provides metadata via environment variables prefixed with TUS_META_
 # Keys are uppercased, and hyphens are replaced with underscores.
 UPLOAD_ID="$TUS_ID"
-TOKEN="$TUS_META_TOKEN"
-ORIGINAL_FILENAME="$TUS_META_FILENAME" # Still attempt to get filename from metadata
+# We will get TOKEN and ORIGINAL_FILENAME from the .info file
 
 # --- Validate Base Info ---
 if [ -z "$UPLOAD_ID" ]; then
   echo "Error: TUS_ID environment variable is missing." >&2
   exit 1 # Exit with error
 fi
-if [ -z "$TOKEN" ]; then
-  echo "Error: TUS_META_TOKEN environment variable is missing." >&2
-  # If token is missing, we cannot proceed
-  exit 1 # Exit with error
+
+# --- Read Token and Filename from .info file ---
+INFO_FILE_PATH="$TUSD_DATA_DIR/$UPLOAD_ID.info"
+echo "Reading info file: $INFO_FILE_PATH" >&2
+
+if [ ! -f "$INFO_FILE_PATH" ]; then
+    echo "Error: .info file not found at $INFO_FILE_PATH." >&2
+    exit 1 # Cannot proceed without the info file
 fi
-# If filename is missing from metadata, try to get it from the .info file as a fallback
+
+# Use jq to extract base64 encoded values, then decode
+# Token:
+ENCODED_TOKEN=$(jq -er '.MetaData.token' "$INFO_FILE_PATH")
+JQ_TOKEN_EXIT_CODE=$?
+if [ $JQ_TOKEN_EXIT_CODE -ne 0 ] || [ -z "$ENCODED_TOKEN" ]; then
+    echo "Error: Failed to parse token from .info file (jq exit code: $JQ_TOKEN_EXIT_CODE)." >&2
+    echo "Info file content:" >&2
+    cat "$INFO_FILE_PATH" >&2
+    exit 1
+fi
+TOKEN=$(echo "$ENCODED_TOKEN" | base64 -d)
+if [ -z "$TOKEN" ]; then
+    echo "Error: Decoded token is empty." >&2
+    exit 1
+fi
+echo "Successfully extracted token from .info file." >&2
+
+# Filename:
+# Try TUS_META_FILENAME first, fallback to .info file
+ORIGINAL_FILENAME="$TUS_META_FILENAME"
+if [ -z "$ORIGINAL_FILENAME" ]; then
+  echo "Warning: TUS_META_FILENAME env var is missing. Reading filename from .info file." >&2
+  ENCODED_FILENAME=$(jq -er '.MetaData.filename' "$INFO_FILE_PATH")
+  JQ_FILENAME_EXIT_CODE=$?
+  if [ $JQ_FILENAME_EXIT_CODE -ne 0 ] || [ -z "$ENCODED_FILENAME" ]; then
+      echo "Error: Failed to parse filename from .info file (jq exit code: $JQ_FILENAME_EXIT_CODE)." >&2
+      echo "Info file content:" >&2
+      cat "$INFO_FILE_PATH" >&2
+      exit 1 # Cannot proceed without a filename
+  fi
+  ORIGINAL_FILENAME=$(echo "$ENCODED_FILENAME" | base64 -d)
+  if [ -z "$ORIGINAL_FILENAME" ]; then
+      echo "Error: Decoded filename is empty." >&2
+      exit 1
+  fi
+  echo "Successfully extracted filename from .info file." >&2
+else
+  echo "Using filename from TUS_META_FILENAME env var." >&2
+fi
+
+# If filename is still empty after trying both methods, exit.
 if [ -z "$ORIGINAL_FILENAME" ]; then
   echo "Warning: TUS_META_FILENAME is missing. Attempting to read from .info file." >&2
   INFO_FILE_PATH="$TUSD_DATA_DIR/$UPLOAD_ID.info"
