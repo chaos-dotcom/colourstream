@@ -17,15 +17,15 @@ import {
 import { styled } from '@mui/material/styles';
 import { Dashboard } from '@uppy/react';
 import Uppy from '@uppy/core';
-// Use the standard AwsS3 plugin
-import AwsS3 from '@uppy/aws-s3'; 
+// Import Tus plugin instead of AwsS3
+import Tus from '@uppy/tus'; 
 import Dropbox from '@uppy/dropbox';
 import GoogleDrivePicker from '@uppy/google-drive-picker';
 import type { UppyFile } from '@uppy/core';
-// Import types needed for AwsS3 configuration
-import type { AwsS3Part } from '@uppy/aws-s3'; // Use type from aws-s3
+// Remove AwsS3 specific types
 // Base Uppy types (Meta, Body) removed as direct import caused issues
-import { v4 as uuidv4 } from 'uuid'; // Import uuid for fallback key generation
+// Keep uuid if needed elsewhere, otherwise remove
+import { v4 as uuidv4 } from 'uuid'; 
 import '@uppy/core/dist/style.min.css';
 import '@uppy/dashboard/dist/style.min.css';
 import { getUploadLink } from '../services/uploadService';
@@ -242,93 +242,34 @@ const UploadPortal: React.FC = () => {
             }
           });
 
-          // --- Configure AwsS3 plugin for direct uploads using temporary credentials ---
-          uppyInstance.use(AwsS3, {
-            // Force multipart for files > 5MB (S3 minimum part size)
-            // Add null check for file.size
-            shouldUseMultipart: (file) => (file.size ?? 0) > 5 * 1024 * 1024,
-            // Adjust concurrency based on network/backend capacity, not signing latency
-            limit: 20,
-            // Use a larger chunk size now that signing overhead is removed
-            getChunkSize: (file) => {
-              // 64 MB chunk size (S3 minimum is 5MB)
-              return 64 * 1024 * 1024;
-            },
-
-            // --- Use Temporary Credentials for Signing (Backend Endpoint Required) ---
-            getTemporarySecurityCredentials: async (options) => {
-              console.log('[AwsS3] Requesting temporary credentials...');
-              // Fetch credentials from your new backend endpoint
-              // The backend endpoint MUST return data in the format expected by Uppy:
-              // { credentials: { AccessKeyId, SecretAccessKey, SessionToken, Expiration }, bucket, region }
-              // Pass the upload token in a header or query param for authorization on the backend
-              try {
-                // Get the token from the file metadata if possible, or from component state/props
-                // This assumes 'token' is available in the scope. Adjust if needed.
-                const currentToken = token; // Using the token from useParams hook
-                if (!currentToken) {
-                  throw new Error('Upload token is not available for fetching credentials.');
-                }
-
-                const response = await fetch(`${API_URL}/upload/s3/sts-token`, {
-                  method: 'GET', // Or POST if you prefer
-                  headers: {
-                    // Add authorization using the upload token
-                    'Authorization': `Bearer ${currentToken}`
-                  },
-                  signal: options?.signal, // Pass the abort signal
-                });
-
-                if (!response.ok) {
-                  const errorText = await response.text();
-                  console.error('[AwsS3] Failed to fetch temporary credentials:', response.status, errorText);
-                  throw new Error(`Failed to fetch temporary credentials: ${response.status} ${errorText}`);
-                }
-
-                const data = await response.json();
-                console.log('[AwsS3] Received temporary credentials response:', data);
-
-                // Validate the structure of the response from the backend
-                if (!data || !data.data || !data.data.credentials || !data.data.bucket || !data.data.region) {
-                   console.error('[AwsS3] Invalid temporary credentials structure received from backend:', data);
-                   throw new Error('Invalid temporary credentials structure received from backend.');
-                }
-
-                // Return the data part which contains { credentials, bucket, region }
-                return data.data;
-              } catch (error) {
-                console.error('[AwsS3] Error in getTemporarySecurityCredentials:', error);
-                // Re-throw the error so Uppy knows the operation failed
-                throw error;
+          // --- Configure Tus plugin ---
+          // Ensure your tusd server is running and accessible at this endpoint
+          // Example assumes tusd is running locally on port 1080
+          const tusdEndpoint = 'http://localhost:1080/files/'; 
+          
+          uppyInstance.use(Tus, {
+            endpoint: tusdEndpoint,
+            retryDelays: [0, 1000, 3000, 5000], // Standard retry delays
+            chunkSize: 64 * 1024 * 1024, // Upload in 64MB chunks (adjust as needed)
+            resume: true, // Enable resumability
+            autoRetry: true, // Automatically retry failed chunks/requests
+            limit: 5, // Number of parallel uploads (adjust based on tusd server capacity)
+            // Tus automatically sends metadata like filename, filetype.
+            // We can add our custom metadata here.
+            // Note: Tus metadata values must be strings.
+            onBeforeRequest: (req) => {
+              const file = req.getFile();
+              if (file) {
+                // Ensure metadata values are strings
+                req.setHeader('Metadata', `filename ${btoa(encodeURIComponent(file.name))},filetype ${btoa(encodeURIComponent(file.type || 'application/octet-stream'))},clientCode ${btoa(encodeURIComponent(file.meta.clientCode || ''))},project ${btoa(encodeURIComponent(file.meta.project || ''))},token ${btoa(encodeURIComponent(file.meta.token || ''))}`);
               }
             },
-            // Add dummy implementations for multipart functions to satisfy TS types
-            // These should not be called when getTemporarySecurityCredentials is used.
-            createMultipartUpload: async (file) => {
-              console.error("Dummy createMultipartUpload called unexpectedly!");
-              // Must return shape: { uploadId: string, key: string }
-              // Generate a dummy key if needed, though this path is unlikely
-              const key = file.meta?.key || `dummy/${uuidv4()}/${file.name}`;
-              return { uploadId: uuidv4(), key: key };
-            },
-            listParts: async (file, { key, uploadId }) => {
-               console.error("Dummy listParts called unexpectedly!");
-               return []; // Return empty array as expected
-            },
-            abortMultipartUpload: async (file, { key, uploadId }) => {
-               console.error("Dummy abortMultipartUpload called unexpectedly!");
-               // No return value needed
-            },
-            completeMultipartUpload: async (file, { key, uploadId, parts }) => {
-               console.error("Dummy completeMultipartUpload called unexpectedly!");
-               // Must return shape: { location?: string }
-               // Construct a plausible dummy location if needed
-               const location = `${S3_PUBLIC_ENDPOINT}/${S3_BUCKET}/${key}`;
-               return { location };
-            },
           });
-
+          
           // --- Configure Companion-based providers (Dropbox, Google Drive) ---
+          // These might still be useful if you want cloud sources, but they upload via Companion,
+          // which would then likely need to upload to Tusd or S3 itself.
+          // Consider if these are still needed with the Tus approach.
           // These still require Companion
           console.log('Configuring Dropbox/Google Drive.');
           // Add Dropbox support if enabled
@@ -357,15 +298,16 @@ const UploadPortal: React.FC = () => {
                 console.error('[upload-success] No file information available.');
                 return;
               }
+              
+              // Tus response structure is different
+              // The response object contains the uploadURL provided by the tusd server
+              console.log(`[upload-success] Tus Upload succeeded: ${file.name}`);
+              console.log('[upload-success] Tus Response details:', response);
+              const uploadURL = response?.uploadURL;
+              console.log(`[upload-success] Tus Upload URL: ${uploadURL}`);
 
-              console.log(`[upload-success] Upload succeeded: ${file.name}`);
-              console.log('[upload-success] Response details:', response);
-
-              // When using AwsS3 with backend signing, the response from completeMultipartUpload contains the location
-              const finalLocation = response?.body?.location || 'unknown-location'; // Access location safely
-              console.log(`[upload-success] Final Location (from backend completeMultipartUpload): ${finalLocation}`);
-
-              // Store the final URL in the file metadata if needed
+              // You might want to store this uploadURL or trigger a backend notification
+              // indicating the upload to the tusd server is complete.
             });
             
             // Log overall progress (bytes uploaded / total)
@@ -686,7 +628,7 @@ const UploadPortal: React.FC = () => {
             fontSize: '19px',
             color: '#0b0c0c'
           }}>
-            Upload large video files with high-speed direct upload. {useS3 && '(Using S3 storage for native filenames)'}
+            Upload large video files with resumable high-speed upload.
           </Typography>
 
           <StyledDashboard>
@@ -709,7 +651,7 @@ const UploadPortal: React.FC = () => {
             <strong>© {new Date().getFullYear()} ColourStream</strong>
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Powered by <Link href="https://github.com/transloadit/uppy" target="_blank" rel="noopener noreferrer" underline="none" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>Uppy</Link> and <Link href="https://min.io/" target="_blank" rel="noopener noreferrer" underline="none" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>MinIO</Link>
+            Powered by <Link href="https://github.com/transloadit/uppy" target="_blank" rel="noopener noreferrer" underline="none" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>Uppy</Link> and <Link href="https://tus.io/" target="_blank" rel="noopener noreferrer" underline="none" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>Tus</Link>
           </Typography>
         </Container>
       </Box>
