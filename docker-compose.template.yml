@@ -146,7 +146,8 @@ services:
     volumes:
       - ./backend/prisma:/app/prisma
       - ./backend/src:/app/src
-      # - ./backend/uploads:/app/uploads # Keep uploads within the container unless specifically needed externally
+      # The ./backend/uploads mount is removed as it's redundant for the Tusd workflow.
+      # Files are processed directly within the shared ./tusd-data volume.
       - ./backend/logs:/app/logs
       - ./tusd-data:/tusd-data-external # Mount the shared tusd data volume
     labels:
