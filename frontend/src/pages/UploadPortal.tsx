@@ -203,13 +203,15 @@ const UploadPortal: React.FC = () => {
           // The API returns data in this format directly
           // We need to extract the fields we need from the response
           const data = response.data;
+          console.log('[UploadPortal] Raw API response data:', JSON.stringify(data, null, 2)); // Log the raw data
 
           // Create our UploadLinkResponse from the API data
           const uploadLinkResponse: UploadLinkResponse = {
-            clientCode: data.project?.client?.code || 'default',
-            projectName: data.project?.name || 'default',
+            clientCode: data.project?.client?.code || 'default', // Logged below
+            projectName: data.project?.name || 'default', // Logged below
             expiresAt: data.expiresAt
           };
+          console.log('[UploadPortal] Constructed uploadLinkResponse:', JSON.stringify(uploadLinkResponse, null, 2)); // Log the constructed object
 
           setProjectInfo(uploadLinkResponse);
 
