@@ -289,6 +289,13 @@ const UploadPortal: React.FC = () => {
              console.log('Configuring Uppy with AwsS3 plugin (direct to MinIO)');
              // --- Configure AwsS3 plugin for direct uploads using temporary credentials ---
              uppyInstance.use(AwsS3, {
++              // Add dummy getUploadParameters to satisfy types when shouldUseMultipart is true
++              getUploadParameters: (file) => {
++                console.warn('[AwsS3] Dummy getUploadParameters called unexpectedly!');
++                // This shouldn't be called for multipart, and non-multipart uses STS creds directly.
++                // Return dummy data matching the expected type: { method, url, fields?, headers? }
++                return { method: 'PUT', url: '', fields: {}, headers: {} };
++              },
                // Force multipart for files > 5MB (S3 minimum part size)
                shouldUseMultipart: (file) => (file.size ?? 0) > 5 * 1024 * 1024,
                // Adjust concurrency based on network/backend capacity
