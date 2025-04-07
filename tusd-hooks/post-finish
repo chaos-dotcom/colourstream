@@ -77,19 +77,36 @@ fi
 
 echo "Received API Response: $API_RESPONSE" >&2
 
-# --- Parse Client Code and Project Name from JSON (Fragile - using grep/sed) ---
-# Assumes JSON structure like: {"status":"success","data":{"project":{"name":"ProjectName","client":{"code":"ClientCode"}}}}
-CLIENT_CODE=$(echo "$API_RESPONSE" | grep -o '"client":{"code":"[^"]*' | sed 's/"client":{"code":"//')
-PROJECT_NAME=$(echo "$API_RESPONSE" | grep -o '"project":{"name":"[^"]*' | sed 's/"project":{"name":"//')
+# --- Parse Client Code and Project Name from JSON (Using jq) ---
+# Use jq to safely parse the JSON response.
+# -e flag makes jq exit with non-zero status if the key path doesn't exist or value is null/false
+# -r flag outputs raw strings without quotes
+CLIENT_CODE=$(echo "$API_RESPONSE" | jq -er '.data.project.client.code')
+JQ_CLIENT_EXIT_CODE=$?
+PROJECT_NAME=$(echo "$API_RESPONSE" | jq -er '.data.project.name')
+JQ_PROJECT_EXIT_CODE=$?
 
-# Validate extracted values
+# Validate extracted values based on jq exit codes
+if [ $JQ_CLIENT_EXIT_CODE -ne 0 ]; then
+  echo "Error: Failed to parse Client Code from API response using jq (jq exit code: $JQ_CLIENT_EXIT_CODE)." >&2
+  echo "API Response was: $API_RESPONSE" >&2
+  exit 1 # Exit with error
+fi
+if [ $JQ_PROJECT_EXIT_CODE -ne 0 ]; then
+  echo "Error: Failed to parse Project Name from API response using jq (jq exit code: $JQ_PROJECT_EXIT_CODE)." >&2
+  echo "API Response was: $API_RESPONSE" >&2
+  exit 1 # Exit with error
+fi
+
+# Double-check if values are empty even if jq succeeded (e.g., empty strings in JSON)
 if [ -z "$CLIENT_CODE" ]; then
   echo "Error: Failed to parse Client Code from API response." >&2
+  echo "Error: Parsed Client Code is empty." >&2
   echo "API Response was: $API_RESPONSE" >&2
   exit 1 # Exit with error
 fi
 if [ -z "$PROJECT_NAME" ]; then
-  echo "Error: Failed to parse Project Name from API response." >&2
+  echo "Error: Parsed Project Name is empty." >&2
   echo "API Response was: $API_RESPONSE" >&2
   exit 1 # Exit with error
 fi
