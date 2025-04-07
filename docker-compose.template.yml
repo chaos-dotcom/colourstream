@@ -533,7 +533,6 @@ tusd:
        -port 1080 
        -upload-dir /srv/tusd-data 
        -max-size 640000000000 
-       -public-url https://tusd.colourstream.${DOMAIN}/ 
        -cors-allow-origin https://upload.colourstream.${DOMAIN} 
        -cors-allow-credentials
      networks: # Added network definition
