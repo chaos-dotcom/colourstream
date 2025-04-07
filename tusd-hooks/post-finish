@@ -44,9 +44,11 @@ if [ $JQ_TOKEN_EXIT_CODE -ne 0 ] || [ -z "$ENCODED_TOKEN" ]; then
     cat "$INFO_FILE_PATH" >&2
     exit 1
 fi
-TOKEN=$(echo "$ENCODED_TOKEN" | base64 -d)
+# The token is NOT base64 encoded in the .info file
+TOKEN="$ENCODED_TOKEN"
+# TOKEN=$(echo "$ENCODED_TOKEN" | base64 -d) # REMOVED base64 decode
 if [ -z "$TOKEN" ]; then
-    echo "Error: Decoded token is empty." >&2
+    echo "Error: Parsed token is empty." >&2 # Updated error message
     exit 1
 fi
 echo "Successfully extracted token from .info file." >&2
@@ -64,9 +66,11 @@ if [ -z "$ORIGINAL_FILENAME" ]; then
       cat "$INFO_FILE_PATH" >&2
       exit 1 # Cannot proceed without a filename
   fi
-  ORIGINAL_FILENAME=$(echo "$ENCODED_FILENAME" | base64 -d)
+  # The filename is NOT base64 encoded in the .info file
+  ORIGINAL_FILENAME="$ENCODED_FILENAME"
+  # ORIGINAL_FILENAME=$(echo "$ENCODED_FILENAME" | base64 -d) # REMOVED base64 decode
   if [ -z "$ORIGINAL_FILENAME" ]; then
-      echo "Error: Decoded filename is empty." >&2
+      echo "Error: Parsed filename is empty." >&2 # Updated error message
       exit 1
   fi
   echo "Successfully extracted filename from .info file." >&2
