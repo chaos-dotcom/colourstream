@@ -184,6 +184,62 @@ const UploadPortal: React.FC = () => {
   const MIN_PROGRESS_UPDATE_INTERVAL = 3000; // Minimum ms between updates (e.g., 3 seconds)
   const PERCENTAGE_UPDATE_THRESHOLD = 5; // Send update every X percent increase (e.g., 5%)
 
+  // --- DELETE THE FOLLOWING UPPY SETUP BLOCK (it will be moved inside useEffect) ---
+  // Initialize Uppy with the token in metadata and correct generic types
+  /* 
+  const uppyInstance = new Uppy<CustomFileMeta, Record<string, never>>({ // Ensure generics match state type
+    id: 'clientUploader',
+    autoProceed: true, // Require user to click upload button
+    allowMultipleUploadBatches: true,
+    debug: true, // Enable debug for troubleshooting
+    restrictions: {
+      maxFileSize: 640000000000, // 640GB (ProRes files can be very large)
+      maxNumberOfFiles: 1000,
+      // Allow all file types - this service is for all files
+    },
+    // Set global metadata using clientCode - THIS NEEDS TO BE DONE INSIDE useEffect
+    // meta: {
+    //   clientCode: uploadLinkResponse.clientCode, // Store clientCode
+    //   project: uploadLinkResponse.projectName,
+    //   token: token
+    // },
+    locale: {
+      strings: {
+        // Customize the "Complete" text to the requested message
+        complete: `Your upload was completed and ${NAMEFORUPLOADCOMPLETION} has received it successfully 😌`
+      },
+      pluralize: (n) => {
+        if (n === 1) {
+          return 0;
+        }
+        return 1;
+      }
+    }
+  });
+
+  // --- Conditionally configure upload plugin based on query param ---
+  // THIS LOGIC ALSO NEEDS TO BE MOVED INSIDE useEffect
+  // if (useTusd) { ... } else { ... }
+
+  // --- Configure Companion-based providers (Dropbox, Google Drive) ---
+  // THIS LOGIC ALSO NEEDS TO BE MOVED INSIDE useEffect
+  // if (ENABLE_DROPBOX) { ... }
+  // if (ENABLE_GOOGLE_DRIVE) { ... }
+  
+  // --- Event listeners ---
+  // ALL EVENT LISTENERS NEED TO BE MOVED INSIDE useEffect
+  // uppyInstance.on('upload-success', ...);
+  // uppyInstance.on('progress', ...);
+  // uppyInstance.on('restriction-failed', ...);
+  // uppyInstance.on('upload-error', ...);
+  // uppyInstance.on('upload-progress', ...);
+  // uppyInstance.on('error', ...);
+  // uppyInstance.on('upload', ...);
+  // uppyInstance.on('file-added', ...);
+  */
+  // --- END OF BLOCK TO DELETE ---
+
+
   useEffect(() => {
     // Select a random accent color on component mount
     const randomColor = accentColors[Math.floor(Math.random() * accentColors.length)];
@@ -213,10 +269,11 @@ const UploadPortal: React.FC = () => {
 
           setProjectInfo(uploadLinkResponse);
 
-          // Initialize Uppy with the token in metadata and correct generic types
-          const uppyInstance = new Uppy<CustomFileMeta, Record<string, never>>({ // Ensure generics match state type
+          // --- START MOVED UPPY SETUP BLOCK ---
+          // Initialize Uppy INSIDE useEffect now
+          const uppyInstance = new Uppy<CustomFileMeta, Record<string, never>>({
             id: 'clientUploader',
-            autoProceed: true, // Require user to click upload button
+            autoProceed: true,
             allowMultipleUploadBatches: true,
             debug: true, // Enable debug for troubleshooting
             restrictions: {
@@ -552,11 +609,11 @@ const UploadPortal: React.FC = () => {
             console.error('[Uppy General Error]', error); 
           });
 
-          // This is a duplicate handler for 'upload-error' - ideally consolidate with the one above
-          // Fixing signature to match Uppy's expected type
+          // REMOVED duplicate upload-error handler
+          /*
           uppyInstance.on('upload-error', (file: UppyFile<CustomFileMeta, Record<string, never>> | undefined, error: Error, response?: Record<string, any>) => {
             if (file) {
-              console.error('File error:', file.name, error); // Log filename safely
+              console.error('File error:', file.name, error); 
               if (response) {
                 console.error('Upload error response:', response);
               } else {
@@ -598,9 +655,10 @@ const UploadPortal: React.FC = () => {
                   errorMessage += ' - Request format may be incorrect for MinIO.';
                 }
               }
-              setError(`Error uploading ${file.name}: ${errorMessage}`);
+              // setError(`Error uploading ${file.name}: ${errorMessage}`); // Logic handled by first upload-error handler
             }
           });
+          */
 
           // Add file validation to block .turbosort files
           uppyInstance.on('file-added', (file: UppyFile<CustomFileMeta, Record<string, never>>) => {
