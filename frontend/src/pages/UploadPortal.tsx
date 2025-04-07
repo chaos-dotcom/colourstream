@@ -216,3 +216,4 @@ const UploadPortal: React.FC = () => {
           setProjectInfo(uploadLinkResponse);
 
         } // End of if (response.status === 'success')
+      }
