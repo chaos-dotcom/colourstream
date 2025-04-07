@@ -108,9 +108,10 @@ echo "--- Attempting to parse API response using jq ---" >&2
 # Use jq to safely parse the JSON response.
 # -e flag makes jq exit with non-zero status if the key path doesn't exist or value is null/false
 # -r flag outputs raw strings without quotes
-CLIENT_CODE=$(echo "$API_RESPONSE" | jq -er '.data.project.client.code')
+# Corrected jq paths based on actual API response structure
+CLIENT_CODE=$(echo "$API_RESPONSE" | jq -er '.data.clientCode')
 JQ_CLIENT_EXIT_CODE=$?
-PROJECT_NAME=$(echo "$API_RESPONSE" | jq -er '.data.project.name')
+PROJECT_NAME=$(echo "$API_RESPONSE" | jq -er '.data.projectName')
 JQ_PROJECT_EXIT_CODE=$?
 
 # Validate extracted values based on jq exit codes
