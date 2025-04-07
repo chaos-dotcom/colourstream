@@ -17,14 +17,15 @@ import {
 import { styled } from '@mui/material/styles';
 import { Dashboard } from '@uppy/react';
 import Uppy from '@uppy/core';
-// Import Tus plugin instead of AwsS3
+// Import both Tus and AwsS3 plugins
 import Tus from '@uppy/tus'; 
+import AwsS3 from '@uppy/aws-s3'; // Re-add AwsS3
 import Dropbox from '@uppy/dropbox';
 import GoogleDrivePicker from '@uppy/google-drive-picker';
 import type { UppyFile } from '@uppy/core';
-// Remove AwsS3 specific types
+// Re-add AwsS3 specific types
+import type { AwsS3Part } from '@uppy/aws-s3'; // Use type from aws-s3
 // Base Uppy types (Meta, Body) removed as direct import caused issues
-// Keep uuid if needed elsewhere, otherwise remove
 import { v4 as uuidv4 } from 'uuid'; 
 import '@uppy/core/dist/style.min.css';
 import '@uppy/dashboard/dist/style.min.css';
@@ -176,7 +177,8 @@ const UploadPortal: React.FC = () => {
   const [uppy, setUppy] = useState<Uppy<CustomFileMeta, Record<string, never>> | null>(null); // Use correct Uppy generic type
   const [accentColor, setAccentColor] = useState('#1d70b8');
   // --- End moved state declarations ---
-  const useS3 = searchParams.get('S3') === 'true';
+  // Check for the 'tusd' query parameter to decide upload method
+  const useTusd = searchParams.get('tusd') === 'true'; 
   const lastProgressUpdateRef = React.useRef<number>(0); // Timestamp of the last update sent
   const lastPercentageUpdateRef = React.useRef<number>(0); // Last percentage milestone reported
   const MIN_PROGRESS_UPDATE_INTERVAL = 3000; // Minimum ms between updates (e.g., 3 seconds)
@@ -242,32 +244,93 @@ const UploadPortal: React.FC = () => {
             }
           });
 
-          // --- Configure Tus plugin ---
-          // Ensure your tusd server is running and accessible at this endpoint
-          // Example assumes tusd is running locally on port 1080
-          const tusdEndpoint = 'http://localhost:1080/files/'; 
-          
-          uppyInstance.use(Tus, {
-            endpoint: tusdEndpoint,
-            retryDelays: [0, 1000, 3000, 5000], // Standard retry delays
-            chunkSize: 64 * 1024 * 1024, // Upload in 64MB chunks (adjust as needed)
-            resume: true, // Enable resumability
-            autoRetry: true, // Automatically retry failed chunks/requests
-            limit: 5, // Number of parallel uploads (adjust based on tusd server capacity)
-            // Tus automatically sends metadata like filename, filetype.
-            // We can add our custom metadata here.
-            // Note: Tus metadata values must be strings.
-            onBeforeRequest: (req) => {
-              const file = req.getFile();
-              if (file) {
-                // Ensure metadata values are strings
-                req.setHeader('Metadata', `filename ${btoa(encodeURIComponent(file.name))},filetype ${btoa(encodeURIComponent(file.type || 'application/octet-stream'))},clientCode ${btoa(encodeURIComponent(file.meta.clientCode || ''))},project ${btoa(encodeURIComponent(file.meta.project || ''))},token ${btoa(encodeURIComponent(file.meta.token || ''))}`);
-              }
-            },
-          });
+          // --- Conditionally configure upload plugin based on query param ---
+          if (useTusd) {
+            console.log('Configuring Uppy with Tus plugin');
+            // --- Configure Tus plugin ---
+            const tusdEndpoint = 'http://localhost:1080/files/'; // Ensure this is correct
+            
+            uppyInstance.use(Tus, {
+              endpoint: tusdEndpoint,
+              retryDelays: [0, 1000, 3000, 5000],
+              chunkSize: 64 * 1024 * 1024, 
+              resume: true, 
+              autoRetry: true, 
+              limit: 5, 
+              onBeforeRequest: (req) => {
+                const file = req.getFile();
+                if (file) {
+                  req.setHeader('Metadata', `filename ${btoa(encodeURIComponent(file.name))},filetype ${btoa(encodeURIComponent(file.type || 'application/octet-stream'))},clientCode ${btoa(encodeURIComponent(file.meta.clientCode || ''))},project ${btoa(encodeURIComponent(file.meta.project || ''))},token ${btoa(encodeURIComponent(file.meta.token || ''))}`);
+                }
+              },
+            });
+          } else {
+             console.log('Configuring Uppy with AwsS3 plugin (direct to MinIO)');
+             // --- Configure AwsS3 plugin for direct uploads using temporary credentials ---
+             uppyInstance.use(AwsS3, {
+               // Force multipart for files > 5MB (S3 minimum part size)
+               shouldUseMultipart: (file) => (file.size ?? 0) > 5 * 1024 * 1024,
+               // Adjust concurrency based on network/backend capacity
+               limit: 20, // Keep the increased limit for S3
+               // Use a larger chunk size for S3
+               getChunkSize: (file) => {
+                 return 64 * 1024 * 1024;
+               },
+               // --- Use Temporary Credentials for Signing (Backend Endpoint Required) ---
+               getTemporarySecurityCredentials: async (options) => {
+                 console.log('[AwsS3] Requesting temporary credentials...');
+                 try {
+                   const currentToken = token; 
+                   if (!currentToken) {
+                     throw new Error('Upload token is not available for fetching credentials.');
+                   }
+                   const response = await fetch(`${API_URL}/upload/s3/sts-token`, {
+                     method: 'GET', 
+                     headers: { 'Authorization': `Bearer ${currentToken}` },
+                     signal: options?.signal, 
+                   });
+                   if (!response.ok) {
+                     const errorText = await response.text();
+                     console.error('[AwsS3] Failed to fetch temporary credentials:', response.status, errorText);
+                     throw new Error(`Failed to fetch temporary credentials: ${response.status} ${errorText}`);
+                   }
+                   const data = await response.json();
+                   console.log('[AwsS3] Received temporary credentials response:', data);
+                   if (!data || !data.data || !data.data.credentials || !data.data.bucket || !data.data.region) {
+                      console.error('[AwsS3] Invalid temporary credentials structure received from backend:', data);
+                      throw new Error('Invalid temporary credentials structure received from backend.');
+                   }
+                   return data.data;
+                 } catch (error) {
+                   console.error('[AwsS3] Error in getTemporarySecurityCredentials:', error);
+                   throw error;
+                 }
+               },
+               // Add dummy implementations for multipart functions to satisfy TS types
+               createMultipartUpload: async (file) => {
+                 console.error("Dummy createMultipartUpload called unexpectedly!");
+                 const key = file.meta?.key || `dummy/${uuidv4()}/${file.name}`;
+                 return { uploadId: uuidv4(), key: key };
+               },
+               listParts: async (file, { key, uploadId }) => {
+                  console.error("Dummy listParts called unexpectedly!");
+                  return []; 
+               },
+               abortMultipartUpload: async (file, { key, uploadId }) => {
+                  console.error("Dummy abortMultipartUpload called unexpectedly!");
+               },
+               completeMultipartUpload: async (file, { key, uploadId, parts }) => {
+                  console.error("Dummy completeMultipartUpload called unexpectedly!");
+                  // Construct a plausible dummy location based on MinIO setup if needed
+                  const location = `${S3_PUBLIC_ENDPOINT}/${S3_BUCKET}/${key}`; 
+                  return { location };
+               },
+             });
+          }
           
           // --- Configure Companion-based providers (Dropbox, Google Drive) ---
-          // These might still be useful if you want cloud sources, but they upload via Companion,
+          // These might still be useful if you want cloud sources, but they upload via Companion.
+          // Companion would need to be configured to upload to the correct target (Tusd or S3/MinIO).
           // which would then likely need to upload to Tusd or S3 itself.
           // Consider if these are still needed with the Tus approach.
           // These still require Companion
@@ -298,16 +361,29 @@ const UploadPortal: React.FC = () => {
                 console.error('[upload-success] No file information available.');
                 return;
               }
-              
-              // Tus response structure is different
-              // The response object contains the uploadURL provided by the tusd server
-              console.log(`[upload-success] Tus Upload succeeded: ${file.name}`);
-              console.log('[upload-success] Tus Response details:', response);
-              const uploadURL = response?.uploadURL;
-              console.log(`[upload-success] Tus Upload URL: ${uploadURL}`);
 
-              // You might want to store this uploadURL or trigger a backend notification
-              // indicating the upload to the tusd server is complete.
+              if (useTusd) {
+                // Tus response structure
+                console.log(`[upload-success] Tus Upload succeeded: ${file.name}`);
+                console.log('[upload-success] Tus Response details:', response);
+                const uploadURL = response?.uploadURL;
+                console.log(`[upload-success] Tus Upload URL: ${uploadURL}`);
+                // TODO: Potentially notify backend that Tus upload is complete
+              } else {
+                // AwsS3 response structure (using temporary credentials, Uppy handles completion)
+                // The 'response' object here might be limited after direct S3 upload.
+                // Uppy's internal state knows the upload is complete.
+                // We might not get a specific 'location' back in this exact event handler
+                // when using getTemporarySecurityCredentials, as Uppy manages the final S3 CompleteMultipartUpload call.
+                console.log(`[upload-success] S3 Upload succeeded: ${file.name}`);
+                console.log('[upload-success] S3 Response details (may be limited):', response);
+                // The final location is implicitly known based on the generated key (file.meta.key)
+                // which would have been determined during the credential fetching or upload process.
+                // If you need the exact final URL confirmed, you might need another mechanism
+                // or rely on the key generation logic.
+                const finalLocation = `${S3_PUBLIC_ENDPOINT}/${S3_BUCKET}/${file.meta.key || file.name}`; // Best guess
+                console.log(`[upload-success] S3 Final Location (estimated): ${finalLocation}`);
+              }
             });
             
             // Log overall progress (bytes uploaded / total)
@@ -628,7 +704,10 @@ const UploadPortal: React.FC = () => {
             fontSize: '19px',
             color: '#0b0c0c'
           }}>
-            Upload large video files with resumable high-speed upload.
+            {useTusd 
+              ? 'Upload large video files with highly resumable upload (Tus).' 
+              : 'Upload large video files with direct high-speed upload (S3/MinIO).'
+            }
           </Typography>
 
           <StyledDashboard>
@@ -651,7 +730,11 @@ const UploadPortal: React.FC = () => {
             <strong>© {new Date().getFullYear()} ColourStream</strong>
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Powered by <Link href="https://github.com/transloadit/uppy" target="_blank" rel="noopener noreferrer" underline="none" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>Uppy</Link> and <Link href="https://tus.io/" target="_blank" rel="noopener noreferrer" underline="none" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>Tus</Link>
+            Powered by <Link href="https://github.com/transloadit/uppy" target="_blank" rel="noopener noreferrer" underline="none" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>Uppy</Link> 
+            {useTusd 
+              ? <> and <Link href="https://tus.io/" target="_blank" rel="noopener noreferrer" underline="none" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>Tus</Link></>
+              : <> and <Link href="https://min.io/" target="_blank" rel="noopener noreferrer" underline="none" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>MinIO</Link></>
+            }
           </Typography>
         </Container>
       </Box>
