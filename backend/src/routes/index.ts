@@ -20,5 +20,6 @@ router.use('/omen', omenRoutes);
 router.use('/mirotalk', mirotalkRoutes);
 router.use('/ome-webhook', omeWebhookRoutes);
 router.use('/upload', uploadRoutes);
+router.use('/upload', tusHookRoutes); // Mount Tus hook routes under /upload
 
 export default router; 
