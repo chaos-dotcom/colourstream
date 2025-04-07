@@ -81,13 +81,13 @@ echo "Original Filename: $ORIGINAL_FILENAME" >&2
 BACKEND_API_URL="http://backend:5001/api/upload/upload-links/$TOKEN"
 echo "Fetching project info from backend: $BACKEND_API_URL" >&2
 
-# Use curl to get the data. Add error handling.
-# The -f flag makes curl fail silently on server errors (HTTP 4xx, 5xx)
-API_RESPONSE=$(curl -fsS "$BACKEND_API_URL")
-CURL_EXIT_CODE=$?
+# Use wget to get the data. Add error handling.
+# -q: quiet mode, -O-: output to stdout
+API_RESPONSE=$(wget -qO- "$BACKEND_API_URL")
+WGET_EXIT_CODE=$?
 
-if [ $CURL_EXIT_CODE -ne 0 ]; then
-    echo "Error: Failed to fetch data from backend API (curl exit code: $CURL_EXIT_CODE). URL: $BACKEND_API_URL" >&2
+if [ $WGET_EXIT_CODE -ne 0 ]; then
+    echo "Error: Failed to fetch data from backend API (wget exit code: $WGET_EXIT_CODE). URL: $BACKEND_API_URL" >&2
     exit 1 # Exit with error
 fi
 
