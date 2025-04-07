@@ -165,11 +165,15 @@ interface CustomFileMeta {
   [key: string]: any;
 }
 
+// Define the upload method choice here ('tus' or 's3')
+const UPLOAD_METHOD_CHOICE: 'tus' | 's3' = 'tus'; // <-- SET YOUR CHOICE HERE ('tus' or 's3')
+
 // Main upload portal for clients (standalone page not requiring authentication)
 const UploadPortal: React.FC = () => {
   const { token } = useParams<{ token: string }>();
   const location = useLocation();
-  const [searchParams] = useSearchParams();
+  // Removed useSearchParams as it's no longer needed for method choice
+  // const [searchParams] = useSearchParams();
   // --- Move state declarations outside useEffect ---
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -177,8 +181,8 @@ const UploadPortal: React.FC = () => {
   const [uppy, setUppy] = useState<Uppy<CustomFileMeta, Record<string, never>> | null>(null); // Use correct Uppy generic type
   const [accentColor, setAccentColor] = useState('#1d70b8');
   // --- End moved state declarations ---
-  // Check for the 'tusd' query parameter to decide upload method
-  const useTusd = searchParams.get('tusd') === 'true'; 
+  // Removed check for 'tusd' query parameter
+  // const useTusd = searchParams.get('tusd') === 'true';
   const lastProgressUpdateRef = React.useRef<number>(0); // Timestamp of the last update sent
   const lastPercentageUpdateRef = React.useRef<number>(0); // Last percentage milestone reported
   const MIN_PROGRESS_UPDATE_INTERVAL = 3000; // Minimum ms between updates (e.g., 3 seconds)
@@ -246,9 +250,9 @@ const UploadPortal: React.FC = () => {
             }
           });
 
-          // --- Conditionally configure upload plugin based on query param ---
-          if (useTusd) {
-            console.log('Configuring Uppy with Tus plugin');
+          // --- Configure upload plugin based on the UPLOAD_METHOD_CHOICE constant ---
+          if (UPLOAD_METHOD_CHOICE === 'tus') {
+            console.log('Configuring Uppy with Tus plugin (based on constant)');
             // --- Configure Tus plugin ---
             // Use the public URL configured in Traefik (ensure HTTPS) - Pointing to default /files/ path
             const tusdEndpoint = 'https://tusd.colourstream.johnrogerscolour.co.uk/files/'; // Re-add /files/ path
@@ -278,8 +282,8 @@ const UploadPortal: React.FC = () => {
                 }
               },
             });
-          } else {
-             console.log('Configuring Uppy with AwsS3 plugin (direct to MinIO)');
+          } else { // Default to S3 if not 'tus'
+             console.log('Configuring Uppy with AwsS3 plugin (based on constant)');
              // --- Configure AwsS3 plugin for direct uploads using temporary credentials ---
              // @ts-ignore - Ignore TS errors for AwsS3 options when using getTemporarySecurityCredentials without Companion.
              // We assume Uppy handles the multipart calls internally in this mode.
@@ -701,9 +705,9 @@ const UploadPortal: React.FC = () => {
             fontSize: '19px',
             color: '#0b0c0c'
           }}>
-            {useTusd 
-              ? 'Upload large video files with highly resumable upload.' 
-              : 'Upload large video files with direct high-speed upload .'
+            {UPLOAD_METHOD_CHOICE === 'tus'
+              ? 'Upload large video files with highly resumable upload.'
+              : 'Upload large video files with direct high-speed upload.'
             }
           </Typography>
 
@@ -727,8 +731,8 @@ const UploadPortal: React.FC = () => {
             <strong>© {new Date().getFullYear()} ColourStream</strong>
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Powered by <Link href="https://github.com/transloadit/uppy" target="_blank" rel="noopener noreferrer" underline="none" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>Uppy</Link> 
-            {useTusd 
+            Powered by <Link href="https://github.com/transloadit/uppy" target="_blank" rel="noopener noreferrer" underline="none" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>Uppy</Link>
+            {UPLOAD_METHOD_CHOICE === 'tus'
               ? <> and <Link href="https://tus.io/" target="_blank" rel="noopener noreferrer" underline="none" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>Tus</Link></>
               : <> and <Link href="https://min.io/" target="_blank" rel="noopener noreferrer" underline="none" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>MinIO</Link></>
             }
