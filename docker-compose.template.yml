@@ -554,8 +554,8 @@ tusd:
        - "traefik.http.routers.tusd-http.rule=Host(`tusd.colourstream.${DOMAIN}`)"
        - "traefik.http.routers.tusd-http.entrypoints=web"
        - "traefik.http.routers.tusd-http.middlewares=redirect-web-to-websecure@internal" # Corrected redirect middleware
-       # HTTPS Router - Rule updated to Host only
-       - "traefik.http.routers.tusd-https.rule=Host(`tusd.colourstream.${DOMAIN}`)"
+       # HTTPS Router - Rule updated to Host and specific PathPrefix
+       - "traefik.http.routers.tusd-https.rule=Host(`tusd.colourstream.${DOMAIN}`) && PathPrefix(`/files`)" # Added PathPrefix
        - "traefik.http.routers.tusd-https.entrypoints=websecure"
        - "traefik.http.routers.tusd-https.tls=true"
        - "traefik.http.routers.tusd-https.tls.certresolver=myresolver"
@@ -569,7 +569,7 @@ tusd:
        - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlAllowMethods=GET,POST,PATCH,HEAD,DELETE,OPTIONS" # Added DELETE
        - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlAllowHeaders=Authorization,Content-Type,Tus-Resumable,Upload-Length,Upload-Metadata,Upload-Offset,X-Requested-With,Origin"
        - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlExposeHeaders=Upload-Offset,Location,Upload-Length,Tus-Version,Tus-Resumable,Tus-Max-Size,Tus-Extension,Upload-Metadata"
-       - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlAllowOriginList=*" # Allow any origin for debugging
+       - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlAllowOriginList=https://upload.colourstream.${DOMAIN}" # Revert to specific origin
        - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlMaxAge=3600"
        - "traefik.http.middlewares.tusd-cors-headers.headers.addVaryHeader=true"
        - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlAllowCredentials=true"
