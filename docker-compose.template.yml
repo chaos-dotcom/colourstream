@@ -534,12 +534,12 @@ tusd:
        - network
      labels:
        - "traefik.enable=true"
-       # HTTP Router (for redirection)
-       - "traefik.http.routers.tusd-http.rule=Host(`tusd.colourstream.${DOMAIN}`) && PathPrefix(`/files/`)"
+       # HTTP Router (for redirection) - Rule updated to Host only
+       - "traefik.http.routers.tusd-http.rule=Host(`tusd.colourstream.${DOMAIN}`)"
        - "traefik.http.routers.tusd-http.entrypoints=web"
        - "traefik.http.routers.tusd-http.middlewares=redirect-web-to-websecure@internal" # Corrected redirect middleware
-       # HTTPS Router
-       - "traefik.http.routers.tusd-https.rule=Host(`tusd.colourstream.${DOMAIN}`) && PathPrefix(`/files/`)"
+       # HTTPS Router - Rule updated to Host only
+       - "traefik.http.routers.tusd-https.rule=Host(`tusd.colourstream.${DOMAIN}`)"
        - "traefik.http.routers.tusd-https.entrypoints=websecure"
        - "traefik.http.routers.tusd-https.tls=true"
        - "traefik.http.routers.tusd-https.tls.certresolver=myresolver"
