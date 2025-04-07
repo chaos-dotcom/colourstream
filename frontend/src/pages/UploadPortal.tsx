@@ -254,18 +254,22 @@ const UploadPortal: React.FC = () => {
             uppyInstance.use(Tus, {
               endpoint: tusdEndpoint,
               retryDelays: [0, 1000, 3000, 5000],
-              chunkSize: 64 * 1024 * 1024, 
+              chunkSize: 64 * 1024 * 1024,
               // resume: true, // Resume is enabled by default, remove explicit option
-              autoRetry: true, 
-              limit: 5, 
+              // autoRetry: true, // Removed: Not a valid Tus option, retry is handled by retryDelays
+              limit: 5,
               // Get file using ID from request
-              onBeforeRequest: (req) => { 
+              onBeforeRequest: (req) => {
                 // @ts-ignore - req.file exists but might not be in base HttpRequest type
                 const fileId = req.file?.id; 
                 if (fileId && uppyInstance) {
                   const file = uppyInstance.getFile(fileId);
                   if (file) {
-                     req.setHeader('Metadata', `filename ${btoa(encodeURIComponent(file.name))},filetype ${btoa(encodeURIComponent(file.type || 'application/octet-stream'))},clientCode ${btoa(encodeURIComponent(file.meta.clientCode || ''))},project ${btoa(encodeURIComponent(file.meta.project || ''))},token ${btoa(encodeURIComponent(file.meta.token || ''))}`);
+                     // Ensure metadata values are strings before encoding
+                     const clientCode = file.meta.clientCode || '';
+                     const project = file.meta.project || '';
+                     const tokenMeta = file.meta.token || '';
+                     req.setHeader('Metadata', `filename ${btoa(encodeURIComponent(file.name))},filetype ${btoa(encodeURIComponent(file.type || 'application/octet-stream'))},clientCode ${btoa(encodeURIComponent(clientCode))},project ${btoa(encodeURIComponent(project))},token ${btoa(encodeURIComponent(tokenMeta))}`);
                   }
                 }
               },
@@ -312,28 +316,11 @@ const UploadPortal: React.FC = () => {
                    throw error;
                  }
                },
-               // Add dummy implementations for multipart functions to satisfy TS types
-               createMultipartUpload: async (file): Promise<{ uploadId: string, key: string }> => { // Ensure return type matches expected Promise<UploadResult>
-                 console.error("Dummy createMultipartUpload called unexpectedly!");
-                 const key = file.meta?.key || `dummy/${uuidv4()}/${file.name}`; // Ensure key is a string
-                 return { uploadId: uuidv4(), key: key }; // Return string key
-               },
-               listParts: async (file, { key, uploadId }) => {
-                  console.error("Dummy listParts called unexpectedly!");
-                  return []; 
-               },
-               abortMultipartUpload: async (file, { key, uploadId }) => {
-                  console.error("Dummy abortMultipartUpload called unexpectedly!");
-               },
-               completeMultipartUpload: async (file, { key, uploadId, parts }) => {
-                  console.error("Dummy completeMultipartUpload called unexpectedly!");
-                  // Construct a plausible dummy location based on MinIO setup if needed
-                  const location = `${S3_PUBLIC_ENDPOINT}/${S3_BUCKET}/${key}`; 
-                  return { location };
-               },
+               // Removed dummy implementations for createMultipartUpload, listParts, abortMultipartUpload, completeMultipartUpload.
+               // Uppy handles these internally when using getTemporarySecurityCredentials.
+               // Providing them here conflicts with that mechanism and causes type errors.
              });
           }
-          
           // --- Configure Companion-based providers (Dropbox, Google Drive) ---
           // These might still be useful if you want cloud sources, but they upload via Companion.
           // Companion would need to be configured to upload to the correct target (Tusd or S3/MinIO).
