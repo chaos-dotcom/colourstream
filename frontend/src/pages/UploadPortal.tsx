@@ -363,7 +363,7 @@ const UploadPortal: React.FC = () => {
                 return;
               }
 
-              if (useTusd) {
+              if (UPLOAD_METHOD_CHOICE === 'tus') {
                 // Tus response structure
                 console.log(`[upload-success] Tus Upload succeeded: ${file.name}`);
                 console.log('[upload-success] Tus Response details:', response);
