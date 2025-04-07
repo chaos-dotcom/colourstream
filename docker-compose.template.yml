@@ -379,6 +379,8 @@ services:
       - "traefik.http.routers.mirotalk-ws.service=mirotalk-ws-service"
       - "traefik.http.services.mirotalk-ws-service.loadbalancer.server.port=3000"
       - "traefik.http.middlewares.sio.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.middlewares.sio.headers.customrequestheaders.Connection=Upgrade" # Add Connection header
+      - "traefik.http.middlewares.sio.headers.customrequestheaders.Upgrade=websocket" # Add Upgrade header
       - "traefik.http.routers.mirotalk-ws.middlewares=sio"
 
   minio:
