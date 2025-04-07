@@ -349,8 +349,9 @@ const UploadPortal: React.FC = () => {
                },
                completeMultipartUpload: async (file, { key, uploadId, parts }) => {
                   console.error("Dummy completeMultipartUpload called unexpectedly!");
-                  // Construct a plausible dummy location based on MinIO setup if needed
-                  const location = `${S3_PUBLIC_ENDPOINT}/${S3_BUCKET}/${key}`; 
+                  // Ensure key is treated as a string when constructing location
+                  const objectKey = typeof key === 'string' ? key : (file.meta?.key || `dummy/${uuidv4()}/${file.name}`);
+                  const location = `${S3_PUBLIC_ENDPOINT}/${S3_BUCKET}/${objectKey}`; 
                   return { location };
                },
              });
