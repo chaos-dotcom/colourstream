@@ -146,8 +146,9 @@ services:
     volumes:
       - ./backend/prisma:/app/prisma
       - ./backend/src:/app/src
-      - ./backend/uploads:/app/uploads
+      # - ./backend/uploads:/app/uploads # Keep uploads within the container unless specifically needed externally
       - ./backend/logs:/app/logs
+      - ./tusd-data:/tusd-data-external # Mount the shared tusd data volume
     labels:
       - "traefik.enable=true"
       # API routes with higher priority
@@ -537,7 +538,11 @@ tusd:
        - "-max-size"
        - "640000000000"
        - "-behind-proxy"
-       - "-disable-cors" # Disable tusd's internal CORS handling
+       - "-disable-cors" # Disable tusd's internal CORS handling, Traefik handles it
+       - "-hook-url" # Add the hook URL
+       - "http://backend:5001/api/upload/tus-hook" # Point to backend service and correct endpoint
+       - "-hook-mode" # Specify which hook(s) to send
+       - "post-finish" # Only send the post-finish hook
      networks: # Added network definition
        - network
      labels:

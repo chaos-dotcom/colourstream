@@ -19,7 +19,7 @@ router.use('/obs', obsRoutes);
 router.use('/omen', omenRoutes);
 router.use('/mirotalk', mirotalkRoutes);
 router.use('/ome-webhook', omeWebhookRoutes);
-router.use('/upload', uploadRoutes);
-router.use('/upload', tusHookRoutes); // Mount Tus hook routes under /upload
+router.use('/upload', uploadRoutes); // General upload routes (e.g., S3 STS)
+router.use('/upload', tusHookRoutes); // Mount Tus hook routes under /upload (e.g., /api/upload/tus-hook)
 
-export default router; 
+export default router;

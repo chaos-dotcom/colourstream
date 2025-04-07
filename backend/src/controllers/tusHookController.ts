@@ -48,6 +48,7 @@ export const handleTusPostFinishHook = async (req: Request, res: Response): Prom
     }
 
     const { ID: uploadId, MetaData: metadata, Storage: storage } = payload.Upload;
+    logger.debug(`Received storage path from Tusd: ${storage.Path}`); // Log the raw storage path
     const clientCode = metadata.clientCode;
     const projectName = metadata.project;
     const originalFilename = metadata.filename; // Get original filename from metadata
