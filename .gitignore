@@ -90,3 +90,6 @@ scripts/template_checker/reports/
 
 /backend/dist
 /backend/dist/*
+
+# Temporary Files
+/tus-data
