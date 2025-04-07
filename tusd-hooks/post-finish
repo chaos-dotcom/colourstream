@@ -71,31 +71,7 @@ if [ -z "$ORIGINAL_FILENAME" ]; then
 fi
 echo "Successfully extracted filename from .info file." >&2
 
-# If filename is still empty after trying both methods, exit. # This check is now redundant but harmless
-if [ -z "$ORIGINAL_FILENAME" ]; then
-  # This block should ideally not be reached anymore
-  echo "Error: Filename is unexpectedly empty after reading from .info file." >&2
-  exit 1
-  # Fallback logic removed as we now mandate reading from .info file
-  # echo "Warning: TUS_META_FILENAME is missing. Attempting to read from .info file." >&2
-  # INFO_FILE_PATH="$TUSD_DATA_DIR/$UPLOAD_ID.info"
-  # if [ -f "$INFO_FILE_PATH" ]; then
-      # Attempt to parse filename from JSON in .info file (fragile)
-      ORIGINAL_FILENAME=$(grep '"filename":' "$INFO_FILE_PATH" | sed -n 's/.*"filename":"\([^"]*\)".*/\1/p')
-      if [ -n "$ORIGINAL_FILENAME" ]; then
-          # Basic Base64 decoding (assuming it was base64 encoded)
-          ORIGINAL_FILENAME=$(echo "$ORIGINAL_FILENAME" | base64 -d)
-          echo "Successfully extracted filename from .info file: $ORIGINAL_FILENAME" >&2
-      else
-          echo "Error: Could not parse filename from .info file." >&2
-          exit 1 # Cannot proceed without a filename
-      fi
-  else
-      echo "Error: .info file not found at $INFO_FILE_PATH. Cannot determine filename." >&2
-      exit 1 # Cannot proceed without a filename
-  fi
-fi
-
+# The redundant check and fallback logic below has been removed.
 
 echo "Processing upload ID: $UPLOAD_ID" >&2
 echo "Using Token: $TOKEN" >&2
