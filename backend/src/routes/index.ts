@@ -7,6 +7,7 @@ import omenRoutes from './omen';
 import mirotalkRoutes from './mirotalk';
 import omeWebhookRoutes from './omeWebhook';
 import uploadRoutes from './upload';
+import tusHookRoutes from './tusHookRoutes'; // Import the new Tus hook routes
 
 
 const router = express.Router();
