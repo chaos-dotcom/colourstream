@@ -297,13 +297,13 @@ const UploadPortal: React.FC = () => {
 +                return { method: 'PUT', url: '', fields: {}, headers: {} };
 +              },
                // Force multipart for files > 5MB (S3 minimum part size)
-               shouldUseMultipart: (file) => (file.size ?? 0) > 5 * 1024 * 1024,
+               shouldUseMultipart: (file) => (file.size ?? 0) > 5 * 1024 * 1024, // <-- Added comma
                // Adjust concurrency based on network/backend capacity
-               limit: 20, // Keep the increased limit for S3
+               limit: 20, // <-- Added comma
                // Use a larger chunk size for S3
                getChunkSize: (file) => {
                  return 64 * 1024 * 1024;
-               },
+               }, // <-- Added comma
                // --- Use Temporary Credentials for Signing (Backend Endpoint Required) ---
                getTemporarySecurityCredentials: async (options) => {
                  console.log('[AwsS3] Requesting temporary credentials...');
@@ -333,27 +333,27 @@ const UploadPortal: React.FC = () => {
                    console.error('[AwsS3] Error in getTemporarySecurityCredentials:', error);
                    throw error;
                  }
-               },
+               }, // <-- Added comma
                // Add dummy implementations for multipart functions to satisfy TS types
                createMultipartUpload: async (file): Promise<{ uploadId: string, key: string }> => { // Ensure return type matches expected Promise<UploadResult>
                  console.error("Dummy createMultipartUpload called unexpectedly!");
                  const key = file.meta?.key || `dummy/${uuidv4()}/${file.name}`; // Ensure key is a string
                  return { uploadId: uuidv4(), key: key }; // Return string key
-               },
+               }, // <-- Added comma
                // Add dummy signPart
                signPart: async (file, partData): Promise<{ url: string }> => {
                  console.error("Dummy signPart called unexpectedly!");
                  // Must return shape: { url: string }
                  // This URL won't actually be used by Uppy in this config, but needs to exist for types
                  return { url: `${S3_PUBLIC_ENDPOINT}/${S3_BUCKET}/${file.meta.key}?partNumber=${partData.partNumber}&uploadId=${partData.uploadId}` };
-               },
+               }, // <-- Added comma
                listParts: async (file, { key, uploadId }) => {
                   console.error("Dummy listParts called unexpectedly!");
                   return []; 
-               },
+               }, // <-- Added comma
                abortMultipartUpload: async (file, { key, uploadId }) => {
                   console.error("Dummy abortMultipartUpload called unexpectedly!");
-               },
+               }, // <-- Added comma
                completeMultipartUpload: async (file, { key, uploadId, parts }) => {
                   console.error("Dummy completeMultipartUpload called unexpectedly!");
                   // Ensure key is treated as a string when constructing location
