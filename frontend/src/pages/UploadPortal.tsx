@@ -260,10 +260,11 @@ const UploadPortal: React.FC = () => {
               // resume: true, // Resume is enabled by default, remove explicit option
               // autoRetry: true, // Removed: Not a valid Tus option, retry is handled by retryDelays
               limit: 5,
-              // Get file using ID from request
+              // Temporarily comment out onBeforeRequest for debugging 404s
+              /*
               onBeforeRequest: (req) => {
                 // @ts-ignore - req.file exists but might not be in base HttpRequest type
-                const fileId = req.file?.id; 
+                const fileId = req.file?.id;
                 if (fileId && uppyInstance) {
                   const file = uppyInstance.getFile(fileId);
                   if (file) {
@@ -276,6 +277,7 @@ const UploadPortal: React.FC = () => {
                   }
                 }
               },
+              */
             });
           } else {
              console.log('Configuring Uppy with AwsS3 plugin (direct to MinIO)');
