@@ -53,36 +53,33 @@ if [ -z "$TOKEN" ]; then
 fi
 echo "Successfully extracted token from .info file." >&2
 
-# Filename:
-# Try TUS_META_FILENAME first, fallback to .info file
-ORIGINAL_FILENAME="$TUS_META_FILENAME"
-if [ -z "$ORIGINAL_FILENAME" ]; then
-  echo "Warning: TUS_META_FILENAME env var is missing. Reading filename from .info file." >&2
-  ENCODED_FILENAME=$(jq -er '.MetaData.filename' "$INFO_FILE_PATH")
-  JQ_FILENAME_EXIT_CODE=$?
-  if [ $JQ_FILENAME_EXIT_CODE -ne 0 ] || [ -z "$ENCODED_FILENAME" ]; then
-      echo "Error: Failed to parse filename from .info file (jq exit code: $JQ_FILENAME_EXIT_CODE)." >&2
-      echo "Info file content:" >&2
-      cat "$INFO_FILE_PATH" >&2
-      exit 1 # Cannot proceed without a filename
-  fi
-  # The filename is NOT base64 encoded in the .info file
-  ORIGINAL_FILENAME="$ENCODED_FILENAME"
-  # ORIGINAL_FILENAME=$(echo "$ENCODED_FILENAME" | base64 -d) # REMOVED base64 decode
-  if [ -z "$ORIGINAL_FILENAME" ]; then
-      echo "Error: Parsed filename is empty." >&2 # Updated error message
-      exit 1
-  fi
-  echo "Successfully extracted filename from .info file." >&2
-else
-  echo "Using filename from TUS_META_FILENAME env var." >&2
+# Filename: Always read from .info file
+echo "Reading filename from .info file." >&2
+ENCODED_FILENAME=$(jq -er '.MetaData.filename' "$INFO_FILE_PATH")
+JQ_FILENAME_EXIT_CODE=$?
+if [ $JQ_FILENAME_EXIT_CODE -ne 0 ] || [ -z "$ENCODED_FILENAME" ]; then
+    echo "Error: Failed to parse filename from .info file (jq exit code: $JQ_FILENAME_EXIT_CODE)." >&2
+    echo "Info file content:" >&2
+    cat "$INFO_FILE_PATH" >&2
+    exit 1 # Cannot proceed without a filename
 fi
-
-# If filename is still empty after trying both methods, exit.
+# The filename is NOT base64 encoded in the .info file
+ORIGINAL_FILENAME="$ENCODED_FILENAME"
 if [ -z "$ORIGINAL_FILENAME" ]; then
-  echo "Warning: TUS_META_FILENAME is missing. Attempting to read from .info file." >&2
-  INFO_FILE_PATH="$TUSD_DATA_DIR/$UPLOAD_ID.info"
-  if [ -f "$INFO_FILE_PATH" ]; then
+    echo "Error: Parsed filename from .info file is empty." >&2
+    exit 1
+fi
+echo "Successfully extracted filename from .info file." >&2
+
+# If filename is still empty after trying both methods, exit. # This check is now redundant but harmless
+if [ -z "$ORIGINAL_FILENAME" ]; then
+  # This block should ideally not be reached anymore
+  echo "Error: Filename is unexpectedly empty after reading from .info file." >&2
+  exit 1
+  # Fallback logic removed as we now mandate reading from .info file
+  # echo "Warning: TUS_META_FILENAME is missing. Attempting to read from .info file." >&2
+  # INFO_FILE_PATH="$TUSD_DATA_DIR/$UPLOAD_ID.info"
+  # if [ -f "$INFO_FILE_PATH" ]; then
       # Attempt to parse filename from JSON in .info file (fragile)
       ORIGINAL_FILENAME=$(grep '"filename":' "$INFO_FILE_PATH" | sed -n 's/.*"filename":"\([^"]*\)".*/\1/p')
       if [ -n "$ORIGINAL_FILENAME" ]; then
@@ -178,22 +175,30 @@ echo "Sanitized Filename: $SANITIZED_FILENAME" >&2
 SOURCE_FILE_PATH="$TUSD_DATA_DIR/$UPLOAD_ID"
 SOURCE_INFO_PATH="$TUSD_DATA_DIR/$UPLOAD_ID.info"
 DESTINATION_DIR="$TUSD_DATA_DIR/$SANITIZED_CLIENT_CODE/$SANITIZED_PROJECT_NAME"
+DESTINATION_METADATA_DIR="$DESTINATION_DIR/.metadata" # Subdirectory for info files
 DESTINATION_FILE_PATH="$DESTINATION_DIR/$SANITIZED_FILENAME"
-DESTINATION_INFO_PATH="$DESTINATION_DIR/$SANITIZED_FILENAME.info"
+# Keep original filename for the info file, but place it in the metadata subdir
+DESTINATION_INFO_PATH="$DESTINATION_METADATA_DIR/$SANITIZED_FILENAME.info"
 
 echo "Source File: $SOURCE_FILE_PATH" >&2
 echo "Source Info: $SOURCE_INFO_PATH" >&2
 echo "Destination Dir: $DESTINATION_DIR" >&2
+echo "Destination Metadata Dir: $DESTINATION_METADATA_DIR" >&2
 echo "Destination File: $DESTINATION_FILE_PATH" >&2
 echo "Destination Info: $DESTINATION_INFO_PATH" >&2
 
-# --- Create Destination Directory ---
+# --- Create Destination Directories ---
 echo "Creating destination directory: $DESTINATION_DIR" >&2
 if ! mkdir -p "$DESTINATION_DIR"; then
   echo "Error: Failed to create destination directory '$DESTINATION_DIR'." >&2
   exit 1 # Exit with error
 fi
-echo "Destination directory created or already exists." >&2
+echo "Creating destination metadata directory: $DESTINATION_METADATA_DIR" >&2
+if ! mkdir -p "$DESTINATION_METADATA_DIR"; then
+  echo "Error: Failed to create destination metadata directory '$DESTINATION_METADATA_DIR'." >&2
+  exit 1 # Exit with error
+fi
+echo "Destination directories created or already exist." >&2
 
 # --- Move Files ---
 # Check if source file exists
