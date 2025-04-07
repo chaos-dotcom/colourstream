@@ -566,7 +566,7 @@ tusd:
        - "traefik.http.services.tusd-service.loadbalancer.server.port=1080" # Tusd internal port
        - "traefik.http.services.tusd-service.loadbalancer.server.scheme=http" # Explicitly set scheme
        # CORS Middleware Definition for Tusd (Re-added)
-       - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlAllowMethods=GET,POST,PATCH,HEAD,OPTIONS"
+       - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlAllowMethods=GET,POST,PATCH,HEAD,DELETE,OPTIONS" # Added DELETE
        - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlAllowHeaders=Authorization,Content-Type,Tus-Resumable,Upload-Length,Upload-Metadata,Upload-Offset,X-Requested-With,Origin"
        - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlExposeHeaders=Upload-Offset,Location,Upload-Length,Tus-Version,Tus-Resumable,Tus-Max-Size,Tus-Extension,Upload-Metadata"
        - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlAllowOriginList=https://upload.colourstream.${DOMAIN}" # Specific origin
