@@ -249,7 +249,7 @@ const UploadPortal: React.FC = () => {
             console.log('Configuring Uppy with Tus plugin');
             // --- Configure Tus plugin ---
             // Use the public URL configured in Traefik (ensure HTTPS)
-            const tusdEndpoint = 'https://tusd.colourstream.johnrogerscolour.co.uk/files/'; // Replace with your actual public Tusd URL
+            const tusdEndpoint = 'https://tusd.colourstream.johnrogerscolour.co.uk/files/files'; // Replace with your actual public Tusd URL
             
             uppyInstance.use(Tus, {
               endpoint: tusdEndpoint,
@@ -699,8 +699,8 @@ const UploadPortal: React.FC = () => {
             color: '#0b0c0c'
           }}>
             {useTusd 
-              ? 'Upload large video files with highly resumable upload (Tus).' 
-              : 'Upload large video files with direct high-speed upload (S3/MinIO).'
+              ? 'Upload large video files with highly resumable upload.' 
+              : 'Upload large video files with direct high-speed upload .'
             }
           </Typography>
 
