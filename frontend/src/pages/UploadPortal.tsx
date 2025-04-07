@@ -269,7 +269,8 @@ const UploadPortal: React.FC = () => {
                      const clientCode = file.meta.clientCode || '';
                      const project = file.meta.project || '';
                      const tokenMeta = file.meta.token || '';
-                     req.setHeader('Metadata', `filename ${btoa(encodeURIComponent(file.name))},filetype ${btoa(encodeURIComponent(file.type || 'application/octet-stream'))},clientCode ${btoa(encodeURIComponent(clientCode))},project ${btoa(encodeURIComponent(project))},token ${btoa(encodeURIComponent(tokenMeta))}`);
+                     // Ensure file.name is also treated as a string, providing an empty fallback
+                     req.setHeader('Metadata', `filename ${btoa(encodeURIComponent(file.name || ''))},filetype ${btoa(encodeURIComponent(file.type || 'application/octet-stream'))},clientCode ${btoa(encodeURIComponent(clientCode))},project ${btoa(encodeURIComponent(project))},token ${btoa(encodeURIComponent(tokenMeta))}`);
                   }
                 }
               },
