@@ -185,9 +185,12 @@ if ! mkdir -p "$DESTINATION_METADATA_DIR"; then
   exit 1 # Exit with error
 fi
 echo "Destination directories created or already exist." >&2
+echo "--- Finished creating directories ---" >&2
 
 # --- Move Files ---
+echo "--- Moving files ---" >&2
 # Check if source file exists
+echo "Checking for source file: $SOURCE_FILE_PATH" >&2
 if [ ! -f "$SOURCE_FILE_PATH" ]; then
     echo "Error: Source file '$SOURCE_FILE_PATH' not found." >&2
     exit 1 # Exit with error
