@@ -3,6 +3,8 @@
 
 # Exit immediately if a command exits with a non-zero status.
 set -e
+# Print each command before executing it (for debugging)
+set -x
 
 # --- Configuration ---
 # Base directory where tusd stores files INSIDE THE CONTAINER
@@ -79,10 +81,12 @@ echo "Original Filename: $ORIGINAL_FILENAME" >&2
 
 # --- Fetch Client/Project Info from Backend ---
 BACKEND_API_URL="http://backend:5001/api/upload/upload-links/$TOKEN"
-echo "Fetching project info from backend: $BACKEND_API_URL" >&2
+echo "--- Attempting to fetch project info from backend ---" >&2
+echo "URL: $BACKEND_API_URL" >&2
 
 # Use wget to get the data. Add error handling.
 # -q: quiet mode, -O-: output to stdout
+echo "Executing wget..." >&2
 API_RESPONSE=$(wget -qO- "$BACKEND_API_URL")
 WGET_EXIT_CODE=$?
 
@@ -95,10 +99,12 @@ if [ -z "$API_RESPONSE" ]; then
     echo "Error: Received empty response from backend API. URL: $BACKEND_API_URL" >&2
     exit 1 # Exit with error
 fi
+echo "--- wget finished (Exit Code: $WGET_EXIT_CODE) ---" >&2
 
 echo "Received API Response: $API_RESPONSE" >&2
 
 # --- Parse Client Code and Project Name from JSON (Using jq) ---
+echo "--- Attempting to parse API response using jq ---" >&2
 # Use jq to safely parse the JSON response.
 # -e flag makes jq exit with non-zero status if the key path doesn't exist or value is null/false
 # -r flag outputs raw strings without quotes
@@ -134,8 +140,10 @@ fi
 
 echo "Parsed Client Code: $CLIENT_CODE" >&2
 echo "Parsed Project Name: $PROJECT_NAME" >&2
+echo "--- Finished parsing API response ---" >&2
 
 # --- Sanitize Paths (Basic) ---
+echo "--- Sanitizing paths ---" >&2
 # Replace potentially problematic characters with underscores
 # A more robust solution might be needed depending on expected inputs
 SANITIZED_CLIENT_CODE=$(echo "$CLIENT_CODE" | sed 's/[^a-zA-Z0-9_-]/_/g')
@@ -162,8 +170,10 @@ echo "Destination Dir: $DESTINATION_DIR" >&2
 echo "Destination Metadata Dir: $DESTINATION_METADATA_DIR" >&2
 echo "Destination File: $DESTINATION_FILE_PATH" >&2
 echo "Destination Info: $DESTINATION_INFO_PATH" >&2
+echo "--- Finished defining paths ---" >&2
 
 # --- Create Destination Directories ---
+echo "--- Creating destination directories ---" >&2
 echo "Creating destination directory: $DESTINATION_DIR" >&2
 if ! mkdir -p "$DESTINATION_DIR"; then
   echo "Error: Failed to create destination directory '$DESTINATION_DIR'." >&2
@@ -182,20 +192,23 @@ if [ ! -f "$SOURCE_FILE_PATH" ]; then
     echo "Error: Source file '$SOURCE_FILE_PATH' not found." >&2
     exit 1 # Exit with error
 fi
+echo "Source file found." >&2
 
-echo "Moving data file..." >&2
+echo "Moving data file from $SOURCE_FILE_PATH to $DESTINATION_FILE_PATH ..." >&2
 if ! mv "$SOURCE_FILE_PATH" "$DESTINATION_FILE_PATH"; then
-  echo "Error: Failed to move data file '$SOURCE_FILE_PATH' to '$DESTINATION_FILE_PATH'." >&2
+  echo "Error: Failed to move data file." >&2
   exit 1 # Exit with error
 fi
 echo "Data file moved successfully." >&2
 
 # Check if source info file exists before moving (it should, but check anyway)
+echo "Checking for source info file: $SOURCE_INFO_PATH" >&2
 if [ -f "$SOURCE_INFO_PATH" ]; then
-    echo "Moving info file..." >&2
+    echo "Source info file found." >&2
+    echo "Moving info file from $SOURCE_INFO_PATH to $DESTINATION_INFO_PATH ..." >&2
     if ! mv "$SOURCE_INFO_PATH" "$DESTINATION_INFO_PATH"; then
       # Log warning but don't fail the hook if only info file move fails
-      echo "Warning: Failed to move info file '$SOURCE_INFO_PATH' to '$DESTINATION_INFO_PATH'." >&2
+      echo "Warning: Failed to move info file." >&2
     else
       echo "Info file moved successfully." >&2
     fi
