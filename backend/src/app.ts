@@ -9,7 +9,8 @@ const app = express();
 app.use(cors());
 
 // Add detailed request logging BEFORE body parsing to find large payloads
-app.use((req, res, next) => {
+// Prefix 'res' with '_' to indicate it's unused
+app.use((req, _res, next) => { 
   const contentLength = req.headers['content-length'];
   console.log(`--> Incoming Request: ${req.method} ${req.originalUrl || req.url} - Content-Length: ${contentLength || 'Not specified'}`);
   // Optionally add a warning for very large content lengths
