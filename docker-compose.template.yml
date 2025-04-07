@@ -542,9 +542,9 @@ tusd:
        - "640000000000"
        - "-behind-proxy"
        - "-disable-cors" # Disable tusd's internal CORS handling, Traefik handles it
-       - "-hook-url" # Add the hook URL
+       - "-hooks-http" # Correct flag for HTTP hook endpoint
        - "http://backend:5001/api/upload/tus-hook" # Point to backend service and correct endpoint
-       - "-hook-mode" # Specify which hook(s) to send
+       - "-hooks-enabled-events" # Correct flag to specify enabled hook events
        - "post-finish" # Only send the post-finish hook
      networks: # Added network definition
        - network
