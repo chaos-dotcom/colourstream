@@ -548,6 +548,7 @@ tusd:
        - "traefik.http.routers.tusd-https.middlewares=tusd-cors-headers@docker"
        # Service Definition
        - "traefik.http.services.tusd-service.loadbalancer.server.port=1080" # Tusd internal port
+       - "traefik.http.services.tusd-service.loadbalancer.server.scheme=http" # Explicitly set scheme
        # CORS Middleware Definition for Tusd
        - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlAllowMethods=GET,POST,PATCH,HEAD,OPTIONS"
        - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlAllowHeaders=Authorization,Content-Type,Tus-Resumable,Upload-Length,Upload-Metadata,Upload-Offset,X-Requested-With,Origin"
