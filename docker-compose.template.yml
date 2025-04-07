@@ -521,6 +521,15 @@ services:
     networks:
       - network
     restart: "no"
+tusd:
+     image: tusproject/tusd:latest
+     ports:
+       - "1080:1080" # Expose tusd port
+     volumes:
+       - ./tusd-data:/srv/tusd-data # Map a local directory for file storage
+     command: -base-path /files/ -upload-dir /srv/tusd-data
+     # Add other tusd flags as needed (e.g., -max-size)
+
 
 volumes:
   postgres_data:
