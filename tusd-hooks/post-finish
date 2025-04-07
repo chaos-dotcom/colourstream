@@ -17,32 +17,85 @@ echo "---------------------------------------" >&2
 # Tusd provides metadata via environment variables prefixed with TUS_META_
 # Keys are uppercased, and hyphens are replaced with underscores.
 UPLOAD_ID="$TUS_ID"
-CLIENT_CODE="$TUS_META_CLIENTCODE"
-PROJECT_NAME="$TUS_META_PROJECT"
-ORIGINAL_FILENAME="$TUS_META_FILENAME"
+TOKEN="$TUS_META_TOKEN"
+ORIGINAL_FILENAME="$TUS_META_FILENAME" # Still attempt to get filename from metadata
 
-# --- Validate Metadata ---
+# --- Validate Base Info ---
 if [ -z "$UPLOAD_ID" ]; then
   echo "Error: TUS_ID environment variable is missing." >&2
   exit 1 # Exit with error
 fi
-if [ -z "$CLIENT_CODE" ]; then
-  echo "Error: TUS_META_CLIENTCODE environment variable is missing." >&2
-  exit 0 # Exit successfully for Tusd, but log error
+if [ -z "$TOKEN" ]; then
+  echo "Error: TUS_META_TOKEN environment variable is missing." >&2
+  # If token is missing, we cannot proceed
+  exit 1 # Exit with error
 fi
-if [ -z "$PROJECT_NAME" ]; then
-  echo "Error: TUS_META_PROJECT environment variable is missing." >&2
-  exit 0 # Exit successfully for Tusd, but log error
-fi
+# If filename is missing from metadata, try to get it from the .info file as a fallback
 if [ -z "$ORIGINAL_FILENAME" ]; then
-  echo "Error: TUS_META_FILENAME environment variable is missing." >&2
-  exit 0 # Exit successfully for Tusd, but log error
+  echo "Warning: TUS_META_FILENAME is missing. Attempting to read from .info file." >&2
+  INFO_FILE_PATH="$TUSD_DATA_DIR/$UPLOAD_ID.info"
+  if [ -f "$INFO_FILE_PATH" ]; then
+      # Attempt to parse filename from JSON in .info file (fragile)
+      ORIGINAL_FILENAME=$(grep '"filename":' "$INFO_FILE_PATH" | sed -n 's/.*"filename":"\([^"]*\)".*/\1/p')
+      if [ -n "$ORIGINAL_FILENAME" ]; then
+          # Basic Base64 decoding (assuming it was base64 encoded)
+          ORIGINAL_FILENAME=$(echo "$ORIGINAL_FILENAME" | base64 -d)
+          echo "Successfully extracted filename from .info file: $ORIGINAL_FILENAME" >&2
+      else
+          echo "Error: Could not parse filename from .info file." >&2
+          exit 1 # Cannot proceed without a filename
+      fi
+  else
+      echo "Error: .info file not found at $INFO_FILE_PATH. Cannot determine filename." >&2
+      exit 1 # Cannot proceed without a filename
+  fi
 fi
 
+
 echo "Processing upload ID: $UPLOAD_ID" >&2
-echo "Client Code: $CLIENT_CODE" >&2
-echo "Project Name: $PROJECT_NAME" >&2
+echo "Using Token: $TOKEN" >&2
 echo "Original Filename: $ORIGINAL_FILENAME" >&2
+
+# --- Fetch Client/Project Info from Backend ---
+BACKEND_API_URL="http://backend:5001/api/upload/upload-links/$TOKEN"
+echo "Fetching project info from backend: $BACKEND_API_URL" >&2
+
+# Use curl to get the data. Add error handling.
+# The -f flag makes curl fail silently on server errors (HTTP 4xx, 5xx)
+API_RESPONSE=$(curl -fsS "$BACKEND_API_URL")
+CURL_EXIT_CODE=$?
+
+if [ $CURL_EXIT_CODE -ne 0 ]; then
+    echo "Error: Failed to fetch data from backend API (curl exit code: $CURL_EXIT_CODE). URL: $BACKEND_API_URL" >&2
+    exit 1 # Exit with error
+fi
+
+if [ -z "$API_RESPONSE" ]; then
+    echo "Error: Received empty response from backend API. URL: $BACKEND_API_URL" >&2
+    exit 1 # Exit with error
+fi
+
+echo "Received API Response: $API_RESPONSE" >&2
+
+# --- Parse Client Code and Project Name from JSON (Fragile - using grep/sed) ---
+# Assumes JSON structure like: {"status":"success","data":{"project":{"name":"ProjectName","client":{"code":"ClientCode"}}}}
+CLIENT_CODE=$(echo "$API_RESPONSE" | grep -o '"client":{"code":"[^"]*' | sed 's/"client":{"code":"//')
+PROJECT_NAME=$(echo "$API_RESPONSE" | grep -o '"project":{"name":"[^"]*' | sed 's/"project":{"name":"//')
+
+# Validate extracted values
+if [ -z "$CLIENT_CODE" ]; then
+  echo "Error: Failed to parse Client Code from API response." >&2
+  echo "API Response was: $API_RESPONSE" >&2
+  exit 1 # Exit with error
+fi
+if [ -z "$PROJECT_NAME" ]; then
+  echo "Error: Failed to parse Project Name from API response." >&2
+  echo "API Response was: $API_RESPONSE" >&2
+  exit 1 # Exit with error
+fi
+
+echo "Parsed Client Code: $CLIENT_CODE" >&2
+echo "Parsed Project Name: $PROJECT_NAME" >&2
 
 # --- Sanitize Paths (Basic) ---
 # Replace potentially problematic characters with underscores
