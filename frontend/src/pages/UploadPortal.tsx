@@ -256,7 +256,7 @@ const UploadPortal: React.FC = () => {
               retryDelays: [0, 1000, 3000, 5000],
               chunkSize: 64 * 1024 * 1024, 
               // resume: true, // Resume is enabled by default, remove explicit option
-              autoRetry: true, 
+              // autoRetry: true, // Auto retry is enabled by default, remove explicit option
               limit: 5, 
               // Get file using ID from request
               onBeforeRequest: (req) => { 
@@ -265,7 +265,22 @@ const UploadPortal: React.FC = () => {
                 if (fileId && uppyInstance) {
                   const file = uppyInstance.getFile(fileId);
                   if (file) {
-                     req.setHeader('Metadata', `filename ${btoa(encodeURIComponent(file.name))},filetype ${btoa(encodeURIComponent(file.type || 'application/octet-stream'))},clientCode ${btoa(encodeURIComponent(file.meta.clientCode || ''))},project ${btoa(encodeURIComponent(file.meta.project || ''))},token ${btoa(encodeURIComponent(file.meta.token || ''))}`);
+                    // Ensure all metadata parts are strings before encoding
+                    const filename = file.name || '';
+                    const filetype = file.type || 'application/octet-stream';
+                    const clientCode = file.meta?.clientCode || '';
+                    const project = file.meta?.project || '';
+                    const tokenMeta = file.meta?.token || ''; // Ensure token is also handled
+
+                    // Construct metadata string safely
+                    const metadataPairs = [
+                      `filename ${btoa(encodeURIComponent(filename))}`,
+                      `filetype ${btoa(encodeURIComponent(filetype))}`,
+                      `clientCode ${btoa(encodeURIComponent(clientCode))}`,
+                      `project ${btoa(encodeURIComponent(project))}`,
+                      `token ${btoa(encodeURIComponent(tokenMeta))}` // Add token to metadata
+                    ];
+                    req.setHeader('Metadata', metadataPairs.join(','));
                   }
                 }
               },
@@ -317,6 +332,13 @@ const UploadPortal: React.FC = () => {
                  console.error("Dummy createMultipartUpload called unexpectedly!");
                  const key = file.meta?.key || `dummy/${uuidv4()}/${file.name}`; // Ensure key is a string
                  return { uploadId: uuidv4(), key: key }; // Return string key
+               },
+               // Add dummy signPart
+               signPart: async (file, partData): Promise<{ url: string }> => {
+                 console.error("Dummy signPart called unexpectedly!");
+                 // Must return shape: { url: string }
+                 // This URL won't actually be used by Uppy in this config, but needs to exist for types
+                 return { url: `${S3_PUBLIC_ENDPOINT}/${S3_BUCKET}/${file.meta.key}?partNumber=${partData.partNumber}&uploadId=${partData.uploadId}` };
                },
                listParts: async (file, { key, uploadId }) => {
                   console.error("Dummy listParts called unexpectedly!");
