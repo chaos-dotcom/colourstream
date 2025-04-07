@@ -554,8 +554,8 @@ tusd:
        - "traefik.http.routers.tusd-http.rule=Host(`tusd.colourstream.${DOMAIN}`)"
        - "traefik.http.routers.tusd-http.entrypoints=web"
        - "traefik.http.routers.tusd-http.middlewares=redirect-web-to-websecure@internal" # Corrected redirect middleware
-       # HTTPS Router - Rule updated to Host and specific PathPrefix
-       - "traefik.http.routers.tusd-https.rule=Host(`tusd.colourstream.${DOMAIN}`) && PathPrefix(`/files`)" # Added PathPrefix
+       # HTTPS Router - Rule reverted to Host only, PathPrefix caused issues with OPTIONS requests
+       - "traefik.http.routers.tusd-https.rule=Host(`tusd.colourstream.${DOMAIN}`)"
        - "traefik.http.routers.tusd-https.entrypoints=websecure"
        - "traefik.http.routers.tusd-https.tls=true"
        - "traefik.http.routers.tusd-https.tls.certresolver=myresolver"
