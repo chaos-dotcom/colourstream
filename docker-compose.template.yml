@@ -535,6 +535,7 @@ tusd:
        -max-size 640000000000 
        -cors-allow-origin https://upload.colourstream.${DOMAIN} 
        -cors-allow-credentials
+       -behind-proxy # Add flag to respect proxy headers
      networks: # Added network definition
        - network
      labels:
