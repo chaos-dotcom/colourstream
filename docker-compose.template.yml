@@ -560,8 +560,8 @@ tusd:
        - "traefik.http.routers.tusd-https.tls=true"
        - "traefik.http.routers.tusd-https.tls.certresolver=myresolver"
        - "traefik.http.routers.tusd-https.service=tusd-service"
-       # Apply Middlewares: Add forwarded proto and CORS
-       - "traefik.http.routers.tusd-https.middlewares=tusd-forwarded-proto@docker,tusd-cors-headers@docker"
+       # Apply Middlewares: Swap order - CORS first, then forwarded proto
+       - "traefik.http.routers.tusd-https.middlewares=tusd-cors-headers@docker,tusd-forwarded-proto@docker"
        # Service Definition
        - "traefik.http.services.tusd-service.loadbalancer.server.port=1080" # Tusd internal port
        - "traefik.http.services.tusd-service.loadbalancer.server.scheme=http" # Explicitly set scheme
