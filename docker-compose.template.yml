@@ -529,7 +529,7 @@ tusd:
        - 1080
      volumes:
        - ./tusd-data:/srv/tusd-data # Map a local directory for file storage
-     command: -port 1080 -upload-dir /srv/tusd-data -max-size 640000000000 # Removed -base-path
+     command: -port 1080 -upload-dir /srv/tusd-data -max-size 640000000000 -public-url https://tusd.colourstream.${DOMAIN}/ # Re-added public URL pointing to root
      networks: # Added network definition
        - network
      labels:
