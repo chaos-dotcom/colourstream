@@ -544,19 +544,19 @@ tusd:
        - "traefik.http.routers.tusd-https.tls=true"
        - "traefik.http.routers.tusd-https.tls.certresolver=myresolver"
        - "traefik.http.routers.tusd-https.service=tusd-service"
-       # Apply Middlewares: Handle CORS only (Removed tusd-forwarded-proto)
-       - "traefik.http.routers.tusd-https.middlewares=tusd-cors-headers@docker"
+       # Apply Middlewares: None needed now, relying on tusd defaults
+       # - "traefik.http.routers.tusd-https.middlewares=tusd-cors-headers@docker" # Removed Traefik CORS middleware
        # Service Definition
        - "traefik.http.services.tusd-service.loadbalancer.server.port=1080" # Tusd internal port
        - "traefik.http.services.tusd-service.loadbalancer.server.scheme=http" # Explicitly set scheme
-       # CORS Middleware Definition for Tusd
-       - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlAllowMethods=GET,POST,PATCH,HEAD,OPTIONS"
-       - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlAllowHeaders=Authorization,Content-Type,Tus-Resumable,Upload-Length,Upload-Metadata,Upload-Offset,X-Requested-With,Origin"
-       - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlExposeHeaders=Upload-Offset,Location,Upload-Length,Tus-Version,Tus-Resumable,Tus-Max-Size,Tus-Extension,Upload-Metadata"
-       - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlAllowOriginList=https://upload.colourstream.${DOMAIN}" # Reverted to specific origin
-       - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlMaxAge=3600"
-       - "traefik.http.middlewares.tusd-cors-headers.headers.addVaryHeader=true"
-       - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlAllowCredentials=true"
+       # CORS Middleware Definition for Tusd (Removed - using tusd defaults)
+       # - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlAllowMethods=GET,POST,PATCH,HEAD,OPTIONS"
+       # - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlAllowHeaders=Authorization,Content-Type,Tus-Resumable,Upload-Length,Upload-Metadata,Upload-Offset,X-Requested-With,Origin"
+       # - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlExposeHeaders=Upload-Offset,Location,Upload-Length,Tus-Version,Tus-Resumable,Tus-Max-Size,Tus-Extension,Upload-Metadata"
+       # - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlAllowOriginList=https://upload.colourstream.${DOMAIN}"
+       # - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlMaxAge=3600"
+       # - "traefik.http.middlewares.tusd-cors-headers.headers.addVaryHeader=true"
+       # - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlAllowCredentials=true"
 
 
 volumes:
