@@ -255,13 +255,18 @@ const UploadPortal: React.FC = () => {
               endpoint: tusdEndpoint,
               retryDelays: [0, 1000, 3000, 5000],
               chunkSize: 64 * 1024 * 1024, 
-              resume: true, 
+              // resume: true, // Resume is enabled by default, remove explicit option
               autoRetry: true, 
               limit: 5, 
-              onBeforeRequest: (req) => {
-                const file = req.getFile();
-                if (file) {
-                  req.setHeader('Metadata', `filename ${btoa(encodeURIComponent(file.name))},filetype ${btoa(encodeURIComponent(file.type || 'application/octet-stream'))},clientCode ${btoa(encodeURIComponent(file.meta.clientCode || ''))},project ${btoa(encodeURIComponent(file.meta.project || ''))},token ${btoa(encodeURIComponent(file.meta.token || ''))}`);
+              // Get file using ID from request
+              onBeforeRequest: (req) => { 
+                // @ts-ignore - req.file exists but might not be in base HttpRequest type
+                const fileId = req.file?.id; 
+                if (fileId && uppyInstance) {
+                  const file = uppyInstance.getFile(fileId);
+                  if (file) {
+                     req.setHeader('Metadata', `filename ${btoa(encodeURIComponent(file.name))},filetype ${btoa(encodeURIComponent(file.type || 'application/octet-stream'))},clientCode ${btoa(encodeURIComponent(file.meta.clientCode || ''))},project ${btoa(encodeURIComponent(file.meta.project || ''))},token ${btoa(encodeURIComponent(file.meta.token || ''))}`);
+                  }
                 }
               },
             });
@@ -308,10 +313,10 @@ const UploadPortal: React.FC = () => {
                  }
                },
                // Add dummy implementations for multipart functions to satisfy TS types
-               createMultipartUpload: async (file) => {
+               createMultipartUpload: async (file): Promise<{ uploadId: string, key: string }> => { // Ensure return type matches expected Promise<UploadResult>
                  console.error("Dummy createMultipartUpload called unexpectedly!");
-                 const key = file.meta?.key || `dummy/${uuidv4()}/${file.name}`;
-                 return { uploadId: uuidv4(), key: key };
+                 const key = file.meta?.key || `dummy/${uuidv4()}/${file.name}`; // Ensure key is a string
+                 return { uploadId: uuidv4(), key: key }; // Return string key
                },
                listParts: async (file, { key, uploadId }) => {
                   console.error("Dummy listParts called unexpectedly!");
