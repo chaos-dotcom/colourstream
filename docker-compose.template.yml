@@ -529,13 +529,17 @@ tusd:
        - 1080
      volumes:
        - ./tusd-data:/srv/tusd-data # Map a local directory for file storage
-     command: > # Use > for multi-line command for readability
-       -port 1080 
-       -upload-dir /srv/tusd-data 
-       -max-size 640000000000 
-       -cors-allow-origin https://upload.colourstream.${DOMAIN} 
-       -cors-allow-credentials
-       -behind-proxy # Add flag to respect proxy headers
+     command: # Use YAML list format for command arguments
+       - "-port"
+       - "1080"
+       - "-upload-dir"
+       - "/srv/tusd-data"
+       - "-max-size"
+       - "640000000000"
+       - "-cors-allow-origin"
+       - "https://upload.colourstream.${DOMAIN}"
+       - "-cors-allow-credentials"
+       - "-behind-proxy"
      networks: # Added network definition
        - network
      labels:
