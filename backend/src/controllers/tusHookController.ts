@@ -34,7 +34,9 @@ interface TusdHookPayload {
 const TUSD_DATA_MOUNT_PATH = '/tusd-data-external'; // Must match the volume mount in docker-compose
 
 export const handleTusPostFinishHook = async (req: Request, res: Response): Promise<void> => {
-  logger.info('Received Tusd post-finish hook');
+  // This endpoint is no longer used with script hooks, but keep it for now
+  // or remove it entirely along with the route if preferred.
+  logger.info('Received Tusd post-finish hook (HTTP endpoint - likely unused)');
   logger.debug('Hook Body:', req.body);
 
   const payload = req.body as TusdHookPayload;
