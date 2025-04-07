@@ -132,11 +132,13 @@ const accentColors = [
 ];
 
 // Rainbow flag component - Ensure it's a valid React Functional Component
-const RainbowFlag: React.FC = () => (
-  <span role="img" aria-label="Rainbow flag" style={{ fontSize: '32px', marginRight: '8px' }}>
-    🏳️‍🌈
-  </span>
-);
+const RainbowFlag: React.FC = () => { // Use curly braces for explicit return
+  return (
+    <span role="img" aria-label="Rainbow flag" style={{ fontSize: '32px', marginRight: '8px' }}>
+      🏳️‍🌈
+    </span>
+  );
+};
 
 const StyledAppBar = styled(AppBar)(() => ({
   backgroundColor: '#0b0c0c',
