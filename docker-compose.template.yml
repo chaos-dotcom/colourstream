@@ -555,9 +555,9 @@ tusd:
        - "post-finish" # Only trigger the post-finish hook
        # --- End script hooks ---
        # --- Enable TLS for HTTP/2 ---
-       - "-tls-cert-file"
+       - "-tls-certificate"
        - "/etc/tusd/certs/cert.crt"
-       - "-tls-key-file"
+       - "-tls-key"
        - "/etc/tusd/certs/priv.key"
        # --- End TLS ---
      networks: # Added network definition
