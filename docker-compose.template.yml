@@ -528,7 +528,10 @@ services:
 tusd:
      image: tusproject/tusd:latest
      container_name: colourstream-tusd # Added container name for clarity
-     restart: always # Added restart policy
+     restart: always  # Added restart policy
+     sysctls:
+      - net.ipv4.tcp_wmem: '4096 4194304 4194304'
+      - net.ipv4.tcp_rmem: '4096 6291456 6291456' 
      expose: # Use expose instead of ports if only Traefik needs access
        - 1080
      volumes:
