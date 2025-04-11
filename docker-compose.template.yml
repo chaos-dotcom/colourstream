@@ -205,6 +205,9 @@ services:
       - "--entrypoints.websecure.transport.respondingTimeouts.readTimeout=600s"
       - "--entrypoints.websecure.transport.respondingTimeouts.writeTimeout=600s"
       - "--entrypoints.websecure.transport.respondingTimeouts.idleTimeout=600s"
+      # --- Enable HTTP/3 on websecure entrypoint ---
+      - "--entrypoints.websecure.http3"
+      # --- End HTTP/3 ---
       - "--certificatesresolvers.myresolver.acme.httpchallenge=true"
       - "--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web"
       - "--certificatesresolvers.myresolver.acme.email=${ADMIN_EMAIL}"
@@ -217,7 +220,8 @@ services:
       - "--serversTransport.forwardingTimeouts.idleConnTimeout=600s"
     ports:
       - "80:80"
-      - "443:443"
+      - "443:443/tcp" # Explicitly TCP
+      - "443:443/udp" # Add UDP for HTTP/3
       - "8090:8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
