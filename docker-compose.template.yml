@@ -537,8 +537,8 @@ tusd:
      volumes:
        - ./tusd-data:/srv/tusd-data # Map a local directory for file storage
        - ./tusd-hooks:/etc/tusd/hooks # Mount the hooks directory
-       - ./certs/certs/live.colourstream.${DOMAIN}.crt:/etc/tusd/certs/cert.crt:ro # Mount TLS cert
-       - ./certs/private/live.colourstream.${DOMAIN}.key:/etc/tusd/certs/priv.key:ro # Mount TLS key
+       - ./certs/certs/tusd.colourstream.${DOMAIN}.crt:/etc/tusd/certs/cert.crt:ro # Mount TLS cert
+       - ./certs/private/tusd.colourstream.${DOMAIN}.key:/etc/tusd/certs/priv.key:ro # Mount TLS key
      entrypoint: /usr/local/bin/tusd # Explicitly set the entrypoint
      command: # Use YAML list format for command arguments
        - "-port"
