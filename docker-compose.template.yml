@@ -537,8 +537,7 @@ tusd:
      volumes:
        - ./tusd-data:/srv/tusd-data # Map a local directory for file storage
        - ./tusd-hooks:/etc/tusd/hooks # Mount the hooks directory
-       - ./certs/certs/tusd.colourstream.${DOMAIN}.crt:/etc/tusd/certs/cert.crt:ro # Mount TLS cert
-       - ./certs/private/tusd.colourstream.${DOMAIN}.key:/etc/tusd/certs/priv.key:ro # Mount TLS key
+       # Removed TLS cert/key mounts as we'll use h2c
      entrypoint: /usr/local/bin/tusd # Explicitly set the entrypoint
      command: # Use YAML list format for command arguments
        - "-port"
@@ -555,12 +554,9 @@ tusd:
        - "-hooks-enabled-events"
        - "post-finish" # Only trigger the post-finish hook
        # --- End script hooks ---
-       # --- Enable TLS for HTTP/2 ---
-       - "-tls-certificate"
-       - "/etc/tusd/certs/cert.crt"
-       - "-tls-key"
-       - "/etc/tusd/certs/priv.key"
-       # --- End TLS ---
+       # --- Enable HTTP/2 Cleartext (h2c) ---
+       - "-enable-h2c"
+       # --- End h2c ---
      networks: # Added network definition
        - network
      labels:
@@ -580,8 +576,9 @@ tusd:
        - "traefik.http.routers.tusd-https.priority=200" # Add higher priority
        # Service Definition
        - "traefik.http.services.tusd-service.loadbalancer.server.port=1080" # Tusd internal port
-       - "traefik.http.services.tusd-service.loadbalancer.server.scheme=https" # Use HTTPS for Traefik <-> tusd connection (enables HTTP/2)
-       # Middleware to explicitly set X-Forwarded-Proto
+       - "traefik.http.services.tusd-service.loadbalancer.server.scheme=http" # Use HTTP for Traefik <-> tusd connection
+       - "traefik.http.services.tusd-service.loadbalancer.server.protocol=h2c" # Tell Traefik to use HTTP/2 Cleartext
+       # Middleware to explicitly set X-Forwarded-Proto (Still needed as client connects via HTTPS)
        - "traefik.http.middlewares.tusd-forwarded-proto.headers.customrequestheaders.X-Forwarded-Proto=https"
        # CORS Middleware Definition for Tusd (Re-added)
        - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlAllowMethods=GET,POST,PATCH,HEAD,DELETE,OPTIONS" # Added DELETE
