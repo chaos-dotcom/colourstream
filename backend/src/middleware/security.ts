@@ -19,7 +19,10 @@ export const generalLimiter = rateLimit({
                req.path.startsWith('/api/rooms/validate') ||
                req.path.startsWith('/api/obs/') ||
                req.path.startsWith('/api/upload/s3/') ||
+               req.path.startsWith('/api/upload/telegram/') ||
+                req.path.startsWith('/files') ||
                req.path.startsWith('/upload');
+
 
     }
 });
