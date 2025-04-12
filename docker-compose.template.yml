@@ -165,7 +165,7 @@ services:
       # Headers for regular API requests
       - "traefik.http.middlewares.backend-headers.headers.accesscontrolallowmethods=GET,OPTIONS,PUT,POST,DELETE"
       - "traefik.http.middlewares.backend-headers.headers.accesscontrolallowheaders=*"
-      - "traefik.http.middlewares.backend-headers.headers.accesscontrolalloworiginlist=https://live.colourstream.${DOMAIN},https://upload.colourstream.${DOMAIN},http://localhost:8000"
+      - "traefik.http.middlewares.backend-headers.headers.accesscontrolalloworiginlist=https://live.colourstream.${DOMAIN},https://upload.colourstream.${DOMAIN},https://tusd.colourstream.${DOMAIN},http://localhost:8000"
       - "traefik.http.middlewares.backend-headers.headers.accesscontrolmaxage=100"
       - "traefik.http.middlewares.backend-headers.headers.addvaryheader=true"
       - "traefik.http.middlewares.backend-headers.headers.accesscontrolallowcredentials=true"
