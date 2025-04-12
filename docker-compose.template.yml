@@ -580,7 +580,7 @@ tusd:
        - "traefik.http.routers.tusd-https.priority=200" # Add higher priority
        # Service Definition
        - "traefik.http.services.tusd-service.loadbalancer.server.port=1080" # Tusd internal port
-       - "traefik.http.services.tusd-service.loadbalancer.server.scheme=http" # Use HTTP for Traefik <-> tusd connection
+       - "traefik.http.services.tusd-service.loadbalancer.server.scheme=h2c" # Use H2C for Traefik <-> tusd connection (HTTP/2 Cleartext)
        # Middleware to explicitly set X-Forwarded-Proto (Still needed as client connects via HTTPS)
        - "traefik.http.middlewares.tusd-forwarded-proto.headers.customrequestheaders.X-Forwarded-Proto=https"
        # CORS Middleware Definition for Tusd (Re-added)
