@@ -4,7 +4,7 @@
 # Exit immediately if a command exits with a non-zero status.
 set -e
 # Print each command before executing it (for debugging)
-# set -x # Uncomment for detailed debugging if needed
+set -x # Enable detailed command execution logging
 
 # --- Configuration ---
 # URL of your backend's unified hook handler
