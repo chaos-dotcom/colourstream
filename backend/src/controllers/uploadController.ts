@@ -263,7 +263,7 @@ export const handleTusHookEvent = async (req: Request, res: Response): Promise<v
              uploadId // Pass uploadId to potentially edit the existing message
            );
            // Clean up message ID tracking in TelegramBot service
-           await telegramBot.deleteMessageId(uploadId);
+           await telegramBot.cleanupUploadMessage(uploadId); // Call the new public method
         }
         // Optional: Clean up any other state associated with the upload ID
         break;

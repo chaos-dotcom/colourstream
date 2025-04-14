@@ -107,6 +107,16 @@ export class TelegramBot {
   }
 
   /**
+   * Public method to clean up the stored message ID for a given upload.
+   * This is typically called after termination or successful completion handling.
+   */
+  public async cleanupUploadMessage(uploadId: string): Promise<boolean> {
+    console.log(`[TELEGRAM-DEBUG] Received request to clean up message ID for upload ${uploadId}`);
+    // Call the private method internally
+    return this.deleteMessageId(uploadId);
+  }
+
+  /**
    * Delete a stored message ID when it's no longer needed
    */
   private async deleteMessageId(uploadId: string): Promise<boolean> {
