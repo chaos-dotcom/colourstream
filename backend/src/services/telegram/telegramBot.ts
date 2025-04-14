@@ -196,28 +196,16 @@ export class TelegramBot {
             // Update the message ID for this upload if fallback succeeds
             if (uploadId && response.data.ok && response.data.result && response.data.result.message_id) {
               await this.storeMessageId(uploadId, response.data.result.message_id);
-            }
-          }
-        }
-      } else {
-        // Send new message
-        console.log(`[TELEGRAM-DEBUG] No existing message found for ${uploadId || 'unknown'}, sending new message`);
-        response = await axios.post(`${this.baseUrl}/sendMessage`, {
-          chat_id: chatId,
-            text: message,
-            parse_mode: 'HTML',
-          });
-          
-          // Update the message ID for this upload
-          if (uploadId && response.data.ok && response.data.result && response.data.result.message_id) {
-            await this.storeMessageId(uploadId, response.data.result.message_id);
-          }
-        }
-      } else {
-        // Send new message
-        console.log(`[TELEGRAM-DEBUG] No existing message found for ${uploadId || 'unknown'}, sending new message`);
-        response = await axios.post(`${this.baseUrl}/sendMessage`, {
-          chat_id: chatId,
+           }
+         }
+       }
+     } // End of the 'if (messageId)' block
+
+     // If no messageId existed OR editing failed and fell through, send a new message
+     if (!response) { // Check if 'response' is still undefined (meaning we need to send new)
+       console.log(`[TELEGRAM-DEBUG] No existing message found or edit failed for ${uploadId || 'unknown'}, sending new message`);
+       response = await axios.post(`${this.baseUrl}/sendMessage`, {
+         chat_id: chatId,
           text: message,
           parse_mode: 'HTML',
         });
@@ -225,14 +213,18 @@ export class TelegramBot {
         // Store the message ID if this is for a specific upload
         if (uploadId && response.data.ok && response.data.result && response.data.result.message_id) {
           await this.storeMessageId(uploadId, response.data.result.message_id);
-        }
-      }
-      
-      console.log('[TELEGRAM-DEBUG] Telegram API response:', JSON.stringify(response.data));
-      
-      return response.data.ok;
-    } catch (error: any) {
-      console.error('[TELEGRAM-DEBUG] Failed to send/edit Telegram message:', error.message);
+     } // This closing brace corresponds to the 'if (!response)' block above
+
+     console.log('[TELEGRAM-DEBUG] Telegram API response:', JSON.stringify(response.data));
+
+     // Store the message ID if a new message was successfully sent
+     if (!messageId && uploadId && response.data.ok && response.data.result && response.data.result.message_id) {
+         await this.storeMessageId(uploadId, response.data.result.message_id);
+     }
+
+     return response.data.ok;
+   } catch (error: any) {
+     console.error('[TELEGRAM-DEBUG] Failed to send/edit Telegram message:', error.message);
       logger.error('Failed to send/edit Telegram message:', error.message);
       
       // If all else fails, try sending a new message
