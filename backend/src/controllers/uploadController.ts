@@ -201,8 +201,9 @@ export const handleTusHookEvent = async (req: Request, res: Response): Promise<v
             }
 
             // Extract the required information
-            clientCode = uploadLink.project.client.code;
-            projectName = uploadLink.project.name;
+            // Use ?? undefined to convert potential null from Prisma to undefined
+            clientCode = uploadLink.project.client.code ?? undefined; // Convert null to undefined
+            projectName = uploadLink.project.name ?? undefined;      // Convert null to undefined
 
             if (!clientCode || !projectName) {
                 // This check might be redundant if the above checks pass, but good for safety
