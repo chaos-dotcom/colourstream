@@ -83,6 +83,7 @@ export const handleTusHookEvent = async (req: Request, res: Response): Promise<v
     // Construct paths (backend needs access to the tusd data volume)
     const infoFilePath = path.join(tusdDataDir, `${uploadId}.info`);
     const dataFilePath = path.join(tusdDataDir, uploadId); // Tusd usually names the data file just by ID
+    logger.info(`Data file path constructed: ${dataFilePath}`);
 
     // Read and parse the .info file (needed for most hooks)
     let infoData: TusInfoFile | null = null;

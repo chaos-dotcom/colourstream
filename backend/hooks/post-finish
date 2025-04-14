@@ -50,6 +50,7 @@ wget -O /dev/null \
      --header="Content-Type: application/json" \
      --post-data="$JSON_PAYLOAD" \
      "$BACKEND_HOOK_URL"
+     logger.info(`Notification sent to backend for upload ID: ${UPLOAD_ID}`);
 
 WGET_EXIT_CODE=$?
 if [ $WGET_EXIT_CODE -eq 0 ]; then
