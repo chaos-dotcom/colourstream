@@ -206,18 +206,28 @@ export class TelegramBot {
        console.log(`[TELEGRAM-DEBUG] No existing message found or edit failed for ${uploadId || 'unknown'}, sending new message`);
        response = await axios.post(`${this.baseUrl}/sendMessage`, {
          chat_id: chatId,
-          text: message,
-          parse_mode: 'HTML',
-        });
-        
-        // Store the message ID if this is for a specific upload
-        if (uploadId && response.data.ok && response.data.result && response.data.result.message_id) {
-          await this.storeMessageId(uploadId, response.data.result.message_id);
-     } // This closing brace corresponds to the 'if (!response)' block above
+         text: message, // Corrected syntax
+         parse_mode: 'HTML', // Corrected syntax
+       }); // Correctly close the axios data object
+
+       // Store the message ID if this is for a specific upload and the call was successful
+       if (uploadId && response.data.ok && response.data.result && response.data.result.message_id) {
+         await this.storeMessageId(uploadId, response.data.result.message_id);
+       }
+     } // This closing brace corresponds to the 'if (!response)' block
+
+     // Ensure response is defined before proceeding (it should be after the above block)
+     if (!response) {
+        // This should ideally not happen if the logic above is correct, but log an error if it does
+        logger.error(`[TELEGRAM-DEBUG] Critical error: Response object is unexpectedly undefined after attempting send/edit for upload ${uploadId || 'unknown'}`);
+        return false; // Cannot proceed without a response object
+     }
 
      console.log('[TELEGRAM-DEBUG] Telegram API response:', JSON.stringify(response.data));
 
-     // Store the message ID if a new message was successfully sent
+     // Store the message ID *again* if it was a *new* message (messageId was null initially)
+     // This might be slightly redundant if the store inside the `if (!response)` block worked,
+     // but ensures it's stored if the initial edit failed and the fallback send worked.
      if (!messageId && uploadId && response.data.ok && response.data.result && response.data.result.message_id) {
          await this.storeMessageId(uploadId, response.data.result.message_id);
      }
