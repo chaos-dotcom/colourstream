@@ -23,8 +23,9 @@ echo "[Tus Hook - post-finish] JSON Payload: $JSON_PAYLOAD" >&2
 
 # Send notification to backend
 echo "[Tus Hook - post-finish] Sending notification to backend with wget (waiting for response): $BACKEND_HOOK_URL for Upload ID: $UPLOAD_ID" >&2
+echo "[Tus Hook - post-finish] JSON Payload: $JSON_PAYLOAD" >&2
 
-RESPONSE=$(wget -O - \
+RESPONSE=$(wget -O - --timeout=10 \
      --header="Content-Type: application/json" \
      --post-data="$JSON_PAYLOAD" \
      "$BACKEND_HOOK_URL" 2>&1)
