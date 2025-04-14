@@ -1,68 +1,43 @@
-#!/bin/sh
-# Tusd post-finish hook: Notify backend's unified hook endpoint
+#!/bin/bash
 
-# Exit immediately if a command exits with a non-zero status.
-set -e
-# Print each command before executing it (for debugging)
-set -x # Enable detailed command execution logging
+# Add debug logging
+echo "[Tus Hook - post-finish] Starting post-finish hook" >&2
+echo "[Tus Hook - post-finish] BACKEND_HOOK_URL: $BACKEND_HOOK_URL" >&2
+echo "[Tus Hook - post-finish] UPLOAD_ID: $UPLOAD_ID" >&2
 
-# --- Configuration ---
-# URL of your backend's unified hook handler
-BACKEND_HOOK_URL="http://backend:5001/api/upload/hook-event"
+# --- Send Data to Backend API (Run SYNCHRONOUSLY - wait for backend to move file) ---
+echo "[Tus Hook - post-finish] Preparing JSON payload" >&2
 
-# --- Extract Tusd Environment Variables ---
-UPLOAD_ID="$TUS_ID"
-UPLOAD_SIZE="${TUS_SIZE:-0}" # Default to 0 if not set
-UPLOAD_OFFSET="${TUS_OFFSET:-0}" # Default to 0 if not set
-
-# --- Basic Validation ---
-if [ -z "$UPLOAD_ID" ]; then
-  echo "[Tus Hook - post-finish] Error: TUS_ID environment variable is missing." >&2
-  exit 1 # Exit with error
-fi
-
-# Optional: Check if offset matches size (basic completion check)
-if [ "$UPLOAD_OFFSET" -ne "$UPLOAD_SIZE" ]; then
-    echo "[Tus Hook - post-finish] Warning: Offset ($UPLOAD_OFFSET) does not match Size ($UPLOAD_SIZE) for upload $UPLOAD_ID. Notifying backend anyway." >&2
-    # Decide if you want to exit here or let the backend handle the discrepancy
-    # exit 1
-fi
-
-# --- Prepare JSON Payload for the backend controller ---
-# The backend controller will read the .info file itself.
-# We just need to tell it which hook ran and the upload ID.
-# Include size/offset as they are readily available and might be useful for the backend.
 JSON_PAYLOAD=$(cat <<EOF
 {
-  "hookType": "post-finish",
-  "uploadId": "$UPLOAD_ID",
-  "size": $UPLOAD_SIZE,
-  "offset": $UPLOAD_OFFSET
+    "uploadId": "$UPLOAD_ID",
+    "fileName": "$UPLOAD_FILENAME",
+    "fileSize": "$UPLOAD_SIZE",
+    "fileType": "$UPLOAD_FILETYPE",
+    "uploadMetadata": "$UPLOAD_METADATA"
 }
 EOF
 )
 
-# --- Send Data to Backend API (Run SYNCHRONOUSLY - wait for backend to move file) --- 
-logger.info(`Sending notification to backend at: ${BACKEND_HOOK_URL} with payload: ${JSON.stringify(JSON_PAYLOAD)}`);
+echo "[Tus Hook - post-finish] JSON Payload: $JSON_PAYLOAD" >&2
+
+# Send notification to backend
 echo "[Tus Hook - post-finish] Sending notification to backend with wget (waiting for response): $BACKEND_HOOK_URL for Upload ID: $UPLOAD_ID" >&2
-    logger.info(`Sending notification to backend at: ${BACKEND_HOOK_URL} with payload: ${JSON.stringify(JSON_PAYLOAD)}`);
-# --post-data sends the JSON payload. --header sets the content type.
-wget -O /dev/null \
+
+RESPONSE=$(wget -O - \
      --header="Content-Type: application/json" \
      --post-data="$JSON_PAYLOAD" \
-     "$BACKEND_HOOK_URL"
-     logger.info(`Notification sent to backend for upload ID: ${UPLOAD_ID}`);
-     logger.info(`Response from backend: ${response}`);
-     logger.info(`Notification sent to backend for upload ID: ${UPLOAD_ID}`);
+     "$BACKEND_HOOK_URL" 2>&1)
 
 WGET_EXIT_CODE=$?
+
+echo "[Tus Hook - post-finish] wget exit code: $WGET_EXIT_CODE" >&2
+echo "[Tus Hook - post-finish] Backend response: $RESPONSE" >&2
+
 if [ $WGET_EXIT_CODE -eq 0 ]; then
-  echo "[Tus Hook - post-finish] Successfully notified backend for $UPLOAD_ID (file move/processing handled by backend)." >&2
-  exit 0 # Success
+    echo "[Tus Hook - post-finish] Notification sent successfully" >&2
+    exit 0
 else
-  # wget exit codes: https://www.gnu.org/software/wget/manual/wget.html#Exit-Status
-  # Common codes: 4: Network failure, 5: SSL verification failure, 6: Auth failure, 7: Protocol errors, 8: Server issued an error response (e.g., 4xx, 5xx).
-  echo "[Tus Hook - post-finish] Error: Backend notification/processing failed for $UPLOAD_ID. wget exit code: $WGET_EXIT_CODE" >&2
-  # Exit with the wget error code to signal failure to Tusd
-  exit $WGET_EXIT_CODE
+    echo "[Tus Hook - post-finish] Failed to send notification to backend" >&2
+    exit 1
 fi
