@@ -255,15 +255,14 @@ const UploadPortal: React.FC = () => {
             console.log('Configuring Uppy with Tus plugin (based on constant)');
             // --- Configure Tus plugin ---
             // Use the public URL configured in Traefik (ensure HTTPS) - Pointing to default /files/ path
-            const tusdEndpoint = 'https://tusd.colourstream.johnrogerscolour.co.uk/files/'; // Re-add /files/ path
+            const tusdEndpoint = 'https://tusd.colourstream.johnrogerscolour.co.uk:1080/files/'; // Re-add /files/ path
 
             uppyInstance.use(Tus, {
               endpoint: tusdEndpoint,
-              retryDelays: [0, 1000, 3000, 5000],
-              chunkSize: 64 * 1024 * 1024,
+              //retryDelays: [0, 1000, 3000, 5000],
+              // chunkSize: 64 * 1024 * 1024,/; // Removed: Not needed for Tus, handled internally and they suggest not to set it in docs 
               // resume: true, // Resume is enabled by default, remove explicit option
               // autoRetry: true, // Removed: Not a valid Tus option, retry is handled by retryDelays
-              limit: 5,
               // Re-enable onBeforeRequest to send metadata
               onBeforeRequest: (req) => {
                 // @ts-ignore - req.file exists but might not be in base HttpRequest type
