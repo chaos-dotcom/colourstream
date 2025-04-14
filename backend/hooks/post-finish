@@ -1,0 +1,86 @@
+#!/bin/sh
+
+# Tusd hook: post-finish
+# Executed after an upload is completed.
+# Reads metadata from Tusd environment variables, decodes it,
+# and sends it to a backend API endpoint.
+
+# --- Configuration ---
+# !!! IMPORTANT: Replace with the actual URL of your backend endpoint !!!
+# This endpoint should accept a POST request with the JSON payload defined below.
+BACKEND_API_URL="http://localhost:3001/api/upload/tus-complete" # Adjust hostname/port as needed
+
+# --- Helper function for base64 decoding ---
+# Handles potential differences in base64 command options across systems (Linux/macOS)
+decode_base64() {
+    # Try standard Linux 'base64 --decode'
+    echo "$1" | base64 --decode 2>/dev/null || \
+    # Fallback for macOS 'base64 -d'
+    echo "$1" | base64 -d 2>/dev/null || \
+    # If decoding fails, log an error and return the original string
+    (echo "Warning: Failed to decode base64 value '$1'" >&2 && echo "$1")
+}
+
+# --- Extract Tusd Environment Variables ---
+# See Tusd hook documentation for available variables: https://github.com/tus/tusd/blob/main/docs/hooks.md#available-environment-variables
+UPLOAD_ID="$TUS_ID"
+UPLOAD_SIZE="$TUS_SIZE"
+UPLOAD_OFFSET="$TUS_OFFSET" # Should equal UPLOAD_SIZE on post-finish
+
+# Extract and decode metadata (sent by Uppy in Upload-Metadata header)
+# Tusd provides metadata keys in uppercase with TUS_META_ prefix.
+FILENAME_ENCODED="$TUS_META_FILENAME"
+CLIENTCODE_ENCODED="$TUS_META_CLIENTCODE"
+PROJECT_ENCODED="$TUS_META_PROJECT"
+TOKEN_ENCODED="$TUS_META_TOKEN" # Include token for potential backend validation
+
+# Decode the metadata values
+FILENAME=$(decode_base64 "$FILENAME_ENCODED")
+CLIENTCODE=$(decode_base64 "$CLIENTCODE_ENCODED")
+PROJECTNAME=$(decode_base64 "$PROJECT_ENCODED")
+TOKEN=$(decode_base64 "$TOKEN_ENCODED")
+
+# --- Prepare JSON Payload ---
+# Construct the JSON payload to send to the backend.
+# Ensure values are properly quoted for JSON.
+JSON_PAYLOAD=$(cat <<EOF
+{
+  "id": "$UPLOAD_ID",
+  "size": $UPLOAD_SIZE,
+  "offset": $UPLOAD_OFFSET,
+  "isComplete": true,
+  "metadata": {
+    "filename": "$FILENAME",
+    "clientName": "$CLIENTCODE",
+    "projectName": "$PROJECTNAME",
+    "token": "$TOKEN"
+  }
+}
+EOF
+)
+
+# --- Send Data to Backend API ---
+echo "[Tusd post-finish hook] Triggered for upload ID: $UPLOAD_ID"
+echo "[Tusd post-finish hook] Sending completion notification to backend: $BACKEND_API_URL"
+# Uncomment the next line for detailed debugging if needed
+# echo "[Tusd post-finish hook] Payload: $JSON_PAYLOAD"
+
+# Use curl to send the POST request
+curl -f -X POST \
+     -H "Content-Type: application/json" \
+     -d "$JSON_PAYLOAD" \
+     "$BACKEND_API_URL"
+
+# Check curl exit status (-f makes curl fail silently on HTTP errors but return non-zero exit code)
+CURL_EXIT_CODE=$?
+if [ $CURL_EXIT_CODE -eq 0 ]; then
+  echo "[Tusd post-finish hook] Successfully notified backend for upload $UPLOAD_ID."
+else
+  # Log error to standard error so it might appear in Tusd logs
+  echo "[Tusd post-finish hook] Error: Failed to notify backend for upload $UPLOAD_ID. curl exit code: $CURL_EXIT_CODE" >&2
+  # Exit with the curl error code to signal failure to Tusd (optional, Tusd might ignore hook exit codes)
+  exit $CURL_EXIT_CODE
+fi
+
+# Exit with 0 to indicate success to tusd
+exit 0
