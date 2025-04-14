@@ -39,16 +39,18 @@ function decodeMetadataValue(encodedValue: string | undefined): string {
     return '';
   }
   try {
-    // Decode URI component first, then base64
-    return Buffer.from(decodeURIComponent(encodedValue), 'base64').toString('utf-8');
+    // Decode base64 first
+    const base64Decoded = Buffer.from(encodedValue, 'base64').toString('utf-8');
+    // Then decode URI component
+    return decodeURIComponent(base64Decoded);
   } catch (error) {
-    logger.warn(`Failed to decode metadata value: ${encodedValue}`, error);
-    // Fallback: try decoding without URI component (if frontend didn't encode it)
+    logger.warn(`Failed to decode metadata value (tried base64 then URI): ${encodedValue}`, error);
+    // Fallback: Maybe it was only base64 encoded? (Less likely with Uppy's default)
     try {
         return Buffer.from(encodedValue, 'base64').toString('utf-8');
     } catch (innerError) {
         logger.error(`Completely failed to decode metadata value: ${encodedValue}`, innerError);
-        return ''; // Return empty string on failure
+        return encodedValue; // Return original encoded value as last resort
     }
   }
 }
