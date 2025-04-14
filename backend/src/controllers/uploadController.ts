@@ -238,6 +238,7 @@ export const handleTusHookEvent = async (req: Request, res: Response): Promise<v
         }
 
         // 2. Sanitize Paths (using backend logic)
+        logger.info(`[post-finish:${uploadId}] Sanitizing paths for client: ${clientCode}, project: ${projectName}`);
         const sanitize = (str: string) => str.replace(/[^a-zA-Z0-9_.-]/g, '_').replace(/\.\./g, '_');
         const sanitizedClientCode = sanitize(clientCode);
         const sanitizedProjectName = sanitize(projectName);
@@ -328,6 +329,9 @@ export const handleTusHookEvent = async (req: Request, res: Response): Promise<v
     }
   } catch (error) {
     // Catch any unexpected errors during asynchronous processing
-    logger.error(`Unhandled error processing hook ${hookType} for upload ID ${uploadId}:`, error);
+    // Ensure hookType and uploadId are included for context, even if they were undefined earlier
+    const currentHookType = payload?.hookType || 'unknown';
+    const currentUploadId = payload?.uploadId || 'unknown';
+    logger.error(`Unhandled error during asynchronous processing of hook ${currentHookType} for upload ID ${currentUploadId}:`, error);
   }
 };
