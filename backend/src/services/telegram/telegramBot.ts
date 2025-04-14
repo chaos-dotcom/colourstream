@@ -176,12 +176,34 @@ export class TelegramBot {
           console.log('[TELEGRAM-DEBUG] Successfully edited message');
         } catch (editError: any) {
           console.error('[TELEGRAM-DEBUG] Error editing message:', editError.message);
-          console.log('[TELEGRAM-DEBUG] Edit error response:', editError.response?.data || 'No response data');
-          
-          // If editing fails, send a new message instead
-          console.log(`[TELEGRAM-DEBUG] Falling back to sending a new message for ${uploadId}`);
-          response = await axios.post(`${this.baseUrl}/sendMessage`, {
-            chat_id: chatId,
+          const errorData = editError.response?.data;
+          console.log('[TELEGRAM-DEBUG] Edit error response:', errorData || 'No response data');
+
+          // Check if the error is specifically "message is not modified"
+          if (errorData?.error_code === 400 && errorData?.description?.includes('message is not modified')) {
+            console.log(`[TELEGRAM-DEBUG] Edit failed because message content is identical. Treating as success for upload ${uploadId}.`);
+            // Message is already correct, no need to send a new one. Return true.
+            return true; 
+          } else {
+            // For other edit errors, fall back to sending a new message
+            console.log(`[TELEGRAM-DEBUG] Falling back to sending a new message for ${uploadId} due to edit error.`);
+            response = await axios.post(`${this.baseUrl}/sendMessage`, {
+              chat_id: chatId,
+              text: message,
+              parse_mode: 'HTML',
+            });
+             
+            // Update the message ID for this upload if fallback succeeds
+            if (uploadId && response.data.ok && response.data.result && response.data.result.message_id) {
+              await this.storeMessageId(uploadId, response.data.result.message_id);
+            }
+          }
+        }
+      } else {
+        // Send new message
+        console.log(`[TELEGRAM-DEBUG] No existing message found for ${uploadId || 'unknown'}, sending new message`);
+        response = await axios.post(`${this.baseUrl}/sendMessage`, {
+          chat_id: chatId,
             text: message,
             parse_mode: 'HTML',
           });
