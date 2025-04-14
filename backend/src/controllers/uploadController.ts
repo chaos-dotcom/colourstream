@@ -167,14 +167,16 @@ export const handleTusHookEvent = async (req: Request, res: Response): Promise<v
 
         // 1. Validate Token & Get Project Info (CRITICAL: Decode token first!)
         const token = decodedMetadata.token;
+        logger.info(`[post-finish:${uploadId}] Attempting to validate token: ${token ? token.substring(0, 8) + '...' : 'MISSING'}`);
         if (!token) {
-            logger.error(`Missing token in metadata for completed upload ${uploadId}. Cannot determine destination.`);
+            logger.error(`[post-finish:${uploadId}] Missing token in metadata. Cannot determine destination.`);
             // Optionally send failure notification
             return;
         }
 
         let clientCode: string | undefined;
         let projectName: string | undefined;
+        logger.info(`[post-finish:${uploadId}] Starting token validation via Prisma.`);
         try {
             // --- Real Token Validation Logic ---
             const uploadLink = await prisma.uploadLink.findUnique({
