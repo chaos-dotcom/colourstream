@@ -319,7 +319,6 @@ export class TelegramBot {
     
     message += `<b>File:</b> ${metadata?.filename || 'Unknown'}\n`;
     message += `<b>Size:</b> ${formatFileSize(size)}\n`;
-    message += `<b>ID:</b> ${id}\n`;
     
     // Add specific details about progress
     if (progress < 100) {
@@ -341,14 +340,7 @@ export class TelegramBot {
     if (metadata?.projectName) {
       message += `<b>Project:</b> ${metadata.projectName}\n`;
     }
-    
-    // Add upload type/method if available
-    if (id.startsWith('xhr-')) {
-      message += `<b>Method:</b> XHR Upload\n`;
-    } else {
-      message += `<b>Method:</b> TUS Upload\n`;
-    }
-    
+        
     // Add estimated time remaining if not complete
     if (!isComplete && offset > 0 && size > offset) {
       if (uploadSpeed && uploadSpeed > 0) {
