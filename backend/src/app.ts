@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
 import routes from './routes';
+import uploadRoutes from './routes/uploadRoutes'; // Import the new upload routes
 // Removed unused import: import { handleCompanionWebhook } from './controllers/companionWebhookController';
 const app = express();
 
@@ -27,6 +28,7 @@ app.use(morgan('dev'));
 
 // Routes
 app.use('/api', routes);
+app.use('/api/upload', uploadRoutes); // Mount the upload-specific routes
 
 
 export default app;
