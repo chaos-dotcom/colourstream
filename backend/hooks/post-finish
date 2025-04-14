@@ -8,7 +8,7 @@
 # --- Configuration ---
 # !!! IMPORTANT: Replace with the actual URL of your backend endpoint !!!
 # This endpoint should accept a POST request with the JSON payload defined below.
-BACKEND_API_URL="http://localhost:3001/api/upload/tus-complete" # Adjust hostname/port as needed
+BACKEND_API_URL="http://backend:5001/api/upload/tus-complete" # Adjust hostname/port as needed
 
 # --- Helper function for base64 decoding ---
 # Handles potential differences in base64 command options across systems (Linux/macOS)
