@@ -43,19 +43,22 @@ EOF
 )
 
 # --- Send Data to Backend API (Run SYNCHRONOUSLY - wait for backend to move file) ---
-echo "[Tus Hook - post-finish] Sending notification to backend (waiting for response): $BACKEND_HOOK_URL for Upload ID: $UPLOAD_ID" >&2
-# Use -f to fail on HTTP errors, capture exit code. Remove -s to see output/errors from curl.
-curl -f -X POST \
-     -H "Content-Type: application/json" \
-     -d "$JSON_PAYLOAD" \
+echo "[Tus Hook - post-finish] Sending notification to backend with wget (waiting for response): $BACKEND_HOOK_URL for Upload ID: $UPLOAD_ID" >&2
+# Use wget to send the POST request. -q suppresses output, -O /dev/null discards the response body.
+# --post-data sends the JSON payload. --header sets the content type.
+wget -q -O /dev/null \
+     --header="Content-Type: application/json" \
+     --post-data="$JSON_PAYLOAD" \
      "$BACKEND_HOOK_URL"
 
-CURL_EXIT_CODE=$?
-if [ $CURL_EXIT_CODE -eq 0 ]; then
+WGET_EXIT_CODE=$?
+if [ $WGET_EXIT_CODE -eq 0 ]; then
   echo "[Tus Hook - post-finish] Successfully notified backend for $UPLOAD_ID (file move/processing handled by backend)." >&2
   exit 0 # Success
 else
-  echo "[Tus Hook - post-finish] Error: Backend notification/processing failed for $UPLOAD_ID. curl exit code: $CURL_EXIT_CODE" >&2
-  # Exit with the curl error code to signal failure to Tusd
-  exit $CURL_EXIT_CODE
+  # wget exit codes: https://www.gnu.org/software/wget/manual/wget.html#Exit-Status
+  # Common codes: 4: Network failure, 5: SSL verification failure, 6: Auth failure, 7: Protocol errors, 8: Server issued an error response (e.g., 4xx, 5xx).
+  echo "[Tus Hook - post-finish] Error: Backend notification/processing failed for $UPLOAD_ID. wget exit code: $WGET_EXIT_CODE" >&2
+  # Exit with the wget error code to signal failure to Tusd
+  exit $WGET_EXIT_CODE
 fi
