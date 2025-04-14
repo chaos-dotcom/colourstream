@@ -1,10 +1,12 @@
 import { Request, Response } from 'express';
 import fs from 'fs/promises';
 import path from 'path';
+import { PrismaClient } from '@prisma/client'; // Import Prisma Client
 import { logger } from '../utils/logger';
 import { getTelegramBot } from '../services/telegram/telegramBot';
-// Assuming you have a service to validate the upload link token
-// import { validateUploadLink } from '../services/uploadLinkService'; 
+
+// Initialize Prisma Client
+const prisma = new PrismaClient();
 
 // Define the expected structure of the hook payload
 interface TusHookPayload {
@@ -169,24 +171,62 @@ export const handleTusHookEvent = async (req: Request, res: Response): Promise<v
         let clientCode: string | undefined;
         let projectName: string | undefined;
         try {
-            // TODO: Replace with actual call to your validation/lookup service
-            // const linkInfo = await validateUploadLink(token); // Assumes this function exists
-            // clientCode = linkInfo.clientCode;
-            // projectName = linkInfo.projectName;
+            // --- Real Token Validation Logic ---
+            const uploadLink = await prisma.uploadLink.findUnique({
+                where: { token: token },
+                include: {
+                    project: { // Include the related project
+                        include: {
+                            client: true // Include the related client from the project
+                        }
+                    }
+                }
+            });
 
-            // Placeholder implementation - REMOVE THIS
-            logger.warn(`Placeholder: Simulating token validation for ${token}`);
-            clientCode = decodedMetadata.clientCode || 'unknown_client'; // Use metadata as fallback for now
-            projectName = decodedMetadata.project || 'unknown_project'; // Use metadata as fallback for now
-            if (!clientCode || !projectName) throw new Error('Client code or project name missing');
-            // End Placeholder
+            if (!uploadLink) {
+                throw new Error(`Upload link with token not found.`);
+            }
+
+            // Check if the link has expired (assuming an expiresAt field exists)
+            if (uploadLink.expiresAt && new Date() > new Date(uploadLink.expiresAt)) {
+                 throw new Error(`Upload link has expired.`);
+            }
+
+            // Check if project and client data exist
+            if (!uploadLink.project) {
+                throw new Error(`Project not found for upload link.`);
+            }
+            if (!uploadLink.project.client) {
+                throw new Error(`Client not found for the project associated with the link.`);
+            }
+
+            // Extract the required information
+            clientCode = uploadLink.project.client.code;
+            projectName = uploadLink.project.name;
+
+            if (!clientCode || !projectName) {
+                // This check might be redundant if the above checks pass, but good for safety
+                throw new Error('Client code or project name could not be determined from the upload link.');
+            }
+            // --- End Real Token Validation Logic ---
 
             logger.info(`Token validated for ${uploadId}. Client: ${clientCode}, Project: ${projectName}`);
 
-        } catch (validationError) {
-            logger.error(`Token validation failed for ${uploadId} (Token: ${token}):`, validationError);
-            // Optionally send failure notification
-            return; // Stop processing if token is invalid
+        } catch (validationError: any) { // Catch specific error type if possible
+            logger.error(`Token validation or data retrieval failed for ${uploadId} (Token: ${token}):`, validationError.message);
+            // Optionally send failure notification via Telegram
+            const telegramBot = getTelegramBot();
+            if (telegramBot) {
+                await telegramBot.sendMessage(
+                    `🚨 Failed to process completed upload ${uploadId}.\n` +
+                    `File: ${decodedMetadata.filename || 'Unknown'}\n` +
+                    `Reason: Token validation failed - ${validationError.message}`,
+                    uploadId // Use uploadId to potentially edit an existing message
+                );
+                // Clean up the message ID since processing failed
+                await telegramBot.cleanupUploadMessage(uploadId);
+            }
+            return; // Stop processing if token is invalid or data retrieval fails
         }
 
         // 2. Sanitize Paths (using backend logic)
