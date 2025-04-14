@@ -87,20 +87,25 @@ export const handleTusHookEvent = async (req: Request, res: Response): Promise<v
     // Read and parse the .info file (needed for most hooks)
     let infoData: TusInfoFile | null = null;
     let decodedMetadata: Record<string, string> = {};
+    logger.info(`[${hookType}:${uploadId}] Attempting to read info file: ${infoFilePath}`);
     try {
       const infoFileContent = await fs.readFile(infoFilePath, 'utf-8');
+      logger.info(`[${hookType}:${uploadId}] Successfully read info file.`);
       infoData = JSON.parse(infoFileContent) as TusInfoFile;
-      logger.debug(`Parsed info file for ${uploadId}:`, infoData);
+      logger.debug(`[${hookType}:${uploadId}] Parsed info file content:`, infoData);
 
       // Decode metadata
       if (infoData.MetaData) {
+        logger.info(`[${hookType}:${uploadId}] Decoding metadata...`);
         for (const key in infoData.MetaData) {
           decodedMetadata[key] = decodeMetadataValue(infoData.MetaData[key]);
         }
-        logger.debug(`Decoded metadata for ${uploadId}:`, decodedMetadata);
+        logger.debug(`[${hookType}:${uploadId}] Decoded metadata:`, decodedMetadata);
+      } else {
+        logger.warn(`[${hookType}:${uploadId}] No MetaData found in info file.`);
       }
     } catch (err) {
-      logger.error(`Error reading or parsing info file ${infoFilePath}:`, err);
+      logger.error(`[${hookType}:${uploadId}] Error reading or parsing info file ${infoFilePath}:`, err);
       // Decide how to handle this - maybe proceed without metadata for some hooks?
       // For post-finish, metadata is crucial.
       if (hookType === 'post-finish') {
@@ -211,10 +216,10 @@ export const handleTusHookEvent = async (req: Request, res: Response): Promise<v
             }
             // --- End Real Token Validation Logic ---
 
-            logger.info(`Token validated for ${uploadId}. Client: ${clientCode}, Project: ${projectName}`);
+            logger.info(`[post-finish:${uploadId}] Token validation successful. Client: ${clientCode}, Project: ${projectName}`);
 
         } catch (validationError: any) { // Catch specific error type if possible
-            logger.error(`Token validation or data retrieval failed for ${uploadId} (Token: ${token}):`, validationError.message);
+            logger.error(`[post-finish:${uploadId}] Token validation or data retrieval failed (Token: ${token}):`, validationError.message);
             // Optionally send failure notification via Telegram
             const telegramBot = getTelegramBot();
             if (telegramBot) {
@@ -243,35 +248,41 @@ export const handleTusHookEvent = async (req: Request, res: Response): Promise<v
         const destinationFilePath = path.join(destinationDir, sanitizedFilename);
         const destinationInfoPath = path.join(destinationMetadataDir, `${sanitizedFilename}.info`);
 
-        logger.info(`Moving file for ${uploadId}:`);
+        logger.info(`[post-finish:${uploadId}] Calculated paths:`);
         logger.info(`  Source Data: ${dataFilePath}`);
         logger.info(`  Source Info: ${infoFilePath}`);
+        logger.info(`  Dest Dir:    ${destinationDir}`);
+        logger.info(`  Dest Meta:   ${destinationMetadataDir}`);
         logger.info(`  Dest Data:   ${destinationFilePath}`);
         logger.info(`  Dest Info:   ${destinationInfoPath}`);
 
         // 4. Create Directories
+        logger.info(`[post-finish:${uploadId}] Attempting to create destination directories: ${destinationMetadataDir}`);
         try {
             await fs.mkdir(destinationMetadataDir, { recursive: true });
-            logger.info(`Created destination directories: ${destinationMetadataDir}`);
+            logger.info(`[post-finish:${uploadId}] Successfully created/ensured destination directories.`);
         } catch (mkdirError) {
-            logger.error(`Failed to create destination directories for ${uploadId}:`, mkdirError);
+            logger.error(`[post-finish:${uploadId}] Failed to create destination directories:`, mkdirError);
             // Optionally send failure notification
             return;
         }
 
         // 5. Move Files (Data first, then Info)
+        logger.info(`[post-finish:${uploadId}] Attempting to move data file from ${dataFilePath} to ${destinationFilePath}`);
         try {
             await fs.rename(dataFilePath, destinationFilePath);
-            logger.info(`Successfully moved data file for ${uploadId}`);
+            logger.info(`[post-finish:${uploadId}] Successfully moved data file.`);
+
+            logger.info(`[post-finish:${uploadId}] Attempting to move info file from ${infoFilePath} to ${destinationInfoPath}`);
             try {
                  await fs.rename(infoFilePath, destinationInfoPath);
-                 logger.info(`Successfully moved info file for ${uploadId}`);
+                 logger.info(`[post-finish:${uploadId}] Successfully moved info file.`);
             } catch (infoMoveError) {
-                 logger.warn(`Failed to move info file for ${uploadId}:`, infoMoveError);
+                 logger.warn(`[post-finish:${uploadId}] Failed to move info file:`, infoMoveError);
                  // Decide if this is critical. Usually, the data file is more important.
             }
         } catch (dataMoveError) {
-            logger.error(`Failed to move data file for ${uploadId}:`, dataMoveError);
+            logger.error(`[post-finish:${uploadId}] Failed to move data file:`, dataMoveError);
             // Optionally send failure notification
             // Attempt to clean up - remove destination dirs? Difficult to rollback safely.
             return;
@@ -287,7 +298,7 @@ export const handleTusHookEvent = async (req: Request, res: Response): Promise<v
             isComplete: true,
           });
         }
-        logger.info(`Successfully processed post-finish for ${uploadId}`);
+        logger.info(`[post-finish:${uploadId}] Successfully processed post-finish hook.`);
         break;
 
       case 'post-terminate':
