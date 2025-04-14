@@ -6,6 +6,9 @@ echo "[Tus Hook - post-finish] BACKEND_HOOK_URL: $BACKEND_HOOK_URL" >&2
 echo "[Tus Hook - post-finish] UPLOAD_ID: $UPLOAD_ID" >&2
 
 # --- Send Data to Backend API (Run SYNCHRONOUSLY - wait for backend to move file) ---
+# Ensure the destination directory exists
+DESTINATION_DIR="/path/to/destination/$UPLOAD_ID" # Update this path as needed
+mkdir -p "$DESTINATION_DIR" # Create the directory if it doesn't exist
 echo "[Tus Hook - post-finish] Preparing JSON payload" >&2
 
 JSON_PAYLOAD=$(cat <<EOF
@@ -25,6 +28,8 @@ echo "[Tus Hook - post-finish] JSON Payload: $JSON_PAYLOAD" >&2
 echo "[Tus Hook - post-finish] Sending notification to backend with wget (waiting for response): $BACKEND_HOOK_URL for Upload ID: $UPLOAD_ID" >&2
 echo "[Tus Hook - post-finish] JSON Payload: $JSON_PAYLOAD" >&2
 
+# Move the uploaded file to the destination directory
+mv "$TUS_DATA_DIR/$UPLOAD_ID" "$DESTINATION_DIR/$UPLOAD_FILENAME" # Ensure the file is moved
 RESPONSE=$(wget -O - --timeout=10 \
      --header="Content-Type: application/json" \
      --post-data="$JSON_PAYLOAD" \
