@@ -222,40 +222,52 @@ export class TelegramBot {
          await this.storeMessageId(uploadId, response.data.result.message_id);
      }
 
-     return response.data.ok;
-   } catch (error: any) {
-     console.error('[TELEGRAM-DEBUG] Failed to send/edit Telegram message:', error.message);
+      return response.data.ok;
+    } catch (error: any) { // This is the main catch block for sendMessage
+      console.error('[TELEGRAM-DEBUG] Failed to send/edit Telegram message:', error.message);
       logger.error('Failed to send/edit Telegram message:', error.message);
-      
-      // If all else fails, try sending a new message
-      if (uploadId) {
-        try {
-          console.log(`[TELEGRAM-DEBUG] Final fallback: sending new message for upload ${uploadId}`);
-          const chatId = !isNaN(Number(this.chatId)) ? Number(this.chatId) : this.chatId;
-          
-          const response = await axios.post(`${this.baseUrl}/sendMessage`, {
-            chat_id: chatId,
-            text: message,
-            parse_mode: 'HTML',
-          });
-          
-          // Store the new message ID
-          if (response.data.ok && response.data.result && response.data.result.message_id) {
-            await this.storeMessageId(uploadId, response.data.result.message_id);
-          }
-          
-          return response.data.ok;
-        } catch (fallbackError) {
-          console.error('[TELEGRAM-DEBUG] Fallback message send also failed:', fallbackError);
-        }
-      }
-      
+
       if (error.response) {
         console.error('[TELEGRAM-DEBUG] Error response data:', JSON.stringify(error.response.data));
       }
+
+      // --- Final Fallback Logic ---
+      // If the initial send/edit failed, try sending a completely new message as a last resort.
+      // This is useful if the original error was related to editing a non-existent message ID.
+      if (uploadId) {
+        console.log(`[TELEGRAM-DEBUG] Entering final fallback: attempting to send a new message for upload ${uploadId}`);
+        try { // Start a new try block specifically for the fallback
+          const chatId = !isNaN(Number(this.chatId)) ? Number(this.chatId) : this.chatId;
+          const fallbackResponse = await axios.post(`${this.baseUrl}/sendMessage`, { // Use a different variable name
+            chat_id: chatId,
+            text: message, // Use the original message content
+            parse_mode: 'HTML',
+          });
+
+          console.log('[TELEGRAM-DEBUG] Fallback sendMessage API response:', JSON.stringify(fallbackResponse.data));
+
+          // Store the new message ID if the fallback was successful
+          if (fallbackResponse.data.ok && fallbackResponse.data.result && fallbackResponse.data.result.message_id) {
+            await this.storeMessageId(uploadId, fallbackResponse.data.result.message_id);
+            return true; // Fallback succeeded
+          } else {
+             console.error('[TELEGRAM-DEBUG] Fallback message send failed (API returned not ok):', fallbackResponse.data);
+             return false; // Fallback failed (API error)
+          }
+        } catch (fallbackError: any) { // Catch errors specifically from the fallback attempt
+          console.error('[TELEGRAM-DEBUG] Fallback message send attempt threw an error:', fallbackError.message);
+          if (fallbackError.response) {
+            console.error('[TELEGRAM-DEBUG] Fallback error response data:', JSON.stringify(fallbackError.response.data));
+          }
+          return false; // Fallback failed (exception)
+        }
+      }
+      // --- End Final Fallback Logic ---
+
+      // If no uploadId or fallback failed, return false from the main catch block
       return false;
-    }
-  }
+    } // End of the main catch block
+  } // End of sendMessage method
 
   /**
    * Edit an existing message
