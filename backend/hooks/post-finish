@@ -44,7 +44,7 @@ EOF
 
 # --- Send Data to Backend API (Run SYNCHRONOUSLY - wait for backend to move file) ---
 echo "[Tus Hook - post-finish] Sending notification to backend with wget (waiting for response): $BACKEND_HOOK_URL for Upload ID: $UPLOAD_ID" >&2
-# Use wget to send the POST request.  suppresses output, -O /dev/null discards the response body.
+    logger.info(`Sending notification to backend at: ${BACKEND_HOOK_URL} with payload: ${JSON.stringify(JSON_PAYLOAD)}`);
 # --post-data sends the JSON payload. --header sets the content type.
 wget -O /dev/null \
      --header="Content-Type: application/json" \
