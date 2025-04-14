@@ -274,13 +274,14 @@ export const handleTusHookEvent = async (req: Request, res: Response): Promise<v
         // 5. Move Files (Data first, then Info)
         logger.info(`[post-finish:${uploadId}] Attempting to move data file from ${dataFilePath} to ${destinationFilePath}`);
         try {
+            await fs.mkdir(destinationDir, { recursive: true }); // Ensure the destination directory exists
             await fs.rename(dataFilePath, destinationFilePath);
-            logger.info(`[post-finish:${uploadId}] Successfully moved data file.`);
+            logger.info(`[post-finish:${uploadId}] Successfully moved data file to ${destinationFilePath}.`);
 
             logger.info(`[post-finish:${uploadId}] Attempting to move info file from ${infoFilePath} to ${destinationInfoPath}`);
             try {
                  await fs.rename(infoFilePath, destinationInfoPath);
-                 logger.info(`[post-finish:${uploadId}] Successfully moved info file.`);
+                 logger.info(`[post-finish:${uploadId}] Successfully moved info file to ${destinationInfoPath}.`);
             } catch (infoMoveError) {
                  logger.warn(`[post-finish:${uploadId}] Failed to move info file:`, infoMoveError);
                  // Decide if this is critical. Usually, the data file is more important.
