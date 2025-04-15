@@ -59,8 +59,7 @@ const sanitizePathString = (str: string | undefined | null): string => {
 // }
 
 
-// --- New Main Handler for Post-Finish Hook ---
-
+// --- Basic Payload Validation ---
 export const handleProcessFinishedUpload = async (req: Request, res: Response): Promise<void> => {
   const infoPayload = req.body as TusInfoFilePayload;
   const uploadId = infoPayload?.ID;
@@ -362,24 +361,9 @@ export const handleProcessFinishedUpload = async (req: Request, res: Response): 
     logger.info(`[ProcessFinished:${uploadId}] Database record updated/created successfully.`);
 
 
-    // 7. Send "Upload Complete" Notification
-    if (telegramBot) {
-      logger.info(`[ProcessFinished:${uploadId}] Sending completion notification.`);
-      await telegramBot.sendUploadNotification({
-        id: uploadId,
-        size: infoPayload.Size,
-        offset: infoPayload.Offset, // Should equal Size
-        metadata: { // Pass relevant final metadata
-            filename: sanitizedFilename,
-            clientName: clientCode,
-            projectName: projectName,
-            filetype: metadata.filetype || metadata.type || 'unknown', // Provide default for filetype
-            // Add other relevant metadata from 'metadata' object if needed
-        },
-        isComplete: true,
-        storage: finalStorageType, // Pass final storage type
-      });
-    }
+    // Use uploadTracker which internally calls telegramBot for the final notification
+    logger.info(`[ProcessFinished:${uploadId}] Triggering completion via uploadTracker.`);
+    uploadTracker.completeUpload(uploadId); // Pass only ID, tracker handles notification details
 
     logger.info(`[ProcessFinished:${uploadId}] Successfully processed finished upload.`);
 
