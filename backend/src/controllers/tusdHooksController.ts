@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { logger } from '../utils/logger';
 import { uploadTracker } from '../services/uploads/uploadTracker';
+import { getTelegramBot } from '../services/telegram/telegramBot';
 
 /**
  * Controller for handling tusd webhook events
@@ -123,9 +124,6 @@ export class TusdHooksController {
       
       logger.info('tusd post-terminate hook received', { uploadId, size, offset });
       
-      // Get the upload info from the tracker
-      const uploadInfo = uploadTracker.getUpload(uploadId);
-      
       // Get the telegram bot service
       const telegramBot = getTelegramBot();
       
@@ -133,10 +131,10 @@ export class TusdHooksController {
       if (telegramBot) {
         logger.info(`Notifying Telegram about terminated upload ${uploadId}`);
         telegramBot.handleTerminatedUpload(uploadId, metadata, size, offset)
-          .then(success => {
+          .then((success: boolean) => {
             logger.info(`Telegram notification for terminated upload ${uploadId} ${success ? 'succeeded' : 'failed'}`);
           })
-          .catch(err => {
+          .catch((err: Error) => {
             logger.error(`Error sending Telegram notification for terminated upload ${uploadId}:`, err);
           });
       }
