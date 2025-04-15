@@ -44,41 +44,64 @@ async function getUploadDetails(uploadId: string, providedToken?: string): Promi
     return cachedInfo;
   }
 
+  // Prioritize cached info if it's complete (has client/project)
+  if (cachedInfo?.clientName && cachedInfo?.projectName) {
+    logger.info(`[getUploadDetails] Found complete info in cache for ${uploadId}`);
+    return cachedInfo;
+  }
+
+  // Initialize variables from cache or defaults
   let token = providedToken || cachedInfo?.token;
   let size = cachedInfo?.size;
   let filename = cachedInfo?.filename;
-  let storage = cachedInfo?.storage || 'local'; // Default to local if not cached
+  let storage = cachedInfo?.storage || 'local';
 
-  // 2. If token is missing, try reading from .info file
+  // 2. If token is still missing, try reading from .info file
   if (!token) {
     const infoFilePath = path.join(TUSD_DATA_DIR, `${uploadId}.info`);
-    logger.info(`[getUploadDetails] Token not provided or cached, reading info file: ${infoFilePath}`);
+    logger.info(`[getUploadDetails] Token not cached, attempting to read info file: ${infoFilePath}`);
     try {
       const infoContent = await fsPromises.readFile(infoFilePath, 'utf-8'); // Use fsPromises
       const infoData = JSON.parse(infoContent);
-      token = infoData?.MetaData?.token; // Extract token
-      size = infoData?.Size; // Extract size
-      filename = infoData?.MetaData?.filename; // Extract filename
-      // storage = infoData?.Storage?.Type === 's3' ? 's3' : 'local'; // Potentially get storage type
+      // Extract potential values from .info file
+      const infoToken = infoData?.MetaData?.token;
+      const infoSize = infoData?.Size;
+      const infoFilename = infoData?.MetaData?.filename || infoData?.MetaData?.name; // Check both common keys
+      const infoStorage = infoData?.Storage?.Type === 's3store' ? 's3' : 'local'; // Map tusd storage type
 
-      if (!token) {
-        logger.error(`[getUploadDetails] Token not found in .info file for ${uploadId}`);
-        return null; // Cannot proceed without a token
+      // Update local variables ONLY if they weren't already set from cache/providedToken
+      if (!token && infoToken) {
+          token = infoToken;
+          logger.info(`[getUploadDetails] Extracted token from .info file for ${uploadId}`);
       }
-      logger.info(`[getUploadDetails] Extracted token, size, filename from .info file for ${uploadId}`);
+      if (size === undefined && infoSize !== undefined) { // Use === undefined to allow size 0
+          size = infoSize;
+          logger.info(`[getUploadDetails] Extracted size (${size}) from .info file for ${uploadId}`);
+      }
+      if (!filename && infoFilename) {
+          filename = infoFilename;
+          logger.info(`[getUploadDetails] Extracted filename (${filename}) from .info file for ${uploadId}`);
+      }
+      // Update storage only if not already set differently
+      if (storage === 'local' && infoStorage === 's3') {
+          storage = infoStorage;
+          logger.info(`[getUploadDetails] Updated storage to 's3' based on .info file for ${uploadId}`);
+      }
+
     } catch (err: any) {
+      // Log errors but don't necessarily fail yet, DB lookup might still work if token was cached/provided
       if (err.code === 'ENOENT') {
-        logger.error(`[getUploadDetails] .info file not found for ${uploadId} at ${infoFilePath}`);
+        logger.warn(`[getUploadDetails] .info file not found for ${uploadId} at ${infoFilePath}. Proceeding with cached/provided info if available.`);
       } else {
         logger.error(`[getUploadDetails] Error reading or parsing .info file for ${uploadId}:`, err);
       }
-      return null; // Cannot proceed if file reading fails
+      // Do not return null here, allow DB lookup attempt if token exists
     }
   }
 
-  // 3. If we have a token, query the database
+  // 3. If we have a token (from cache, param, or .info file), query the database for authoritative info
   if (token) {
-    logger.info(`[getUploadDetails] Querying database with token for ${uploadId}`);
+    logger.info(`[getUploadDetails] Have token, querying database for ${uploadId}`);
     try {
       const uploadLink = await prisma.uploadLink.findUnique({
         where: { token },
@@ -89,26 +112,28 @@ async function getUploadDetails(uploadId: string, providedToken?: string): Promi
         logger.info(`[getUploadDetails] DB Query Result for token ${token}: Client=${uploadLink.project?.client?.name}, Project=${uploadLink.project?.name}`); // Log DB result more concisely
         const fullInfo: TusdUploadInfo = {
           token: token,
-          clientName: uploadLink.project.client.name,
-          projectName: uploadLink.project.name,
-          // Use size/filename from cache/file if available, otherwise set defaults
-          size: size ?? 0,
-          filename: filename ?? 'Unknown Filename',
-          storage: storage,
+          clientName: uploadLink.project.client.name, // Authoritative from DB
+          projectName: uploadLink.project.name, // Authoritative from DB
+          // Use size/filename from earlier steps (cache/.info) if available, otherwise set defaults
+          size: size ?? 0, // Use size derived from cache/.info
+          filename: filename ?? 'Unknown Filename', // Use filename derived from cache/.info
+          storage: storage, // Use storage derived from cache/.info
         };
-        // Update cache with full details
+        // Update cache ONLY with successfully fetched, complete details
         tusdProgressCache.set(uploadId, fullInfo);
         logger.info(`[getUploadDetails] Successfully fetched info from DB and updated cache for ${uploadId}`);
         return fullInfo;
       } else {
-        logger.error(`[getUploadDetails] Invalid token '${token}' found for ${uploadId}. Cannot fetch DB details.`);
-        logger.info(`[getUploadDetails] DB Query returned null/falsy for token ${token}.`); // Log null result explicitly
-        // Cache minimal info to avoid re-reading file, but mark as invalid?
-         tusdProgressCache.set(uploadId, { token, storage, size: size ?? 0, filename: filename ?? 'Unknown Filename', clientName: 'Invalid Token', projectName: 'Invalid Token' });
-        return null;
+        // Token was invalid according to DB
+        logger.error(`[getUploadDetails] Invalid token '${token}' found for ${uploadId} (DB lookup failed).`);
+        // Do NOT cache invalid token info. Remove potentially stale cache entry.
+        tusdProgressCache.delete(uploadId);
+        return null; // Indicate failure
       }
     } catch (dbError) {
       logger.error(`[getUploadDetails] Database error fetching details for token ${token} (uploadId ${uploadId}):`, dbError);
+      // Do not cache on DB error. Remove potentially stale cache entry.
+      tusdProgressCache.delete(uploadId);
       return null;
     }
   }
@@ -1688,40 +1713,53 @@ router.post('/hook-progress', async (req: Request, res: Response) => {
         }
 
         // Use helper function to get details (checks cache first, then file/DB)
-        const receivingDetails = await getUploadDetails(uploadId);
+        let receivingDetails = await getUploadDetails(uploadId);
 
         if (!receivingDetails) {
-          logger.error(`[Hook Progress] Failed to get details for 'receiving' status, uploadId: ${uploadId}. Sending notification with defaults.`);
-          // Send notification with defaults if details can't be fetched
-          await telegramBot.sendUploadNotification({
-            id: uploadId,
-            size: 0, // Unknown size
-            offset: Number(offset),
-            metadata: {
-              filename: 'Unknown Filename',
-              clientName: 'Unknown Client',
-              projectName: 'Unknown Project',
-              token: 'Unknown',
-            },
-            storage: 'local',
-            isComplete: false,
-          });
-           // Allow hook to succeed even if details are missing
-           return res.status(200).json({ status: 'warning', message: 'Upload details not found, sent default notification.' });
+          logger.warn(`[Hook Progress] Failed to get complete details via getUploadDetails for 'receiving' status, uploadId: ${uploadId}. Checking cache for partial info.`);
+          // Attempt to get partial info (filename/size) from cache if full details failed
+          const cachedInfo = tusdProgressCache.get(uploadId);
+          if (cachedInfo) {
+             logger.info(`[Hook Progress] Found partial info in cache for ${uploadId}. Using it for notification.`);
+             receivingDetails = cachedInfo; // Use cached info, even if incomplete
+          } else {
+             logger.error(`[Hook Progress] No details found in getUploadDetails or cache for ${uploadId}. Sending notification with defaults.`);
+             // Send notification with defaults only if absolutely no info is available
+             await telegramBot.sendUploadNotification({
+               id: uploadId,
+               size: 0, // Unknown size
+               offset: Number(offset),
+               metadata: {
+                 filename: 'Unknown Filename',
+                 clientName: 'Unknown Client',
+                 projectName: 'Unknown Project',
+                 token: 'Unknown',
+               },
+               storage: 'local', // Default storage
+               isComplete: false,
+             });
+             // Allow hook to succeed even if details are missing
+             return res.status(200).json({ status: 'warning', message: 'Upload details not found, sent default notification.' });
+          }
         }
 
-        // Send updated Telegram message using potentially refreshed details
+        // Send updated Telegram message using best available details (full or partial)
         await telegramBot.sendUploadNotification({
           id: uploadId,
-          size: receivingDetails.size ?? 0,
+          // Use size from details if available and valid, otherwise default to 0
+          size: (receivingDetails?.size !== undefined && receivingDetails.size >= 0) ? receivingDetails.size : 0,
           offset: Number(offset),
           metadata: {
-            filename: receivingDetails.filename ?? 'Unknown Filename',
-            clientName: receivingDetails.clientName || 'Unknown Client',
-            projectName: receivingDetails.projectName || 'Unknown Project',
-            token: receivingDetails.token,
+            // Use filename from details if available, otherwise default
+            filename: receivingDetails?.filename || 'Unknown Filename',
+            // Use client/project from details if available, otherwise default
+            clientName: receivingDetails?.clientName || 'Unknown Client',
+            projectName: receivingDetails?.projectName || 'Unknown Project',
+            // Include token if available
+            token: receivingDetails?.token || 'Unknown',
           },
-          storage: receivingDetails.storage,
+          // Use storage from details if available, otherwise default
+          storage: receivingDetails?.storage || 'local',
           isComplete: false,
         });
         break;
