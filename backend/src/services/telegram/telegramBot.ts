@@ -28,6 +28,20 @@ export class TelegramBot {
     console.log('[TELEGRAM-DEBUG] Telegram API Base URL:', `https://api.telegram.org/bot${this.botToken.substring(0, 10)}...`);
     logger.info('Telegram API Base URL:', `https://api.telegram.org/bot${this.botToken.substring(0, 10)}...`);
   }
+  
+  /**
+   * Get the chat ID for this bot
+   */
+  getChatId(): string {
+    return this.chatId;
+  }
+  
+  /**
+   * Get the bot token (masked for security)
+   */
+  getBotToken(): string {
+    return this.botToken;
+  }
 
   /**
    * Get the message ID for a specific upload from the database

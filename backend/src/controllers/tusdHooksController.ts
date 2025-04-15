@@ -170,29 +170,40 @@ export class TusdHooksController {
           telegramBot.cleanupUploadMessage(uploadId)
             .then(() => {
               logger.info(`Cleaned up existing message for terminated upload ${uploadId}`);
+              
+              // Create a new message instead of updating the existing one
+              const terminatedMessage = `<b>❌ Upload Terminated</b>\n` +
+                `<b>File:</b> ${enhancedMetadata?.filename || 'Unknown File'}\n` +
+                `<b>Size:</b> ${formatFileSize(size || 0)}\n` +
+                `<b>Progress:</b> Cancelled at ${calculateProgress(offset || 0, size || 0)}% (${formatFileSize(offset || 0)} / ${formatFileSize(size || 0)})\n` +
+                `<b>Client:</b> ${enhancedMetadata?.clientName || enhancedMetadata?.client || 'Unknown Client'}\n` +
+                `<b>Project:</b> ${enhancedMetadata?.projectName || enhancedMetadata?.project || 'Unknown Project'}\n` +
+                `<b>Terminated at:</b> ${new Date().toLocaleString()}`;
+              
+              // Send a new message directly WITHOUT the upload ID to prevent editing
+              // Use direct axios call to ensure we're not trying to edit an existing message
+              const chatId = !isNaN(Number(telegramBot.getChatId())) ? Number(telegramBot.getChatId()) : telegramBot.getChatId();
+              const botToken = telegramBot.getBotToken();
+              const baseUrl = `https://api.telegram.org/bot${botToken}`;
+              
+              axios.post(`${baseUrl}/sendMessage`, {
+                chat_id: chatId,
+                text: terminatedMessage,
+                parse_mode: 'HTML',
+              })
+              .then(response => {
+                logger.info(`Telegram notification for terminated upload ${uploadId} succeeded`);
+                console.log('[TELEGRAM-DEBUG] Termination message sent successfully:', response.data);
+              })
+              .catch(err => {
+                logger.error(`Error sending Telegram notification for terminated upload ${uploadId}:`, err);
+                console.error('[TELEGRAM-DEBUG] Failed to send termination message:', err);
+              });
             })
             .catch((err: Error) => {
               logger.error(`Error cleaning up message for terminated upload ${uploadId}:`, err);
             });
         }
-        
-        // Create a new message instead of updating the existing one
-        const terminatedMessage = `<b>❌ Upload Terminated</b>\n` +
-          `<b>File:</b> ${enhancedMetadata?.filename || 'Unknown File'}\n` +
-          `<b>Size:</b> ${formatFileSize(size || 0)}\n` +
-          `<b>Progress:</b> Cancelled at ${calculateProgress(offset || 0, size || 0)}% (${formatFileSize(offset || 0)} / ${formatFileSize(size || 0)})\n` +
-          `<b>Client:</b> ${enhancedMetadata?.clientName || enhancedMetadata?.client || 'Unknown Client'}\n` +
-          `<b>Project:</b> ${enhancedMetadata?.projectName || enhancedMetadata?.project || 'Unknown Project'}\n` +
-          `<b>Terminated at:</b> ${new Date().toLocaleString()}`;
-        
-        // Send a new message directly WITHOUT the upload ID to prevent editing
-        telegramBot.sendMessage(terminatedMessage)
-          .then((success: boolean) => {
-            logger.info(`Telegram notification for terminated upload ${uploadId} ${success ? 'succeeded' : 'failed'}`);
-          })
-          .catch((err: Error) => {
-            logger.error(`Error sending Telegram notification for terminated upload ${uploadId}:`, err);
-          });
       }
       
       // Mark the upload as terminated in the tracker instead of removing it
