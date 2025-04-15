@@ -16,6 +16,7 @@ export class TelegramBot {
   private chatId: string;
   private baseUrl: string;
   private messageIdCache: Map<string, number>; // In-memory cache for message IDs
+  private uploadInfoCache: Map<string, any> = new Map<string, any>(); // Cache for upload information
 
   constructor(config: TelegramConfig) {
     this.botToken = config.botToken;
@@ -420,7 +421,8 @@ export class TelegramBot {
     if (!actuallyComplete && !isTerminated && (uploadSpeed !== undefined || effectiveSpeed !== undefined)) {
       // Force a minimum display value for very small speeds
       const speedToUse = uploadSpeed !== undefined ? uploadSpeed : effectiveSpeed;
-      const displaySpeed = speedToUse <= 0 ? undefined : Math.max(speedToUse, 1);
+      // Only use Math.max if speedToUse is defined and not zero/negative
+      const displaySpeed = speedToUse !== undefined && speedToUse > 0 ? Math.max(speedToUse, 1) : undefined;
       message += `<b>Speed:</b> ${formatSpeed(displaySpeed)}\n`;
     }
 
@@ -518,7 +520,7 @@ export class TelegramBot {
     console.log(`[TELEGRAM-DEBUG] Handling terminated upload ${uploadId} with size=${size}, offset=${offset}`);
     
     // Try to get existing info from cache first
-    const cachedInfo = this.uploadInfoCache.get(uploadId);
+    const cachedInfo = this.uploadInfoCache?.get(uploadId);
     
     // Get existing upload info from the database if available
     let uploadInfo: any = {
