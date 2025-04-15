@@ -380,7 +380,7 @@ export class TelegramBot {
     }
 
     // Add upload speed if available and not a completed upload
-    if (!isComplete && uploadSpeed !== undefined && uploadSpeed > 0) { // Check > 0
+    if (!actuallyComplete && uploadSpeed !== undefined && uploadSpeed > 0) { // Check > 0
       message += `<b>Speed:</b> ${formatSpeed(uploadSpeed)}\n`;
     }
 
