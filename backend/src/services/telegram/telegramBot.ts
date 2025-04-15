@@ -523,16 +523,11 @@ export class TelegramBot {
       // Try to get existing info from cache first
       const cachedInfo = this.uploadInfoCache?.get(uploadId);
       
-      // Get existing upload info from the database if available
-      let uploadInfo: any = {
-        id: uploadId,
-        terminated: true,
-        metadata: metadata || (cachedInfo?.metadata || {}),
-        size: size || (cachedInfo?.size || 0),
-        offset: offset || (cachedInfo?.offset || 0),
-        isComplete: false,
-        createdAt: cachedInfo?.createdAt || new Date()
-      };
+      // Get metadata and size information from cache if not provided
+      const finalMetadata = metadata || (cachedInfo?.metadata || {});
+      const finalSize = size || (cachedInfo?.size || 0);
+      const finalOffset = offset || (cachedInfo?.offset || 0);
+      const createdTime = cachedInfo?.createdAt || new Date();
       
       // Extract filename and project info from metadata
       // Check both standard metadata fields and the ones from the upload tracker
