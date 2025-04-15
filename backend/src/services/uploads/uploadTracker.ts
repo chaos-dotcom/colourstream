@@ -97,7 +97,14 @@ class UploadTracker {
         console.log('[TELEGRAM-DEBUG] Calling sendUploadNotification for completed upload:', id);
         // We'll use the same upload ID to ensure message editing occurs
         telegramBot.sendUploadNotification(completedUpload)
-          .then(success => console.log('[TELEGRAM-DEBUG] sendUploadNotification result:', success ? 'Success' : 'Failed'))
+          .then(async (success) => { // Make async to await cleanup
+              console.log('[TELEGRAM-DEBUG] sendUploadNotification result:', success ? 'Success' : 'Failed');
+              if (success) {
+                  // Clean up the message ID storage after successful completion notification
+                  console.log(`[TELEGRAM-DEBUG] Cleaning up message ID for completed upload: ${id}`);
+                  await telegramBot.cleanupUploadMessage(id);
+              }
+          })
           .catch((err: Error) => { // Type the error parameter
             console.error('[TELEGRAM-DEBUG] Failed to send completion notification to Telegram:', err);
             logger.error('Failed to send completion notification to Telegram:', err);
