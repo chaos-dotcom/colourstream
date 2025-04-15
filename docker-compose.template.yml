@@ -152,7 +152,6 @@ services:
       # Files are processed directly within the shared ./tusd-data volume.
       - ./backend/logs:/app/logs
       - /Volumes/Backup3/tusd-data:/srv/tusd-data # Mount the *same* host path as tusd service uses for its data
-      - ./organized-uploads:/app/organized # Mount host directory for final organized files (if using local storage)
     labels:
       - "traefik.enable=true"
       # API routes with higher priority
@@ -449,8 +448,8 @@ tusd:
      volumes:
        - /Volumes/Backup3/tusd-data:/srv/tusd-data # Map a local directory for file storage
        # - ./tusd-hooks:/etc/tusd/hooks # Removed script hook directory mount
-       - ./certs/certs/tusd.colourstream.${DOMAIN}.co.uk.crt:/etc/tusd/tusd.crt:ro # Mount the TLS certificate
-       - ./certs/private/tusd.colourstream.${DOMAIN}.co.uk.key:/etc/tusd/tusd.key:ro # Mount the TLS key
+       - ./certs/certs/tusd.colourstream.${DOMAIN}.crt:/etc/tusd/tusd.crt:ro # Mount the TLS certificate
+       - ./certs/private/tusd.colourstream.${DOMAIN}.key:/etc/tusd/tusd.key:ro # Mount the TLS key
      entrypoint: /usr/local/bin/tusd # Explicitly set the entrypoint
      ports:
       - "1080:1080" # Map tusd port to host
@@ -465,7 +464,7 @@ tusd:
        - "-hooks-http-forward-headers=Upload-Concat,Upload-Defer-Length,Upload-Length,Upload-Metadata,Upload-Offset,Tus-Resumable"
        # Specify which events trigger hooks (all sent to the same URL)
        - "-hooks-enabled-events=post-create,post-receive,post-finish,post-terminate"
-       # - "-enable-h2c" # This might conflict with TLS, review if needed
+       - "-enable-h2c" # This might conflict with TLS, review if needed
      networks: # Added network definition
        - network
 

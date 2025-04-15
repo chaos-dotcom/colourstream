@@ -1,106 +1,20 @@
-!/bin/sh
-# Tusd post-create hook script
-# Runs after an upload is created and the .info file exists.
-
-# Exit immediately if a command exits with a non-zero status.
-set -e
-# Print each command before executing it (for debugging)
-# set -x # Uncomment for debugging
-
-# --- Configuration ---
-TUSD_DATA_DIR="/srv/tusd-data"
-# !!! IMPORTANT: Replace with the actual URL of your backend endpoint !!!
-BACKEND_PROGRESS_API_URL="http://backend:5001/api/upload/progress"
-
-# --- Log Environment Variables (for debugging) ---
-echo "[post-create] --- Tusd Hook Environment Variables ---" >&2
-env | grep TUS_ | sort >&2
-echo "[post-create] ---------------------------------------" >&2
-
-# --- Get Upload ID ---
-UPLOAD_ID="$TUS_ID"
-if [ -z "$UPLOAD_ID" ]; then
-  echo "[post-create] Error: TUS_ID environment variable is missing." >&2
-  exit 1 # Exit with error
-fi
-echo "[post-create] Processing upload ID: $UPLOAD_ID" >&2
-
-# --- Read Token, Filename, and Size from .info file ---
-INFO_FILE_PATH="$TUSD_DATA_DIR/$UPLOAD_ID.info"
-echo "[post-create] Reading info file: $INFO_FILE_PATH" >&2
-
-if [ ! -f "$INFO_FILE_PATH" ]; then
-    echo "[post-create] Error: .info file not found at $INFO_FILE_PATH." >&2
-    # It might take a moment for the file system to sync, add a small delay and retry
-    sleep 0.5
-    if [ ! -f "$INFO_FILE_PATH" ]; then
-        echo "[post-create] Error: .info file still not found after delay." >&2
-        exit 1 # Cannot proceed without the info file
-    fi
-    echo "[post-create] Info file found after delay." >&2
-fi
-
-# Use jq to extract values
-# Token:
-ENCODED_TOKEN=$(jq -er '.MetaData.token' "$INFO_FILE_PATH")
-if [ $? -ne 0 ] || [ -z "$ENCODED_TOKEN" ]; then
-    echo "[post-create] Error: Failed to parse token from .info file." >&2
-    cat "$INFO_FILE_PATH" >&2
-    exit 1
-fi
-TOKEN="$ENCODED_TOKEN" # Token is not base64 encoded
-echo "[post-create] Extracted token." >&2
-
-# Filename:
-ENCODED_FILENAME=$(jq -er '.MetaData.filename' "$INFO_FILE_PATH")
-if [ $? -ne 0 ] || [ -z "$ENCODED_FILENAME" ]; then
-    echo "[post-create] Error: Failed to parse filename from .info file." >&2
-    cat "$INFO_FILE_PATH" >&2
-    exit 1
-fi
-ORIGINAL_FILENAME="$ENCODED_FILENAME" # Filename is not base64 encoded
-echo "[post-create] Extracted filename: $ORIGINAL_FILENAME" >&2
-
-# Size:
-UPLOAD_SIZE=$(jq -er '.Size' "$INFO_FILE_PATH")
-if [ $? -ne 0 ] || [ -z "$UPLOAD_SIZE" ]; then
-    echo "[post-create] Error: Failed to parse Size from .info file." >&2
-    cat "$INFO_FILE_PATH" >&2
-    exit 1
-fi
-echo "[post-create] Extracted size: $UPLOAD_SIZE" >&2
-
-# --- Notify Backend ---
-echo "[post-create] Notifying backend API: $BACKEND_PROGRESS_API_URL" >&2
-
-# Construct JSON payload
-JSON_PAYLOAD=$(cat <<EOF
-{
-  "uploadId": "$UPLOAD_ID",
-  "status": "created",
-  "token": "$TOKEN",
-  "filename": "$ORIGINAL_FILENAME",
-  "size": $UPLOAD_SIZE,
-  "offset": 0
-}
-EOF
-)
-
-echo "[post-create] Sending JSON Payload: $JSON_PAYLOAD" >&2
-
-# Use wget to send POST request
-# -q: quiet, -O-: output response to stdout (discarded here with > /dev/null)
-# --post-data: send data as POST body
-# --header: set content type
-wget -qO- --post-data="$JSON_PAYLOAD" --header="Content-Type: application/json" "$BACKEND_PROGRESS_API_URL" > /dev/null
-WGET_EXIT_CODE=$?
-
-if [ $WGET_EXIT_CODE -ne 0 ]; then
-    echo "[post-create] Warning: Failed to notify backend API (wget exit code: $WGET_EXIT_CODE). URL: $BACKEND_PROGRESS_API_URL" >&2
-    # Don't exit with error, allow tusd to continue, but log the failure.
-else
-    echo "[post-create] Backend notified successfully." >&2
-fi
-
-echo "[post-create] Hook finished for upload ID: $UPLOAD_ID" >&2
-exit 0
+#!/bin/sh                                                                                                                                                
+# DEPRECATED: Tusd post-finish hook script                                                                                                               
+#                                                                                                                                                        
+# This script is no longer used. The backend now handles the post-finish                                                                                 
+# logic directly via the /api/upload/process-finished endpoint.                                                                                          
+#                                                                                                                                                        
+# Tusd should be configured to call this endpoint directly using the HTTP hook protocol.                                                                 
+# Example Tusd flags:                                                                                                                                    
+#   -hooks-protocol http \                                                                                                                               
+#   -hooks-http-url http://backend:5001/api/upload/process-finished \                                                                                    
+#   -hooks-http-forward-headers "Upload-Concat,Upload-Defer-Length,Upload-Length,Upload-Metadata,Upload-Offset,Tus-Resumable" \                          
+#   -hooks-enabled-events post-finish                                                                                                                    
+#                                                                                                                                                        
+# This script can be safely removed or left empty.                                                                                                       
+                                                                                                                                                         
+echo "[post-finish] This hook script is deprecated and should not be executed." >&2                                                                      
+echo "[post-finish] Configure Tusd to use the HTTP hook protocol for post-finish events." >&2                                                            
+                                                                                                                                                         
+# Exit with success to avoid causing issues if accidentally executed                                                                                     
+exit 0     
