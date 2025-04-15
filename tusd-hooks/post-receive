@@ -1,0 +1,62 @@
+#!/bin/sh
+# Tusd post-receive hook script
+# Runs after a chunk has been received.
+
+# Exit immediately if a command exits with a non-zero status.
+set -e
+# Print each command before executing it (for debugging)
+# set -x # Uncomment for debugging
+
+# --- Configuration ---
+# !!! IMPORTANT: Replace with the actual URL of your backend endpoint !!!
+BACKEND_PROGRESS_API_URL="http://backend:5001/api/upload/progress"
+
+# --- Log Environment Variables (for debugging) ---
+# echo "[post-receive] --- Tusd Hook Environment Variables ---" >&2
+# env | grep TUS_ | sort >&2
+# echo "[post-receive] ---------------------------------------" >&2
+
+# --- Get Upload ID and Offset ---
+UPLOAD_ID="$TUS_ID"
+OFFSET="$TUS_OFFSET"
+
+if [ -z "$UPLOAD_ID" ]; then
+  echo "[post-receive] Error: TUS_ID environment variable is missing." >&2
+  exit 1 # Exit with error
+fi
+if [ -z "$OFFSET" ]; then
+  echo "[post-receive] Error: TUS_OFFSET environment variable is missing." >&2
+  exit 1 # Exit with error
+fi
+
+# echo "[post-receive] Processing upload ID: $UPLOAD_ID, Offset: $OFFSET" >&2 # Too noisy
+
+# --- Notify Backend ---
+# echo "[post-receive] Notifying backend API: $BACKEND_PROGRESS_API_URL" >&2 # Too noisy
+
+# Construct JSON payload
+JSON_PAYLOAD=$(cat <<EOF
+{
+  "uploadId": "$UPLOAD_ID",
+  "status": "receiving",
+  "offset": $OFFSET
+}
+EOF
+)
+
+# echo "[post-receive] Sending JSON Payload: $JSON_PAYLOAD" >&2 # Too noisy
+
+# Use wget to send POST request
+wget -qO- --post-data="$JSON_PAYLOAD" --header="Content-Type: application/json" "$BACKEND_PROGRESS_API_URL" > /dev/null
+WGET_EXIT_CODE=$?
+
+if [ $WGET_EXIT_CODE -ne 0 ]; then
+    echo "[post-receive] Warning: Failed to notify backend API (wget exit code: $WGET_EXIT_CODE) for Upload $UPLOAD_ID, Offset $OFFSET. URL: $BACKEND_PROGRESS_API_URL" >&2
+    # Don't exit with error, allow tusd to continue
+else
+    # echo "[post-receive] Backend notified successfully for offset $OFFSET." >&2 # Too noisy
+    : # No-op, just successfully completed
+fi
+
+# echo "[post-receive] Hook finished for upload ID: $UPLOAD_ID, Offset: $OFFSET" >&2 # Too noisy
+exit 0
