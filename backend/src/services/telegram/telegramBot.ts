@@ -122,17 +122,48 @@ export class TelegramBot {
   }
 
   /**
-   * Public method to clean up the stored message ID for a given upload.
-   * This is typically called after termination or successful completion handling.
+   * Delete a stored message ID when it's no longer needed (from cache and DB)
+   * Made public for use after sending termination/completion messages.
    */
   public async cleanupUploadMessage(uploadId: string): Promise<boolean> {
-    console.log(`[TELEGRAM-DEBUG] Received request to clean up message ID for upload ${uploadId}`);
-    // Call the private method internally
-    return this.deleteMessageId(uploadId);
+    console.log(`[TELEGRAM-DEBUG] Cleaning up message ID for upload ${uploadId}`);
+    try {
+      // Remove from the in-memory cache first
+      this.messageIdCache.delete(uploadId);
+      this.uploadInfoCache.delete(uploadId); // Also clear related upload info cache
+
+      // Check if our model exists yet (after migration) to avoid runtime errors
+      // @ts-ignore - We're checking this at runtime
+      if (!prisma.telegramMessage) {
+        console.log(`[TELEGRAM-DEBUG] TelegramMessage model not yet available in Prisma client, using memory cache only for cleanup`);
+        return true;
+      }
+
+      // Then remove from the database if the record exists
+      // @ts-ignore - We've checked it exists at runtime
+      const existing = await prisma.telegramMessage.findUnique({ where: { uploadId } });
+      if (existing) {
+        // @ts-ignore - We've checked it exists at runtime
+        await prisma.telegramMessage.delete({
+          where: { uploadId }
+        });
+        console.log(`[TELEGRAM-DEBUG] Deleted message ID for upload ${uploadId} from database`);
+      } else {
+        console.log(`[TELEGRAM-DEBUG] No message ID found in database for upload ${uploadId} to delete.`);
+      }
+
+      return true;
+    } catch (error) {
+      // Log error but don't throw, cleanup failure shouldn't break main flow
+      console.error(`[TELEGRAM-DEBUG] Error deleting message ID for upload ${uploadId}:`, error);
+      logger.error(`[TELEGRAM-DEBUG] Error cleaning up message ID for ${uploadId}: ${error instanceof Error ? error.message : error}`);
+      return false; // Indicate cleanup failed
+    }
   }
 
   /**
-   * Delete a stored message ID when it's no longer needed
+   * Delete a stored message ID when it's no longer needed (Internal Implementation)
+   * Kept private as the public interface is now cleanupUploadMessage
    */
   private async deleteMessageId(uploadId: string): Promise<boolean> {
     try {
@@ -293,6 +324,50 @@ export class TelegramBot {
       return false;
     } // End of the main catch block
   } // End of sendMessage method
+
+
+  /**
+   * Sends a dedicated termination message for an upload.
+   * This method ALWAYS sends a new message and does NOT attempt to edit.
+   * It also cleans up any stored message ID for the upload afterwards.
+   */
+  async sendTerminationMessage(uploadId: string, message: string): Promise<boolean> {
+    const chatId = !isNaN(Number(this.chatId)) ? Number(this.chatId) : this.chatId;
+    console.log(`[TELEGRAM-DEBUG] Sending dedicated termination message for upload ${uploadId}`);
+
+    try {
+      // Always send a new message for termination
+      const response = await axios.post(`${this.baseUrl}/sendMessage`, {
+        chat_id: chatId,
+        text: message,
+        parse_mode: 'HTML',
+      });
+
+      console.log('[TELEGRAM-DEBUG] Termination message sent via API. Response:', JSON.stringify(response.data));
+
+      if (response.data.ok) {
+        logger.info(`Successfully sent termination notification for upload ${uploadId}`);
+        // Crucially, clean up any old message ID *after* sending the new one
+        await this.cleanupUploadMessage(uploadId);
+        return true;
+      } else {
+        logger.error(`Telegram API failed to send termination message for ${uploadId}: ${response.data.description}`);
+        // Attempt cleanup even if sending failed, to prevent future issues
+        await this.cleanupUploadMessage(uploadId);
+        return false;
+      }
+    } catch (error: any) {
+      console.error(`[TELEGRAM-DEBUG] Failed to send termination message for upload ${uploadId}:`, error.message);
+      logger.error(`Failed to send termination message for ${uploadId}:`, error.message);
+      if (error.response) {
+        console.error('[TELEGRAM-DEBUG] Error response data:', JSON.stringify(error.response.data));
+      }
+      // Attempt cleanup even if sending failed, to prevent future issues
+      await this.cleanupUploadMessage(uploadId);
+      return false;
+    }
+  }
+
 
   /**
    * Edit an existing message
