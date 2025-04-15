@@ -4,6 +4,25 @@ import { uploadTracker } from '../services/uploads/uploadTracker';
 import { getTelegramBot } from '../services/telegram/telegramBot';
 
 /**
+ * Format bytes to human-readable format
+ */
+function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  
+  return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${units[i]}`;
+}
+
+/**
+ * Calculate progress percentage
+ */
+function calculateProgress(current: number, total: number): number {
+  return total > 0 ? Math.round((current / total) * 100) : 0;
+}
+
+/**
  * Controller for handling tusd webhook events
  */
 export class TusdHooksController {
@@ -137,7 +156,17 @@ export class TusdHooksController {
         // Use the metadata from the upload tracker if available, as it might have more info
         const enhancedMetadata = uploadInfo?.metadata || metadata;
         
-        telegramBot.handleTerminatedUpload(uploadId, enhancedMetadata, size, offset)
+        // Create a new message instead of updating the existing one
+        const terminatedMessage = `<b>❌ Upload Terminated</b>\n` +
+          `<b>File:</b> ${enhancedMetadata?.filename || 'Unknown File'}\n` +
+          `<b>Size:</b> ${formatFileSize(size || 0)}\n` +
+          `<b>Progress:</b> Cancelled at ${calculateProgress(offset || 0, size || 0)}% (${formatFileSize(offset || 0)} / ${formatFileSize(size || 0)})\n` +
+          `<b>Client:</b> ${enhancedMetadata?.clientName || enhancedMetadata?.client || 'Unknown Client'}\n` +
+          `<b>Project:</b> ${enhancedMetadata?.projectName || enhancedMetadata?.project || 'Unknown Project'}\n` +
+          `<b>Terminated at:</b> ${new Date().toLocaleString()}`;
+        
+        // Send a new message directly
+        telegramBot.sendMessage(terminatedMessage)
           .then((success: boolean) => {
             logger.info(`Telegram notification for terminated upload ${uploadId} ${success ? 'succeeded' : 'failed'}`);
           })
