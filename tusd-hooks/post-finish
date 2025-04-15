@@ -76,6 +76,35 @@ echo "Successfully extracted filename from .info file." >&2
 # The redundant check and fallback logic below has been removed.
 
 echo "Processing upload ID: $UPLOAD_ID" >&2
+
+# --- Notify Backend of Completion ---
+# Use the correct endpoint for hook progress updates
+BACKEND_PROGRESS_API_URL="http://backend:5001/api/upload/hook-progress"
+
+echo "[post-finish] Notifying backend API of completion: $BACKEND_PROGRESS_API_URL" >&2
+
+# Construct JSON payload for completion
+JSON_PAYLOAD_FINISH=$(cat <<EOF
+{
+  "uploadId": "$UPLOAD_ID",
+  "status": "finished"
+}
+EOF
+)
+
+echo "[post-finish] Sending completion JSON Payload: $JSON_PAYLOAD_FINISH" >&2
+
+# Use wget to send POST request for completion status
+wget -qO- --post-data="$JSON_PAYLOAD_FINISH" --header="Content-Type: application/json" "$BACKEND_PROGRESS_API_URL" > /dev/null
+WGET_FINISH_EXIT_CODE=$?
+
+if [ $WGET_FINISH_EXIT_CODE -ne 0 ]; then
+    echo "[post-finish] Warning: Failed to notify backend API of completion (wget exit code: $WGET_FINISH_EXIT_CODE). URL: $BACKEND_PROGRESS_API_URL" >&2
+    # Log warning but continue with file moving logic
+else
+    echo "[post-finish] Backend notified of completion successfully." >&2
+fi
+
 echo "Using Token: $TOKEN" >&2
 echo "Original Filename: $ORIGINAL_FILENAME" >&2
 
