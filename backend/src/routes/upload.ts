@@ -516,9 +516,9 @@ router.post('/upload/:token', upload.array('files'), async (req: Request, res: R
     if (!uploadLink) {
       // Delete uploaded files since the link is invalid
       for (const file of files) {
-        await fs.promises.unlink(file.path);
+        await fsPromises.unlink(file.path); // Use fsPromises
       }
-      return res.status(404).json({ 
+      return res.status(404).json({
         status: 'error',
         message: 'Upload link not found'
       });
@@ -527,9 +527,9 @@ router.post('/upload/:token', upload.array('files'), async (req: Request, res: R
     if (uploadLink.expiresAt < new Date()) {
       // Delete uploaded files since the link has expired
       for (const file of files) {
-        await fs.promises.unlink(file.path);
+        await fsPromises.unlink(file.path); // Use fsPromises
       }
-      return res.status(403).json({ 
+      return res.status(403).json({
         status: 'error',
         message: 'Upload link has expired'
       });
@@ -539,9 +539,9 @@ router.post('/upload/:token', upload.array('files'), async (req: Request, res: R
     if (uploadLink.maxUses !== null && uploadLink.usedCount >= uploadLink.maxUses) {
       // Delete uploaded files since the link has reached max uses
       for (const file of files) {
-        await fs.promises.unlink(file.path);
+        await fsPromises.unlink(file.path); // Use fsPromises
       }
-      return res.status(403).json({ 
+      return res.status(403).json({
         status: 'error',
         message: 'Upload link has reached maximum uses'
       });
@@ -825,10 +825,10 @@ router.get('/projects/:projectId', authenticateToken, async (req: Request, res: 
       const turbosortPath = path.join(projectPath, '.turbosort');
       
       // Check if the file exists locally
-      if (fs.existsSync(turbosortPath)) {
+      if (fs.existsSync(turbosortPath)) { // Use standard fs for sync check
         // Read the content of the .turbosort file
-        turbosortContent = fs.readFileSync(turbosortPath, 'utf8').trim();
-      } 
+        turbosortContent = fs.readFileSync(turbosortPath, 'utf8').trim(); // Use standard fs for sync read
+      }
       // If not found locally and we have client info, try to get from S3
       else if (project.client && project.client.code) {
         try {
