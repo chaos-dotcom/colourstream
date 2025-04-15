@@ -431,6 +431,12 @@ export class TelegramBot {
          const durationMinutes = Math.floor(durationSeconds / 60);
          const remainingSeconds = durationSeconds % 60;
          message += `<b>Duration:</b> ${durationMinutes}m ${remainingSeconds}s\n`;
+         
+         // Calculate and show average speed for completed uploads
+         if (durationSeconds > 0) {
+           const avgSpeedBps = size / durationSeconds;
+           message += `<b>Average Speed:</b> ${formatSpeed(avgSpeedBps)}\n`;
+         }
       }
     }
 
