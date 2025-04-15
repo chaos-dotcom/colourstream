@@ -331,6 +331,16 @@ export class TelegramBot {
     // Debug log for upload speed
     console.log(`[TELEGRAM-DEBUG] Upload speed for ${id}: ${uploadSpeed} bytes/sec`);
     
+    // Calculate speed if not provided but we have enough data
+    let effectiveSpeed = uploadSpeed;
+    if (!effectiveSpeed && offset > 0 && createdAt) {
+      const elapsedSeconds = (Date.now() - createdAt.getTime()) / 1000;
+      if (elapsedSeconds > 0) {
+        effectiveSpeed = offset / elapsedSeconds;
+        console.log(`[TELEGRAM-DEBUG] Calculated speed for ${id}: ${effectiveSpeed} bytes/sec (${offset} bytes in ${elapsedSeconds} seconds)`);
+      }
+    }
+    
     // Force isComplete to true if offset equals size (upload is complete)
     const actuallyComplete = isComplete || (offset === size);
     
@@ -407,9 +417,10 @@ export class TelegramBot {
     console.log(`[TELEGRAM-DEBUG] Upload speed check: complete=${actuallyComplete}, terminated=${isTerminated}, speed=${uploadSpeed}`);
     
     // Always show speed if it's available, even if it's very small
-    if (!actuallyComplete && !isTerminated && uploadSpeed !== undefined) {
+    if (!actuallyComplete && !isTerminated && (uploadSpeed !== undefined || effectiveSpeed !== undefined)) {
       // Force a minimum display value for very small speeds
-      const displaySpeed = uploadSpeed <= 0 ? undefined : Math.max(uploadSpeed, 1);
+      const speedToUse = uploadSpeed !== undefined ? uploadSpeed : effectiveSpeed;
+      const displaySpeed = speedToUse <= 0 ? undefined : Math.max(speedToUse, 1);
       message += `<b>Speed:</b> ${formatSpeed(displaySpeed)}\n`;
     }
 
@@ -504,15 +515,23 @@ export class TelegramBot {
   async handleTerminatedUpload(uploadId: string, metadata?: Record<string, string>, size?: number, offset?: number): Promise<boolean> {
     logger.info(`[handleTerminatedUpload] Upload ${uploadId} was terminated`);
     
+    console.log(`[TELEGRAM-DEBUG] Handling terminated upload ${uploadId} with size=${size}, offset=${offset}`);
+    
+    // Try to get existing info from cache first
+    const cachedInfo = this.uploadInfoCache.get(uploadId);
+    
     // Get existing upload info from the database if available
     let uploadInfo: any = {
       id: uploadId,
       terminated: true,
-      metadata: metadata || {},
-      size: size || 0,
-      offset: offset || 0,
-      isComplete: false
+      metadata: metadata || (cachedInfo?.metadata || {}),
+      size: size || (cachedInfo?.size || 0),
+      offset: offset || (cachedInfo?.offset || 0),
+      isComplete: false,
+      createdAt: cachedInfo?.createdAt || new Date()
     };
+    
+    console.log(`[TELEGRAM-DEBUG] Sending terminated notification for ${uploadId} with data:`, uploadInfo);
     
     // Send the notification with terminated flag
     return this.sendUploadNotification(uploadInfo);
