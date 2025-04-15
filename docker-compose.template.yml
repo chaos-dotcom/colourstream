@@ -386,64 +386,7 @@ services:
       - "traefik.http.middlewares.sio.headers.customrequestheaders.Connection=Upgrade" # Add Connection header
       - "traefik.http.middlewares.sio.headers.customrequestheaders.Upgrade=websocket" # Add Upgrade header
       - "traefik.http.routers.mirotalk-ws.middlewares=sio"
-
-  minio:
-    image: minio/minio:latest
-    container_name: colourstream-minio
-    command: server --console-address ":9001" /data
-    environment:
-      # Enable CORS
-      MINIO_BROWSER: "on"
-      MINIO_CORS_ALLOW_ALL: "true"
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-      MINIO_IDENTITY_OPENID_CONFIG_URL: ${MINIO_IDENTITY_OPENID_CONFIG_URL}
-      MINIO_IDENTITY_OPENID_CLIENT_ID: ${MINIO_IDENTITY_OPENID_CLIENT_ID}
-      MINIO_IDENTITY_OPENID_CLIENT_SECRET: ${MINIO_IDENTITY_OPENID_CLIENT_SECRET}
-      MINIO_BROWSER_REDIRECT_URL: ${MINIO_BROWSER_REDIRECT_URL}
-      MINIO_REGION: us-east-1
-      # Set CORS allow origin via environment variable (more reliable)
-      MINIO_API_CORS_ALLOW_ORIGIN: "*" # Or restrict to "https://upload.colourstream.${DOMAIN}"
-      # PocketID-specific OIDC settings
-      MINIO_IDENTITY_OPENID_CLAIM_NAME: "groups"
-      MINIO_IDENTITY_OPENID_DISPLAY_NAME: "name"
-      MINIO_IDENTITY_OPENID_CLAIM_PREFIX: "minio-"
-    expose:
-      - 9000
-      - 9001
-    volumes:
-      - minio_data:/data
-    networks:
-      - network
-    restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
-      # API endpoint
-      - "traefik.http.routers.minio-api.rule=Host(`s3.colourstream.${DOMAIN}`)"
-      - "traefik.http.routers.minio-api.entrypoints=websecure"
-      - "traefik.http.routers.minio-api.tls=true"
-      - "traefik.http.routers.minio-api.tls.certresolver=myresolver" # Add cert resolver
-      - "traefik.http.routers.minio-api.service=minio-api"
-      - "traefik.http.services.minio-api.loadbalancer.server.port=9000"
-      - "traefik.http.services.minio-api.loadbalancer.passHostHeader=true" # Ensure original Host header is passed to MinIO
-      # Re-add CORS middleware with VERY PERMISSIVE settings for debugging
-      - "traefik.http.routers.minio-api.middlewares=minio-cors-headers@docker"
-      # Permissive CORS middleware definition for Traefik v3 (DEBUGGING ONLY)
-      - "traefik.http.middlewares.minio-cors-headers.headers.accessControlAllowMethods=GET,OPTIONS,PUT,POST,DELETE,HEAD" 
-      - "traefik.http.middlewares.minio-cors-headers.headers.accessControlAllowHeaders=*" # Allow ANY header
-      - "traefik.http.middlewares.minio-cors-headers.headers.accessControlAllowOriginList=*" # Allow ANY origin (less secure)
-      - "traefik.http.middlewares.minio-cors-headers.headers.accessControlMaxAge=3600"
-      - "traefik.http.middlewares.minio-cors-headers.headers.addVaryHeader=true"
-      - "traefik.http.middlewares.minio-cors-headers.headers.accessControlAllowCredentials=true"
-      - "traefik.http.middlewares.minio-cors-headers.headers.accessControlExposeHeaders=ETag,Content-Length,Content-Type,X-Amz-Request-Id" # Expose ETag
-      # Console endpoint
-      - "traefik.http.routers.minio-console.rule=Host(`s3-console.colourstream.${DOMAIN}`)"
-      - "traefik.http.routers.minio-console.entrypoints=websecure"
-      - "traefik.http.routers.minio-console.tls=true"
-      - "traefik.http.routers.minio-console.tls.certresolver=myresolver"
-      - "traefik.http.routers.minio-console.service=minio-console"
-      - "traefik.http.services.minio-console.loadbalancer.server.port=9001"
-
+  # Add Uppy Companion service for handling large file uploads
   companion:
     image: transloadit/companion:latest
     container_name: colourstream-companion
@@ -496,102 +439,30 @@ services:
       - "traefik.http.routers.companion.tls.certresolver=myresolver"
       - "traefik.http.routers.companion.service=companion"
       - "traefik.http.services.companion.loadbalancer.server.port=3020"
-
-  createbuckets:
-    image: minio/mc:latest
-    container_name: colourstream-createbuckets
-    depends_on:
-      - minio
-    entrypoint: >
-      /bin/sh -c '
-      set -ex # Exit on error and print commands
-      
-      echo "Waiting for MinIO to be ready...";
-      sleep 5;
-      
-      echo "Adding MinIO host configuration...";
-      /usr/bin/mc config host add myminio http://minio:9000 $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD;
-      echo "Host configuration added.";
-      
-      echo "Attempting to create bucket $S3_BUCKET...";
-      /usr/bin/mc mb --ignore-existing myminio/$S3_BUCKET;
-      echo "Bucket creation command finished.";
-      
-      # Removed anonymous policy setting - bucket should remain private
-      # echo "Setting anonymous policy for bucket $S3_BUCKET...";
-      # /usr/bin/mc anonymous set readwrite myminio/$S3_BUCKET;
-      # echo "Anonymous policy command finished.";
-      
-      # CORS will be configured via MinIO environment variables now.
-      echo "Bucket setup process completed for bucket $S3_BUCKET.";
-      exit 0; # Exit successfully
-      '
-    networks:
-      - network
-    restart: "no"
 tusd:
      image: tusproject/tusd:latest
      container_name: colourstream-tusd # Added container name for clarity
-     restart: always  # Added restart policy
-     sysctls:
-      - net.ipv4.tcp_wmem: '4096 4194304 4194304'
-      - net.ipv4.tcp_rmem: '4096 6291456 6291456' 
-     expose: # Use expose instead of ports if only Traefik needs access
-       - 1080
+     restart: unless-stopped # Restart policy
      volumes:
-       - ./tusd-data:/srv/tusd-data # Map a local directory for file storage
+       - /Volumes/Backup3/tusd-data:/srv/tusd-data # Map a local directory for file storage
        - ./tusd-hooks:/etc/tusd/hooks # Mount the hooks directory
-       # Removed TLS cert/key mounts as we'll use h2c
+       - ./certs/certs/tusd.colourstream.${DOMAIN}.co.uk.crt:/etc/tusd/tusd.crt:ro # Mount the TLS certificate
+       - ./certs/private/tusd.colourstream.${DOMAIN}.co.uk.key:/etc/tusd/tusd.key:ro # Mount the TLS key
      entrypoint: /usr/local/bin/tusd # Explicitly set the entrypoint
+     ports:
+      - "1080:1080" # Map tusd port to host
      command: # Use YAML list format for command arguments
-       - "-port"
-       - "1080"
-       - "-upload-dir"
-       - "/srv/tusd-data"
-       - "-max-size"
-       - "640000000000"
-       - "-behind-proxy"
-       - "-disable-cors" # Disable tusd's internal CORS handling, Traefik handles it
+       - "-port=1080"
+       - "-upload-dir=/srv/tusd-data"
        # --- Use script hooks ---
-       - "-hooks-dir"
-       - "/etc/tusd/hooks" # Point to the mounted hooks directory
-       - "-hooks-enabled-events"
-       - "post-finish" # Only trigger the post-finish hook
-       # --- End script hooks ---
-       # --- Enable HTTP/2 Cleartext (h2c) ---
-       - "-enable-h2c"
-       # --- End h2c ---
-     networks: # Added network definition
-       - network
-     labels:
-       - "traefik.enable=true"
-       # HTTP Router (for redirection) - Rule updated to Host only
-       - "traefik.http.routers.tusd-http.rule=Host(`tusd.colourstream.${DOMAIN}`)"
-       - "traefik.http.routers.tusd-http.entrypoints=web"
-       - "traefik.http.routers.tusd-http.middlewares=redirect-web-to-websecure@internal" # Corrected redirect middleware
-       # HTTPS Router - Rule reverted to Host only, PathPrefix caused issues with OPTIONS requests
-       - "traefik.http.routers.tusd-https.rule=Host(`tusd.colourstream.${DOMAIN}`)"
-       - "traefik.http.routers.tusd-https.entrypoints=websecure"
-       - "traefik.http.routers.tusd-https.tls=true"
-       - "traefik.http.routers.tusd-https.tls.certresolver=myresolver"
-       - "traefik.http.routers.tusd-https.service=tusd-service"
-       # Apply Middlewares: Swap order - CORS first, then forwarded proto
-       - "traefik.http.routers.tusd-https.middlewares=tusd-cors-headers@docker,tusd-forwarded-proto@docker"
-       - "traefik.http.routers.tusd-https.priority=200" # Add higher priority
-       # Service Definition
-       - "traefik.http.services.tusd-service.loadbalancer.server.port=1080" # Tusd internal port
-       - "traefik.http.services.tusd-service.loadbalancer.server.scheme=h2c" # Use H2C for Traefik <-> tusd connection (HTTP/2 Cleartext)
-       # Middleware to explicitly set X-Forwarded-Proto (Still needed as client connects via HTTPS)
-       - "traefik.http.middlewares.tusd-forwarded-proto.headers.customrequestheaders.X-Forwarded-Proto=https"
-       # CORS Middleware Definition for Tusd (Re-added)
-       - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlAllowMethods=GET,POST,PATCH,HEAD,DELETE,OPTIONS" # Added DELETE
-       - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlAllowHeaders=Authorization,Content-Type,Tus-Resumable,Upload-Length,Upload-Metadata,Upload-Offset,X-Requested-With,Origin,Metadata" # Added Metadata
-       - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlExposeHeaders=Upload-Offset,Location,Upload-Length,Tus-Version,Tus-Resumable,Tus-Max-Size,Tus-Extension,Upload-Metadata,Metadata" # Added Metadata
-       - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlAllowOriginList=https://upload.colourstream.${DOMAIN}" # Revert to specific origin
-       - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlMaxAge=3600"
-       - "traefik.http.middlewares.tusd-cors-headers.headers.addVaryHeader=true"
-       - "traefik.http.middlewares.tusd-cors-headers.headers.accessControlAllowCredentials=true"
+       - "-hooks-dir=/etc/tusd/hooks"
 
+       - "-tls-certificate=/etc/tusd/tusd.crt"
+       - "-tls-key=/etc/tusd/tusd.key"
+       - "-enable-h2c" # Enable HTTP/2 over cleartext
+       - "-hooks-dir=/etc/tusd/hooks" # Point to the mounted hooks directory"
+     networks: # Added network def\\inition
+       - network
 
 volumes:
   postgres_data:
