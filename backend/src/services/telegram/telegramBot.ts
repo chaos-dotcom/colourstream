@@ -527,7 +527,6 @@ export class TelegramBot {
       const finalMetadata = metadata || (cachedInfo?.metadata || {});
       const finalSize = size || (cachedInfo?.size || 0);
       const finalOffset = offset || (cachedInfo?.offset || 0);
-      const createdTime = cachedInfo?.createdAt || new Date();
       
       // Extract filename and project info from metadata
       // Check both standard metadata fields and the ones from the upload tracker
