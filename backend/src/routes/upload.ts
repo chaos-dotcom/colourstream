@@ -2,7 +2,8 @@ import express, { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import multer from 'multer';
 import path from 'path';
-import fs from 'fs/promises'; // Use promises version of fs
+import fs from 'fs'; // Import standard fs for sync methods
+import fsPromises from 'fs/promises'; // Import promises API separately
 import { v4 as uuidv4 } from 'uuid';
 import xxhash from 'xxhash-wasm';
 import { authenticateToken } from '../middleware/auth';
@@ -20,13 +21,11 @@ const prisma = new PrismaClient();
 // Note: This is basic and will be lost on server restart.
 // Consider Redis or a database for production.
 interface TusdUploadInfo {
-  size: number;
-  filename: string;
   token: string;
   clientName?: string;
   projectName?: string;
   storage: 'local' | 's3';
-  // Add optional fields for when info is fetched later
+  // Optional fields, potentially populated later or from hooks/cache
   size?: number;
   filename?: string;
 }
@@ -55,7 +54,7 @@ async function getUploadDetails(uploadId: string, providedToken?: string): Promi
     const infoFilePath = path.join(TUSD_DATA_DIR, `${uploadId}.info`);
     logger.info(`[getUploadDetails] Token not provided or cached, reading info file: ${infoFilePath}`);
     try {
-      const infoContent = await fs.readFile(infoFilePath, 'utf-8');
+      const infoContent = await fsPromises.readFile(infoFilePath, 'utf-8'); // Use fsPromises
       const infoData = JSON.parse(infoContent);
       token = infoData?.MetaData?.token; // Extract token
       size = infoData?.Size; // Extract size
@@ -162,8 +161,8 @@ const storage = multer.diskStorage({
         uploadLink.project.name
       );
 
-      if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
+      if (!fs.existsSync(uploadDir)) { // Use standard fs for sync check
+        fs.mkdirSync(uploadDir, { recursive: true }); // Use standard fs for sync creation
       }
       cb(null, uploadDir);
     } catch (error) {
@@ -574,7 +573,7 @@ router.post('/upload/:token', upload.array('files'), async (req: Request, res: R
       
       try {
         // Calculate file hash for integrity and deduplication
-        const fileBuffer = await fs.promises.readFile(file.path);
+        const fileBuffer = await fsPromises.readFile(file.path); // Use fsPromises
         const fileHash = xxhash64.h64Raw(Buffer.from(fileBuffer)).toString(16);
 
         // Check for existing file with same hash in this project
@@ -587,8 +586,8 @@ router.post('/upload/:token', upload.array('files'), async (req: Request, res: R
 
         if (existingFile) {
           // Delete the duplicate file
-          await fs.promises.unlink(file.path);
-          
+          await fsPromises.unlink(file.path); // Use fsPromises
+
           // Track the upload as complete
           uploadTracker.completeUpload(xhrUploadId);
           
@@ -629,8 +628,8 @@ router.post('/upload/:token', upload.array('files'), async (req: Request, res: R
           );
 
           // Delete the local file after successful S3 upload
-          await fs.promises.unlink(file.path);
-          
+          await fsPromises.unlink(file.path); // Use fsPromises
+
           // Update the file path to use the S3 URL
           filePath = fileUrl;
         }
@@ -846,10 +845,10 @@ router.get('/projects/:projectId', authenticateToken, async (req: Request, res: 
             turbosortContent = s3Object.toString('utf8').trim();
             
             // Cache the S3 content locally for future use
-            if (!fs.existsSync(projectPath)) {
-              fs.mkdirSync(projectPath, { recursive: true });
+            if (!fs.existsSync(projectPath)) { // Use standard fs for sync check
+              fs.mkdirSync(projectPath, { recursive: true }); // Use standard fs for sync creation
             }
-            fs.writeFileSync(turbosortPath, turbosortContent);
+            fs.writeFileSync(turbosortPath, turbosortContent); // Use standard fs for sync write
             console.log(`Cached turbosort file from S3 to local path: ${turbosortPath}`);
           }
         } catch (s3Error) {
@@ -1334,7 +1333,7 @@ router.post('/tusd-hook', async (req: Request, res: Response) => {
       logger.error('[/tusd-hook] Missing required metadata fields (token, clientCode, project, filename)');
       // Attempt to delete the orphaned file left by Tusd
       try {
-        await fs.promises.unlink(tusFilePath);
+        await fsPromises.unlink(tusFilePath); // Use fsPromises
         logger.warn(`[/tusd-hook] Deleted orphaned Tusd file due to missing metadata: ${tusFilePath}`);
       } catch (unlinkError) {
         logger.error(`[/tusd-hook] Failed to delete orphaned Tusd file: ${tusFilePath}`, unlinkError);
@@ -1352,7 +1351,7 @@ router.post('/tusd-hook', async (req: Request, res: Response) => {
       logger.error(`[/tusd-hook] Invalid token: ${token}`);
       // Attempt to delete the orphaned file
       try {
-        await fs.promises.unlink(tusFilePath);
+        await fsPromises.unlink(tusFilePath); // Use fsPromises
         logger.warn(`[/tusd-hook] Deleted orphaned Tusd file due to invalid token: ${tusFilePath}`);
       } catch (unlinkError) {
         logger.error(`[/tusd-hook] Failed to delete orphaned Tusd file: ${tusFilePath}`, unlinkError);
@@ -1371,7 +1370,7 @@ router.post('/tusd-hook', async (req: Request, res: Response) => {
        logger.warn(`[/tusd-hook] Expired or over-limit token used: ${token}`);
        // Attempt to delete the orphaned file
        try {
-         await fs.promises.unlink(tusFilePath);
+         await fsPromises.unlink(tusFilePath); // Use fsPromises
          logger.warn(`[/tusd-hook] Deleted orphaned Tusd file due to expired/over-limit token: ${tusFilePath}`);
        } catch (unlinkError) {
          logger.error(`[/tusd-hook] Failed to delete orphaned Tusd file: ${tusFilePath}`, unlinkError);
@@ -1391,8 +1390,8 @@ router.post('/tusd-hook', async (req: Request, res: Response) => {
       // Upload from Tusd's path to S3
       const s3Key = s3Service.generateKey(clientCode, projectName, safeFilename);
       logger.info(`[/tusd-hook] Uploading Tusd file ${tusFilePath} to S3 key: ${s3Key}`);
-      
-      const fileBuffer = await fs.promises.readFile(tusFilePath);
+
+      const fileBuffer = await fsPromises.readFile(tusFilePath); // Use fsPromises
       finalUrl = await s3Service.uploadFile(
         fileBuffer,
         s3Key,
@@ -1407,7 +1406,7 @@ router.post('/tusd-hook', async (req: Request, res: Response) => {
 
       // Delete the local file left by Tusd after successful S3 upload
       try {
-        await fs.promises.unlink(tusFilePath);
+        await fsPromises.unlink(tusFilePath); // Use fsPromises
         logger.info(`[/tusd-hook] Deleted local Tusd file after S3 upload: ${tusFilePath}`);
       } catch (unlinkError) {
         logger.error(`[/tusd-hook] Failed to delete local Tusd file after S3 upload: ${tusFilePath}`, unlinkError);
@@ -1418,22 +1417,22 @@ router.post('/tusd-hook', async (req: Request, res: Response) => {
       // Move file locally
       const organizedDir = process.env.TUS_ORGANIZED_DIR || path.join(__dirname, '../../organized'); // Use a specific organized dir for Tusd files
       const clientProjectDir = path.join(organizedDir, clientCode, projectName);
-      
-      if (!fs.existsSync(clientProjectDir)) {
-        await fs.promises.mkdir(clientProjectDir, { recursive: true });
+
+      if (!fs.existsSync(clientProjectDir)) { // Use standard fs for sync check
+        await fsPromises.mkdir(clientProjectDir, { recursive: true }); // Use fsPromises
       }
-      
+
       finalPath = path.join(clientProjectDir, safeFilename);
       logger.info(`[/tusd-hook] Moving Tusd file from ${tusFilePath} to ${finalPath}`);
-      
+
       try {
-        await fs.promises.rename(tusFilePath, finalPath);
+        await fsPromises.rename(tusFilePath, finalPath); // Use fsPromises
       } catch (renameError) {
          // Handle potential cross-device link error (EXDEV) by copying and unlinking
          if ((renameError as NodeJS.ErrnoException).code === 'EXDEV') {
             logger.warn(`[/tusd-hook] Cross-device link error (EXDEV) moving ${tusFilePath} to ${finalPath}. Attempting copy/unlink.`);
-            await fs.promises.copyFile(tusFilePath, finalPath);
-            await fs.promises.unlink(tusFilePath);
+            await fsPromises.copyFile(tusFilePath, finalPath); // Use fsPromises
+            await fsPromises.unlink(tusFilePath); // Use fsPromises
             logger.info(`[/tusd-hook] Successfully copied and unlinked file across devices.`);
          } else {
             logger.error(`[/tusd-hook] Failed to move Tusd file: ${renameError}`);
@@ -1446,7 +1445,7 @@ router.post('/tusd-hook', async (req: Request, res: Response) => {
     // Note: Hashing large files here can be resource-intensive. Consider doing it async or skipping if not critical.
     let fileHash = `tus-${tusId}`; // Default hash if calculation fails or is skipped
     try {
-      const finalFileBuffer = await fs.promises.readFile(finalPath); // Read the *final* file if local
+      const finalFileBuffer = await fsPromises.readFile(finalPath); // Read the *final* file if local // Use fsPromises
       const xxhash64 = await xxhash();
       fileHash = xxhash64.h64Raw(Buffer.from(finalFileBuffer)).toString(16);
       logger.info(`[/tusd-hook] Calculated hash for ${finalPath}: ${fileHash}`);
@@ -1669,9 +1668,9 @@ router.post('/hook-progress', async (req: Request, res: Response) => {
             filename: initialDetails.filename ?? 'Unknown Filename',
             clientName: initialDetails.clientName || 'Unknown Client',
             projectName: initialDetails.projectName || 'Unknown Project',
-            token: initialInfo.token,
+            token: initialDetails.token, // Use initialDetails
           },
-          storage: initialInfo.storage,
+          storage: initialDetails.storage, // Use initialDetails
           isComplete: false,
         });
         break;
@@ -1775,58 +1774,8 @@ router.post('/hook-progress', async (req: Request, res: Response) => {
 // --- End Tusd Hook Progress Handler ---
 
 
-// Endpoint for Companion to notify backend after successful S3 upload
-// NOTE: This endpoint remains separate from the Tusd hook handler
-router.post('/s3-callback', async (req: Request, res: Response) => {
-    const { uploadId, bytesUploaded, bytesTotal, filename, clientName, projectName } = req.body;
-
-    // Basic validation
-    if (!uploadId || bytesUploaded === undefined || bytesTotal === undefined || !filename || !token) {
-      logger.warn('[Progress Update] Received incomplete payload:', req.body);
-      return res.status(400).json({ status: 'error', message: 'Incomplete progress data' });
-    }
-
-    // Validate token (optional but good practice)
-    // You might want to add a quick check here if needed, similar to other routes
-
-    const telegramBot = getTelegramBot();
-    if (!telegramBot) {
-      logger.error('[Progress Update] Telegram bot not initialized.');
-      // Don't block the frontend, just log the error server-side
-      return res.status(200).json({ status: 'warning', message: 'Telegram bot not available' });
-    }
-
-    // Prepare data for the notification function
-    const uploadInfo = {
-      id: uploadId, // Use the uploadId provided by Uppy/frontend
-      size: Number(bytesTotal),
-      offset: Number(bytesUploaded),
-      metadata: {
-        filename: filename,
-        // Add client/project if available in request body
-        clientName: clientName || 'Unknown Client',
-        projectName: projectName || 'Unknown Project',
-        token: token, // Include token if needed
-      },
-      // isComplete: false, // Explicitly ensure progress endpoint doesn't mark as complete
-      storage: 's3', // Assuming these are S3 uploads via Companion
-      // uploadSpeed: Can be calculated if needed, but let telegramBot handle it for now
-    };
-
-    // Send notification (don't wait for it to finish)
-    telegramBot.sendUploadNotification(uploadInfo).catch((err: any) => { // Add type to err
-      logger.error(`[Progress Update] Error sending Telegram notification for ${uploadId}:`, err);
-    });
-
-    // Respond quickly to the frontend
-    res.status(200).json({ status: 'success', message: 'Progress received' });
-
-  } catch (error) {
-    logger.error('[Progress Update] Error processing progress update:', error);
-    // Avoid sending error back to frontend unless necessary
-    res.status(500).json({ status: 'error', message: 'Internal server error processing progress' });
-  }
-});
+// The duplicate /s3-callback endpoint below was removed as it was erroneous and redundant.
+// The correct /s3-callback endpoint is defined earlier in the file (around line 1180).
 
 // Set turbosort directory for a project
 // Note: The turbosort directory is stored in a .turbosort file in the project directory,
@@ -1862,13 +1811,13 @@ router.post('/projects/:projectId/turbosort', authenticateToken, async (req: Req
     const projectPath = path.join(process.env.UPLOAD_DIR || 'uploads', projectId);
     
     // Create the project directory if it doesn't exist
-    if (!fs.existsSync(projectPath)) {
-      fs.mkdirSync(projectPath, { recursive: true });
+    if (!fs.existsSync(projectPath)) { // Use standard fs for sync check
+      fs.mkdirSync(projectPath, { recursive: true }); // Use standard fs for sync creation
     }
 
     // Write the directory name to the .turbosort file
     const turbosortPath = path.join(projectPath, '.turbosort');
-    fs.writeFileSync(turbosortPath, directory);
+    fs.writeFileSync(turbosortPath, directory); // Use standard fs for sync write
 
     // Also save the .turbosort file to S3 if project has a client
     if (project.client && project.client.code) {
@@ -1936,10 +1885,10 @@ router.delete('/projects/:projectId/turbosort', authenticateToken, async (req: R
     // Construct the path to the .turbosort file
     const projectPath = path.join(process.env.UPLOAD_DIR || 'uploads', projectId);
     const turbosortPath = path.join(projectPath, '.turbosort');
-    
+
     // Check if the file exists before attempting to delete
-    if (fs.existsSync(turbosortPath)) {
-      fs.unlinkSync(turbosortPath);
+    if (fs.existsSync(turbosortPath)) { // Use standard fs for sync check
+      fs.unlinkSync(turbosortPath); // Use standard fs for sync unlink
     }
 
     // Also delete from S3 if project has a client
