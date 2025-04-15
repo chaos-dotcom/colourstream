@@ -6,14 +6,9 @@ set -e
 # Print each command before executing it (for debugging)
 set -x
 
-# --- Configuration ---
-# Base directory where tusd stores files INSIDE THE CONTAINER
-TUSD_DATA_DIR="/srv/tusd-data"
-
-# --- Log Environment Variables (for debugging) ---
-echo "--- Tusd Hook Environment Variables ---" >&2
-env | grep TUS_ | sort >&2
-echo "---------------------------------------" >&2
+# This script now ONLY notifies the backend that Tusd has finished receiving bytes.
+# Actual file processing (moving, DB update, final notification) is handled
+# by a separate backend endpoint triggered by a different hook mechanism.
 
 # --- Get Metadata ---
 # Tusd provides metadata via environment variables prefixed with TUS_META_
