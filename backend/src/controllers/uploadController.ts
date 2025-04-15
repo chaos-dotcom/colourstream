@@ -115,9 +115,10 @@ export const handleProcessFinishedUpload = async (req: Request, res: Response): 
 
   // --- Get TUSD Data Directory (Needed for constructing relative paths if necessary) ---
   // This should match the root directory tusd uses.
-  const tusdDataDir = process.env.TUSD_DATA_DIR;
-  if (!tusdDataDir) {
-    logger.error('[ProcessFinished:${uploadId}] TUSD_DATA_DIR environment variable is not set. Cannot reliably construct destination paths.');
+  // The variable 'tusdDataDir' is already declared and checked earlier in the function.
+  // We remove the redundant declaration below.
+  if (!tusdDataDir) { // Keep the check, but remove the 'const tusdDataDir = ...' line
+    logger.error(`[ProcessFinished:${uploadId}] TUSD_DATA_DIR environment variable is not set. Cannot reliably construct destination paths.`); // Use template literal for uploadId
     // Optionally send failure notification
     return;
   }
