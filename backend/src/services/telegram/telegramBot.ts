@@ -161,35 +161,7 @@ export class TelegramBot {
     }
   }
 
-  /**
-   * Delete a stored message ID when it's no longer needed (Internal Implementation)
-   * Kept private as the public interface is now cleanupUploadMessage
-   */
-  private async deleteMessageId(uploadId: string): Promise<boolean> {
-    try {
-      // Remove from the in-memory cache first
-      this.messageIdCache.delete(uploadId);
-      
-      // Check if our model exists yet (after migration) to avoid runtime errors
-      // @ts-ignore - We're checking this at runtime
-      if (!prisma.telegramMessage) {
-        console.log(`[TELEGRAM-DEBUG] TelegramMessage model not yet available in Prisma client, using memory cache only`);
-        return true;
-      }
-      
-      // Then remove from the database
-      // @ts-ignore - We've checked it exists at runtime
-      await prisma.telegramMessage.delete({
-        where: { uploadId }
-      });
-      
-      console.log(`[TELEGRAM-DEBUG] Deleted message ID for upload ${uploadId} from database`);
-      return true;
-    } catch (error) {
-      console.error(`[TELEGRAM-DEBUG] Error deleting message ID for upload ${uploadId}:`, error);
-      return false;
-    }
-  }
+  // Removed unused private deleteMessageId method. Use cleanupUploadMessage instead.
 
   /**
    * Send a message to the configured Telegram chat
@@ -600,17 +572,7 @@ export class TelegramBot {
     return success;
   }
 
-  /**
-   * Format bytes to human-readable format
-   */
-  private formatBytes(bytes: number): string {
-    if (bytes === 0) return '0 B';
-    
-    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    
-    return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${units[i]}`;
-  }
+  // Removed unused private formatBytes method. Formatting is done within sendUploadNotification.
 
   /**
    * Send a test message to verify the bot is working
