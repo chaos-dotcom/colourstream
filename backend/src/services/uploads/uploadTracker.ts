@@ -8,8 +8,8 @@ interface UploadInfo {
   metadata?: Record<string, string>;
   createdAt: Date;
   lastUpdated: Date;
-  previousOffset?: number;
-  previousUpdateTime?: Date;
+  previousOffset?: number; // Store previous offset for speed calculation
+  previousUpdateTime?: Date; // Store previous time for speed calculation
   uploadSpeed?: number; // Speed in bytes per second
   storage?: string;
   isComplete: boolean;
@@ -25,33 +25,41 @@ class UploadTracker {
   trackUpload(uploadInfo: Omit<UploadInfo, 'lastUpdated' | 'isComplete'> & { isComplete?: boolean }): void {
     const now = new Date();
     const existingUpload = this.uploads.get(uploadInfo.id);
-    
+
     console.log('[TELEGRAM-DEBUG] trackUpload called for ID:', uploadInfo.id);
-    
+
     // Calculate upload speed if this is an update
     let uploadSpeed: number | undefined = undefined;
-    
-    if (existingUpload && existingUpload.offset !== uploadInfo.offset) {
-      const timeDiffMs = now.getTime() - existingUpload.lastUpdated.getTime();
-      if (timeDiffMs > 0) {
-        // Only calculate speed if some time has passed (avoid division by zero)
+    // Store previous state for the *next* calculation
+    const previousOffset = existingUpload?.offset;
+    const previousUpdateTime = existingUpload?.lastUpdated;
+
+    if (existingUpload && existingUpload.offset !== uploadInfo.offset && previousUpdateTime) {
+      const timeDiffMs = now.getTime() - previousUpdateTime.getTime();
+      // Ensure time difference is positive and offset has increased
+      if (timeDiffMs > 50 && uploadInfo.offset > existingUpload.offset) { // Only calc speed if > 50ms passed & offset increased
         const bytesDiff = uploadInfo.offset - existingUpload.offset;
-        // Convert to bytes per second
-        uploadSpeed = (bytesDiff / timeDiffMs) * 1000;
+        uploadSpeed = (bytesDiff / timeDiffMs) * 1000; // Bytes per second
         console.log(`[TELEGRAM-DEBUG] Calculated upload speed for ${uploadInfo.id}: ${uploadSpeed.toFixed(2)} bytes/s`);
+      } else if (timeDiffMs <= 50) {
+         // If time diff is too small, reuse the previous speed if available
+         uploadSpeed = existingUpload.uploadSpeed;
+         console.log(`[TELEGRAM-DEBUG] Time diff too small, reusing previous speed for ${uploadInfo.id}: ${uploadSpeed?.toFixed(2)} bytes/s`);
       }
     }
-    
+
     const updatedUpload: UploadInfo = {
       ...uploadInfo,
       lastUpdated: now,
       isComplete: uploadInfo.isComplete ?? false,
       createdAt: existingUpload?.createdAt || now,
-      previousOffset: existingUpload?.offset,
-      previousUpdateTime: existingUpload?.lastUpdated,
-      uploadSpeed
+      // Store the state *before* this update for the next calculation
+      previousOffset: previousOffset,
+      previousUpdateTime: previousUpdateTime,
+      // Use newly calculated speed, or retain previous speed if calculation wasn't possible this interval
+      uploadSpeed: uploadSpeed !== undefined ? uploadSpeed : existingUpload?.uploadSpeed
     };
-    
+
     this.uploads.set(uploadInfo.id, updatedUpload);
     
     // Send notification via Telegram if configured

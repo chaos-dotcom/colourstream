@@ -323,11 +323,11 @@ export class TelegramBot {
     uploadSpeed?: number;
     storage?: string;
   }): Promise<boolean> {
-    const { id, size, offset, metadata, isComplete, uploadSpeed } = uploadInfo;
+    const { id, size, offset, metadata, isComplete, uploadSpeed, createdAt } = uploadInfo; // Add createdAt
 
-    logger.info(`[sendUploadNotification] Received data for ID ${id}: size=${size}, offset=${offset}, filename=${metadata?.filename}, client=${metadata?.clientName}, project=${metadata?.projectName}, isComplete=${isComplete}`); // Log received data
+    logger.info(`[sendUploadNotification] Received data for ID ${id}: size=${size}, offset=${offset}, filename=${metadata?.filename}, client=${metadata?.clientName}, project=${metadata?.projectName}, isComplete=${isComplete}, speed=${uploadSpeed}`); // Log received data
 
-    console.log('[TELEGRAM-DEBUG] Creating upload notification message for upload:', id);
+    console.log('[TELEGRAM-DEBUG] Creating/Updating upload notification message for upload:', id);
 
     // Calculate progress percentage
     const progress = size > 0 ? Math.round((offset / size) * 100) : 0;
@@ -341,7 +341,8 @@ export class TelegramBot {
     };
 
     // Format transfer speed in human-readable format
-    const formatSpeed = (bytesPerSecond: number): string => {
+    const formatSpeed = (bytesPerSecond: number | undefined): string => {
+      if (bytesPerSecond === undefined || bytesPerSecond <= 0) return 'N/A'; // Handle undefined or zero speed
       if (bytesPerSecond < 1024) return `${bytesPerSecond.toFixed(2)} B/s`;
       if (bytesPerSecond < 1024 * 1024) return `${(bytesPerSecond / 1024).toFixed(2)} KB/s`;
       if (bytesPerSecond < 1024 * 1024 * 1024) return `${(bytesPerSecond / (1024 * 1024)).toFixed(2)} MB/s`;
@@ -374,12 +375,12 @@ export class TelegramBot {
     } else {
       message += `<b>Progress:</b> 100% Complete!\n`;
     }
-    
+
     // Add upload speed if available and not a completed upload
-    if (uploadSpeed && !isComplete && uploadSpeed > 0) {
+    if (!isComplete && uploadSpeed !== undefined && uploadSpeed > 0) { // Check > 0
       message += `<b>Speed:</b> ${formatSpeed(uploadSpeed)}\n`;
     }
-    
+
     // Add client and project information if available
     if (metadata?.clientName) {
       message += `<b>Client:</b> ${metadata.clientName}\n`;
@@ -414,13 +415,23 @@ export class TelegramBot {
         const remainingBytes = size - offset;
         const remainingTime = remainingBytes > 0 ? 'Calculating...' : 'Almost done';
         message += `<b>Time remaining:</b> ${remainingTime}\n`;
+      } else {
+        // Fallback if we don't have speed data yet or speed is zero
+        message += `<b>Time remaining:</b> Calculating...\n`;
       }
     }
-    
-    // Add completion timestamp if completed
+
+    // Add completion timestamp and duration if completed
     if (isComplete) {
-      const now = new Date();
-      message += `<b>Completed at:</b> ${now.toLocaleString()}\n`;
+      const completedTime = new Date();
+      message += `<b>Completed at:</b> ${completedTime.toLocaleString()}\n`;
+      if (createdAt) { // Calculate duration if start time is known
+         const durationMs = completedTime.getTime() - createdAt.getTime();
+         const durationSeconds = Math.round(durationMs / 1000);
+         const durationMinutes = Math.floor(durationSeconds / 60);
+         const remainingSeconds = durationSeconds % 60;
+         message += `<b>Duration:</b> ${durationMinutes}m ${remainingSeconds}s\n`;
+      }
     }
 
     // Check if there's already a message ID for this upload before sending
