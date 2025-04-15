@@ -1646,6 +1646,7 @@ router.post('/hook-progress', async (req: Request, res: Response) => {
         }
 
         // Use helper function to get details and populate cache
+        logger.info(`[Hook Progress - created] Received: uploadId=${uploadId}, token=${token ? token.substring(0,8)+'...' : 'MISSING'}, filename=${filename}, size=${size}`); // Log received data (mask token)
         const initialDetails = await getUploadDetails(uploadId, token);
 
         if (!initialDetails) {
