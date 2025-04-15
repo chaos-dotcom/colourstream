@@ -64,12 +64,8 @@ const sanitizePathString = (str: string | undefined | null): string => {
 export const handleProcessFinishedUpload = async (req: Request, res: Response): Promise<void> => {
   const infoPayload = req.body as TusInfoFilePayload;
   const uploadId = infoPayload?.ID;
-
-  // Immediately acknowledge the request to the hook script
-  res.status(200).send({ message: 'Received finished upload payload.' });
-
-  logger.info(`[ProcessFinished:${uploadId}] Received finished upload payload.`);
-  logger.debug(`[ProcessFinished:${uploadId}] Payload:`, infoPayload);
+  // ... (lines 321 and onward)
+};
 
   // --- Basic Payload Validation ---
   if (!uploadId || !infoPayload.MetaData?.token || !infoPayload.Storage?.Path || !infoPayload.Storage?.InfoPath || !infoPayload.Storage?.Type) {
