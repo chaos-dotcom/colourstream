@@ -65,30 +65,53 @@ const sanitizePathString = (str: string | undefined | null): string => {
 // The correct definition starts below.
 
 // --- Basic Payload Validation ---
-export const handleProcessFinishedUpload = async (req: Request, res: Response): Promise<void> => { // Ensure this is the only export of this function
-  const infoPayload = req.body as TusInfoFilePayload;
-  const uploadId = infoPayload?.ID;
+export const handleProcessFinishedUpload = async (req: Request, res: Response): Promise<void> => {
+  // Extract uploadId from the hook payload (sent to /hook-progress)
+  const hookPayload = req.body;
+  const uploadId = hookPayload?.uploadId;
 
-  // Acknowledge Tusd immediately ONLY if the basic payload looks okay.
-  // We'll handle internal errors without failing the hook where possible.
-  if (uploadId && infoPayload.MetaData?.token && infoPayload.Storage?.Path) {
-    res.status(200).send({ message: 'Received finished upload payload. Processing initiated.' });
-  } else {
-    // If basic info is missing, reject the hook call.
-    logger.error(`[ProcessFinished:${uploadId || 'UNKNOWN'}] Invalid or incomplete payload received from hook. Missing ID, token, or storage path.`);
-    res.status(400).send({ message: 'Invalid or incomplete payload.' });
-    return; // Stop processing
-  }
-
-  logger.info(`[ProcessFinished:${uploadId}] Received finished upload payload.`);
-  logger.debug(`[ProcessFinished:${uploadId}] Payload:`, infoPayload);
-
-  // --- Basic Payload Validation ---
-  if (!uploadId || !infoPayload.MetaData?.token || !infoPayload.Storage?.Path || !infoPayload.Storage?.InfoPath || !infoPayload.Storage?.Type) {
-    logger.error(`[ProcessFinished:${uploadId}] Invalid or incomplete payload received from hook. Missing ID, token, storage paths, or type.`);
-    // Already responded with 400 above if critical info was missing.
+  if (!uploadId) {
+    logger.error('[ProcessFinished] Received hook call without uploadId.');
+    // Send response directly as this function is now called by the route handler
+    res.status(400).send({ message: 'Missing uploadId in hook payload.' });
     return;
   }
+
+  logger.info(`[ProcessFinished:${uploadId}] Received 'finished' hook via /hook-progress. Starting processing.`);
+
+  // --- Get TUSD Data Directory ---
+  const tusdDataDir = process.env.TUSD_DATA_DIR;
+  if (!tusdDataDir) {
+    logger.error(`[ProcessFinished:${uploadId}] TUSD_DATA_DIR environment variable is not set. Cannot read .info file.`);
+    // Send internal error response
+    res.status(500).send({ message: 'Internal server configuration error (TUSD_DATA_DIR).' });
+    return;
+  }
+
+  // --- Read the .info file to get the full payload ---
+  let infoPayload: TusInfoFilePayload;
+  const infoFilePath = path.join(tusdDataDir, `${uploadId}.info`);
+  try {
+    logger.info(`[ProcessFinished:${uploadId}] Reading info file: ${infoFilePath}`);
+    const infoContent = await fs.readFile(infoFilePath, 'utf-8');
+    infoPayload = JSON.parse(infoContent);
+    logger.info(`[ProcessFinished:${uploadId}] Successfully read and parsed info file.`);
+    logger.debug(`[ProcessFinished:${uploadId}] Info Payload:`, infoPayload); // Log the full payload
+
+    // --- Validate the reconstructed payload ---
+    if (!infoPayload.ID || !infoPayload.MetaData?.token || !infoPayload.Storage?.Path || !infoPayload.Storage?.InfoPath || !infoPayload.Storage?.Type) {
+      throw new Error('Parsed .info file is missing required fields (ID, MetaData.token, Storage.Path, Storage.InfoPath, Storage.Type).');
+    }
+
+  } catch (err: any) {
+    logger.error(`[ProcessFinished:${uploadId}] Failed to read or parse info file ${infoFilePath}:`, err);
+    // Send internal error response
+    res.status(500).send({ message: 'Internal server error reading upload details.' });
+    return;
+  }
+
+  // --- Proceed with the original processing logic using the reconstructed infoPayload ---
+  const telegramBot = getTelegramBot(); // Get bot instance
 
   // --- Get TUSD Data Directory (Needed for constructing relative paths if necessary) ---
   // This should match the root directory tusd uses.
@@ -99,11 +122,9 @@ export const handleProcessFinishedUpload = async (req: Request, res: Response): 
     return;
   }
 
-  const telegramBot = getTelegramBot(); // Get bot instance
-
-  // --- Process Upload Asynchronously ---
+  // --- Process Upload --- (Removed "Asynchronously" as the hook waits)
   try {
-    // --- Restore Core Processing Logic ---
+    // --- Core Processing Logic --- (No longer needs restoring, it's below)
 
     // 1. Decode Metadata (if necessary - check actual .info file content)
     // Assuming metadata in the received JSON is already decoded for now.
@@ -267,9 +288,17 @@ export const handleProcessFinishedUpload = async (req: Request, res: Response): 
     logger.info(`[ProcessFinished:${uploadId}] Triggering completion via uploadTracker.`);
     uploadTracker.completeUpload(uploadId); // Pass only ID, tracker should have details or fetch them
 
+    // Send a final success response for the hook *if not already sent*
+    // (handleProcessFinishedUpload might be called directly in future, so check res.headersSent)
+    if (!res.headersSent) {
+       logger.info(`[ProcessFinished:${uploadId}] Sending final success response to hook.`);
+       res.status(200).send({ message: 'Upload processed successfully.' });
+    }
+
   } catch (error: any) {
     logger.error(`[ProcessFinished:${uploadId}] Error processing finished upload:`, error);
-    // Send failure notification
+
+    // Send failure notification via Telegram
     if (telegramBot) {
       try {
         await telegramBot.sendMessage(
@@ -293,6 +322,12 @@ export const handleProcessFinishedUpload = async (req: Request, res: Response): 
         });
     } catch (dbError) {
         logger.error(`[ProcessFinished:${uploadId}] Failed to update database status to failed:`, dbError);
+    }
+
+    // Send a final error response for the hook *if not already sent*
+    if (!res.headersSent) {
+       logger.error(`[ProcessFinished:${uploadId}] Sending final error response to hook.`);
+       res.status(500).send({ message: `Internal server error processing upload: ${error.message}` });
     }
   }
 };

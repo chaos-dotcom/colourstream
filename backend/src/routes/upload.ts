@@ -19,7 +19,9 @@ import { handleProcessFinishedUpload } from '../controllers/uploadController';
 const router = express.Router();
 const prisma = new PrismaClient();
 
-router.post('/process-finished', handleProcessFinishedUpload);
+// Removed the separate /process-finished route, as all hooks go to /hook-progress now.
+// router.post('/process-finished', handleProcessFinishedUpload);
+
 // Note: This is basic and will be lost on server restart.
 // Consider Redis or a database for production.
 interface TusdUploadInfo {
@@ -1550,7 +1552,18 @@ router.post('/hook-progress', async (req: Request, res: Response) => {
         });
         break;
 
-      // The 'finished' case block has been removed from here.
+      case 'finished':
+        // Upload is fully received by Tusd. Trigger final processing.
+        logger.info(`[Hook Progress] Received 'finished' status for ${uploadId}. Triggering final processing.`);
+        // Call the controller function responsible for handling the finished state.
+        // We pass the request and response objects along, but the controller
+        // will now primarily use the uploadId from the body to fetch details.
+        // Note: handleProcessFinishedUpload needs modification to read the .info file itself.
+        handleProcessFinishedUpload(req, res);
+        // We don't break here because handleProcessFinishedUpload will send its own response.
+        // However, we need to prevent the default success response below from being sent.
+        // Let's return here to stop further execution in this handler for the 'finished' case.
+        return;
 
       default:
         logger.warn(`[Hook Progress] Received unknown status '${status}' for uploadId: ${uploadId}`);

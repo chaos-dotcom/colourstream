@@ -459,17 +459,11 @@ tusd:
        - "-upload-dir=/srv/tusd-data"
        - "-tls-certificate=/etc/tusd/tusd.crt"
        - "-tls-key=/etc/tusd/tusd.key"
-       # --- Use HTTP hooks with specific URLs per event ---
-       - "-hooks-protocol=http"
-       # Point create/receive/terminate events to the progress endpoint
-       - "-hooks-http-post-create-url=http://backend:5001/api/upload/hook-progress"
-       - "-hooks-http-post-receive-url=http://backend:5001/api/upload/hook-progress"
-       - "-hooks-http-post-terminate-url=http://backend:5001/api/upload/hook-progress" # Can add specific handling later if needed
-       # Point finish event to the dedicated processing endpoint
-       - "-hooks-http-post-finish-url=http://backend:5001/api/upload/process-finished"
-       # Forward necessary headers for all HTTP hooks
+       # --- Use single HTTP hook endpoint ---
+       - "-hooks-http=http://backend:5001/api/upload/hook-progress"
+       # Forward necessary headers for the HTTP hook
        - "-hooks-http-forward-headers=Upload-Concat,Upload-Defer-Length,Upload-Length,Upload-Metadata,Upload-Offset,Tus-Resumable"
-       # Specify which events trigger hooks
+       # Specify which events trigger hooks (all sent to the same URL)
        - "-hooks-enabled-events=post-create,post-receive,post-finish,post-terminate"
        # - "-enable-h2c" # This might conflict with TLS, review if needed
      networks: # Added network definition
