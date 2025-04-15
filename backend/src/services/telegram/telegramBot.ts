@@ -533,10 +533,54 @@ export class TelegramBot {
       createdAt: cachedInfo?.createdAt || new Date()
     };
     
+    // Extract filename and project info from metadata
+    const filename = metadata?.filename || 'Unknown File';
+    const clientName = metadata?.clientName || 'Unknown Client';
+    const projectName = metadata?.projectName || 'Unknown Project';
+    
+    // Create a special terminated message
+    let message = `<b>❌ Upload Terminated</b>\n`;
+    message += `<b>File:</b> ${filename}\n`;
+    message += `<b>Size:</b> ${this.formatBytes(size || 0)}\n`;
+    
+    // Calculate and show progress
+    const progress = size && size > 0 ? Math.round((offset || 0) / size * 100) : 0;
+    message += `<b>Progress:</b> Cancelled at ${progress}% (${this.formatBytes(offset || 0)} / ${this.formatBytes(size || 0)})\n`;
+    
+    // Add client and project information
+    message += `<b>Client:</b> ${clientName}\n`;
+    message += `<b>Project:</b> ${projectName}\n`;
+    
+    // Add timestamp
+    message += `<b>Terminated at:</b> ${new Date().toLocaleString()}\n`;
+    
+    // Send the message directly
+    const success = await this.sendMessage(message, uploadId);
+    
     console.log(`[TELEGRAM-DEBUG] Sending terminated notification for ${uploadId} with data:`, uploadInfo);
     
-    // Send the notification with terminated flag
-    return this.sendUploadNotification(uploadInfo);
+    // Clean up the message ID after a short delay
+    if (success) {
+      setTimeout(() => {
+        this.cleanupUploadMessage(uploadId).then(cleaned => {
+          console.log(`[TELEGRAM-DEBUG] Cleanup for terminated upload ${uploadId} completed: ${cleaned}`);
+        });
+      }, 2 * 60 * 1000); // 2 minutes
+    }
+    
+    return success;
+  }
+  
+  /**
+   * Format bytes to human-readable format
+   */
+  private formatBytes(bytes: number): string {
+    if (bytes === 0) return '0 B';
+    
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    
+    return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${units[i]}`;
   }
 
   /**
