@@ -435,16 +435,10 @@ export class TelegramBot {
     // Send message with upload ID for editing
     const success = await this.sendMessage(message, id);
     
-    // If upload is complete, we should clean up the message ID after a delay
-    // to ensure proper editing has occurred
-    if (isComplete && success) {
-      // Wait 10 seconds before removing the message ID 
-      // to ensure edit operations have completed
-      setTimeout(async () => {
-        console.log(`[TELEGRAM-DEBUG] Cleaning up message ID after completion for ${id}`);
-        await this.deleteMessageId(id);
-      }, 10000);
-    }
+    // If upload is complete and the notification was sent/edited successfully,
+    // the backend should now handle calling `cleanupUploadMessage(id)`
+    // based on receiving the "finished" status from the post-finish hook.
+    // The timeout logic is removed from here.
     
     return success;
   }
