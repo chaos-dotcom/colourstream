@@ -1764,40 +1764,7 @@ router.post('/hook-progress', async (req: Request, res: Response) => {
         });
         break;
 
-      case 'finished':
-        // Final notification when upload completes (before file move/processing)
-        // Use helper function to get details (checks cache first, then file/DB)
-        const finishedDetails = await getUploadDetails(uploadId);
-
-        if (!finishedDetails) {
-           logger.error(`[Hook Progress] Failed to get details for 'finished' status, uploadId: ${uploadId}. Cannot send final notification or cleanup.`);
-           // Attempt cleanup anyway? Or just warn?
-           await telegramBot.cleanupUploadMessage(uploadId); // Try cleanup even if details failed
-           tusdProgressCache.delete(uploadId); // Clean cache
-           return res.status(200).json({ status: 'warning', message: 'Upload details not found for finished status.' });
-        }
-
-        // Send final "complete" Telegram message using potentially refreshed details
-        await telegramBot.sendUploadNotification({
-          id: uploadId,
-          size: finishedDetails.size ?? 0,
-          offset: finishedDetails.size ?? 0, // Mark as fully uploaded
-          metadata: {
-            filename: finishedDetails.filename ?? 'Unknown Filename',
-            clientName: finishedDetails.clientName || 'Unknown Client',
-            projectName: finishedDetails.projectName || 'Unknown Project',
-            token: finishedDetails.token,
-          },
-          storage: finishedDetails.storage,
-          isComplete: true, // Mark as complete
-        });
-
-        // Clean up the message ID storage in the bot
-        await telegramBot.cleanupUploadMessage(uploadId);
-
-        // Remove from cache
-        tusdProgressCache.delete(uploadId);
-        logger.info(`[Hook Progress] Processed 'finished' status and cleaned up cache for ${uploadId}`);
+        // Remove the 'finished' case as it is no longer used
         break;
 
       default:
