@@ -410,15 +410,11 @@ export class TelegramBot {
         }
         
         message += `<b>Time remaining:</b> ${remainingTimeStr}\n`;
-      } 
-      else {
+      } else {
         // Fallback if we don't have speed data
         const remainingBytes = size - offset;
         const remainingTime = remainingBytes > 0 ? 'Calculating...' : 'Almost done';
         message += `<b>Time remaining:</b> ${remainingTime}\n`;
-      } else {
-        // Fallback if we don't have speed data yet or speed is zero
-        message += `<b>Time remaining:</b> Calculating...\n`;
       }
     }
 
