@@ -27,59 +27,12 @@ if [ -z "$UPLOAD_ID" ]; then
   exit 1 # Exit with error
 fi
 
-# --- Read Token and Filename from .info file ---
-INFO_FILE_PATH="$TUSD_DATA_DIR/$UPLOAD_ID.info"
-echo "Reading info file: $INFO_FILE_PATH" >&2
-
-if [ ! -f "$INFO_FILE_PATH" ]; then
-    echo "Error: .info file not found at $INFO_FILE_PATH." >&2
-    exit 1 # Cannot proceed without the info file
-fi
-
-# Use jq to extract base64 encoded values, then decode
-# Token:
-ENCODED_TOKEN=$(jq -er '.MetaData.token' "$INFO_FILE_PATH")
-JQ_TOKEN_EXIT_CODE=$?
-if [ $JQ_TOKEN_EXIT_CODE -ne 0 ] || [ -z "$ENCODED_TOKEN" ]; then
-    echo "Error: Failed to parse token from .info file (jq exit code: $JQ_TOKEN_EXIT_CODE)." >&2
-    echo "Info file content:" >&2
-    cat "$INFO_FILE_PATH" >&2
-    exit 1
-fi
-# The token is NOT base64 encoded in the .info file
-TOKEN="$ENCODED_TOKEN"
-# TOKEN=$(echo "$ENCODED_TOKEN" | base64 -d) # REMOVED base64 decode
-if [ -z "$TOKEN" ]; then
-    echo "Error: Parsed token is empty." >&2 # Updated error message
-    exit 1
-fi
-echo "Successfully extracted token from .info file." >&2
-
-# Filename: Always read from .info file
-echo "Reading filename from .info file." >&2
-ENCODED_FILENAME=$(jq -er '.MetaData.filename' "$INFO_FILE_PATH")
-JQ_FILENAME_EXIT_CODE=$?
-if [ $JQ_FILENAME_EXIT_CODE -ne 0 ] || [ -z "$ENCODED_FILENAME" ]; then
-    echo "Error: Failed to parse filename from .info file (jq exit code: $JQ_FILENAME_EXIT_CODE)." >&2
-    echo "Info file content:" >&2
-    cat "$INFO_FILE_PATH" >&2
-    exit 1 # Cannot proceed without a filename
-fi
-# The filename is NOT base64 encoded in the .info file
-ORIGINAL_FILENAME="$ENCODED_FILENAME"
-if [ -z "$ORIGINAL_FILENAME" ]; then
-    echo "Error: Parsed filename from .info file is empty." >&2
-    exit 1
-fi
-echo "Successfully extracted filename from .info file." >&2
-
-# The redundant check and fallback logic below has been removed.
-
 echo "Processing upload ID: $UPLOAD_ID" >&2
 
 # --- Notify Backend of Completion ---
-# Use the correct endpoint for hook progress updates
-BACKEND_PROGRESS_API_URL="http://backend:5001/api/upload/hook-progress"
+# This script now ONLY notifies the backend that Tusd has finished receiving bytes.
+# Actual file processing (moving, DB update, final notification) is handled
+# by a separate backend endpoint triggered by a different hook mechanism.
 
 echo "[post-finish] Notifying backend API of completion: $BACKEND_PROGRESS_API_URL" >&2
 
@@ -92,15 +45,13 @@ JSON_PAYLOAD_FINISH=$(cat <<EOF
 EOF
 )
 
-echo "[post-finish] Sending completion JSON Payload: $JSON_PAYLOAD_FINISH" >&2
-
 # Use wget to send POST request for completion status
 wget -qO- --post-data="$JSON_PAYLOAD_FINISH" --header="Content-Type: application/json" "$BACKEND_PROGRESS_API_URL" > /dev/null
 WGET_FINISH_EXIT_CODE=$?
 
 if [ $WGET_FINISH_EXIT_CODE -ne 0 ]; then
     echo "[post-finish] Warning: Failed to notify backend API of completion (wget exit code: $WGET_FINISH_EXIT_CODE). URL: $BACKEND_PROGRESS_API_URL" >&2
-    # Log warning but continue with file moving logic
+    # Log warning but continue
 else
     echo "[post-finish] Backend notified of completion successfully." >&2
 fi
