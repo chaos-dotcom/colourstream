@@ -324,9 +324,11 @@ export class TelegramBot {
     storage?: string;
   }): Promise<boolean> {
     const { id, size, offset, metadata, isComplete, uploadSpeed } = uploadInfo;
-    
+
+    logger.info(`[sendUploadNotification] Received data for ID ${id}: size=${size}, offset=${offset}, filename=${metadata?.filename}, client=${metadata?.clientName}, project=${metadata?.projectName}, isComplete=${isComplete}`); // Log received data
+
     console.log('[TELEGRAM-DEBUG] Creating upload notification message for upload:', id);
-    
+
     // Calculate progress percentage
     const progress = size > 0 ? Math.round((offset / size) * 100) : 0;
     

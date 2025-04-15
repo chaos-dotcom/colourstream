@@ -86,6 +86,7 @@ async function getUploadDetails(uploadId: string, providedToken?: string): Promi
       });
 
       if (uploadLink) {
+        logger.info(`[getUploadDetails] DB Query Result for token ${token}: Client=${uploadLink.project?.client?.name}, Project=${uploadLink.project?.name}`); // Log DB result more concisely
         const fullInfo: TusdUploadInfo = {
           token: token,
           clientName: uploadLink.project.client.name,
@@ -101,6 +102,7 @@ async function getUploadDetails(uploadId: string, providedToken?: string): Promi
         return fullInfo;
       } else {
         logger.error(`[getUploadDetails] Invalid token '${token}' found for ${uploadId}. Cannot fetch DB details.`);
+        logger.info(`[getUploadDetails] DB Query returned null/falsy for token ${token}.`); // Log null result explicitly
         // Cache minimal info to avoid re-reading file, but mark as invalid?
          tusdProgressCache.set(uploadId, { token, storage, size: size ?? 0, filename: filename ?? 'Unknown Filename', clientName: 'Invalid Token', projectName: 'Invalid Token' });
         return null;
@@ -1653,8 +1655,10 @@ router.post('/hook-progress', async (req: Request, res: Response) => {
         }
 
         // Ensure size and filename from body are stored if helper didn't get them from file
+        logger.info(`[Hook Progress - created] initialDetails from getUploadDetails: size=${initialDetails.size}, filename=${initialDetails.filename}, client=${initialDetails.clientName}, project=${initialDetails.projectName}`); // Log before assignment
         initialDetails.size = Number(size);
         initialDetails.filename = filename;
+        logger.info(`[Hook Progress - created] initialDetails after assigning hook payload: size=${initialDetails.size}, filename=${initialDetails.filename}`); // Log after assignment
         tusdProgressCache.set(uploadId, initialDetails); // Ensure cache is updated
         logger.info(`[Hook Progress] Cached initial info for ${uploadId}`);
 
