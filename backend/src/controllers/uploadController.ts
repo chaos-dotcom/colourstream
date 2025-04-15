@@ -240,7 +240,7 @@ export const handleProcessFinishedUpload = async (req: Request, res: Response): 
 
     // 6. Update Database Record
     logger.info(`[ProcessFinished:${uploadId}] Updating database record.`);
-    const _updatedFileRecord = await prisma.uploadedFile.upsert({ // Prefix unused variable
+    await prisma.uploadedFile.upsert({ // Remove unused variable assignment
         where: { id: uploadId },
         update: {
             status: 'completed',
