@@ -9,7 +9,7 @@ set -e
 
 # --- Configuration ---
 # !!! IMPORTANT: Replace with the actual URL of your backend endpoint !!!
-BACKEND_PROGRESS_API_URL="http://backend:5001/api/upload/progress"
+BACKEND_PROGRESS_API_URL="http://backend:5001/api/upload/hook-progress"
 
 # --- Log Environment Variables (for debugging) ---
 # echo "[post-receive] --- Tusd Hook Environment Variables ---" >&2
