@@ -9,6 +9,8 @@ set -x
 # This script now ONLY notifies the backend that Tusd has finished receiving bytes.
 # Actual file processing (moving, DB update, final notification) is handled
 # by a separate backend endpoint triggered by a different hook mechanism.
+# The logic for sanitizing paths, determining the final destination,
+# creating directories, and moving the file now resides within the backend controller.
 
 # --- Get Metadata ---
 # Tusd provides metadata via environment variables prefixed with TUS_META_
@@ -17,6 +19,7 @@ UPLOAD_ID="$TUS_ID"
 # We will get TOKEN and ORIGINAL_FILENAME from the .info file
 
 # --- Validate Base Info ---
+# The following logic has been moved to the backend controller.
 if [ -z "$UPLOAD_ID" ]; then
   echo "Error: TUS_ID environment variable is missing." >&2
   exit 1 # Exit with error
