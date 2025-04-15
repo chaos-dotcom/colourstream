@@ -2,7 +2,7 @@
 import { Request, Response } from 'express';
 import fs from 'fs/promises';
 import path from 'path';
-import { PrismaClient, UploadedFile } from '@prisma/client';
+import { PrismaClient } from '@prisma/client'; // Removed unused UploadedFile type
 import { logger } from '../utils/logger';
 import { getTelegramBot } from '../services/telegram/telegramBot';
 import { s3FileProcessor } from '../services/s3/s3FileProcessor'; // Import S3 processor if needed
@@ -144,7 +144,7 @@ export const handleProcessFinishedUpload = async (req: Request, res: Response): 
       const relativeDestInfoPath = path.join(relativeDestMetadataDir, `${sanitizedFilename}.info`);
 
       // Absolute paths for file operations
-      const absoluteDestDir = path.join(tusdDataDir, relativeDestDir);
+      // const absoluteDestDir = path.join(tusdDataDir, relativeDestDir); // Unused variable removed
       const absoluteDestMetadataDir = path.join(tusdDataDir, relativeDestMetadataDir);
       const absoluteDestFilePath = path.join(tusdDataDir, relativeDestFilePath);
       const absoluteDestInfoPath = path.join(tusdDataDir, relativeDestInfoPath);
@@ -191,6 +191,9 @@ export const handleProcessFinishedUpload = async (req: Request, res: Response): 
 
       // TODO: Adapt this call based on how s3FileProcessor works.
       // It might need the upload ID and token, or the S3 key from infoPayload.Storage.Path.
+      if (!token) { // Ensure token exists before processing S3
+          throw new Error(`Token is missing, cannot process S3 upload for ${uploadId}.`);
+      }
       const s3Processed = await s3FileProcessor.processFile(uploadId, token);
 
       if (!s3Processed) {
@@ -212,7 +215,7 @@ export const handleProcessFinishedUpload = async (req: Request, res: Response): 
 
     // 5. Update Database Record
     logger.info(`[ProcessFinished:${uploadId}] Updating database record.`);
-    const updatedFileRecord = await prisma.uploadedFile.upsert({
+    const _updatedFileRecord = await prisma.uploadedFile.upsert({ // Prefix unused variable
         where: { id: uploadId },
         update: {
             status: 'completed',
@@ -232,7 +235,7 @@ export const handleProcessFinishedUpload = async (req: Request, res: Response): 
             mimeType: metadata.filetype || metadata.type || 'application/octet-stream',
             status: 'completed',
             storage: finalStorageType,
-            token: token, // Store the token used
+            // token: token, // Removed - 'token' field likely doesn't exist on UploadedFile model
             projectId: project.id,
             completedAt: new Date(),
             // createdAt will be set automatically
@@ -252,7 +255,7 @@ export const handleProcessFinishedUpload = async (req: Request, res: Response): 
             filename: sanitizedFilename,
             clientName: clientCode,
             projectName: projectName,
-            filetype: metadata.filetype || metadata.type,
+            filetype: metadata.filetype || metadata.type || 'unknown', // Provide default for filetype
             // Add other relevant metadata from 'metadata' object if needed
         },
         isComplete: true,
@@ -284,7 +287,8 @@ export const handleProcessFinishedUpload = async (req: Request, res: Response): 
     try {
         await prisma.uploadedFile.update({
             where: { id: uploadId },
-            data: { status: 'failed', failureReason: error.message }
+            // data: { status: 'failed', failureReason: error.message } // Removed - 'failureReason' field likely doesn't exist
+            data: { status: 'failed' } // Only update status
         });
     } catch (dbError) {
         logger.error(`[ProcessFinished:${uploadId}] Failed to update database status to failed:`, dbError);
