@@ -322,13 +322,17 @@ export class TelegramBot {
     createdAt?: Date;
     uploadSpeed?: number;
     storage?: string;
+    terminated?: boolean;
   }): Promise<boolean> {
-    const { id, size, offset, metadata, isComplete, uploadSpeed, createdAt } = uploadInfo; // Add createdAt
+    const { id, size, offset, metadata, isComplete, uploadSpeed, createdAt, terminated } = uploadInfo;
 
-    logger.info(`[sendUploadNotification] Received data for ID ${id}: size=${size}, offset=${offset}, filename=${metadata?.filename}, client=${metadata?.clientName}, project=${metadata?.projectName}, isComplete=${isComplete}, speed=${uploadSpeed}`); // Log received data
+    logger.info(`[sendUploadNotification] Received data for ID ${id}: size=${size}, offset=${offset}, filename=${metadata?.filename}, client=${metadata?.clientName}, project=${metadata?.projectName}, isComplete=${isComplete}, speed=${uploadSpeed}, terminated=${terminated}`);
     
     // Force isComplete to true if offset equals size (upload is complete)
     const actuallyComplete = isComplete || (offset === size);
+    
+    // Handle terminated uploads
+    const isTerminated = terminated === true;
 
     console.log('[TELEGRAM-DEBUG] Creating/Updating upload notification message for upload:', id);
 
@@ -362,7 +366,9 @@ export class TelegramBot {
 
     // Create message with upload details and fewer emojis
     let message = '';
-    if (actuallyComplete) {
+    if (isTerminated) {
+      message = `<b>❌ Upload Terminated</b>\n`;
+    } else if (actuallyComplete) {
       message = `<b>✅ Upload Completed!</b>\n`;
     } else {
       const progressEmoji = getProgressEmoji(progress);
@@ -373,14 +379,16 @@ export class TelegramBot {
     message += `<b>Size:</b> ${formatFileSize(size)}\n`;
     
     // Add specific details about progress
-    if (progress < 100) {
+    if (isTerminated) {
+      message += `<b>Progress:</b> Cancelled at ${progress}% (${formatFileSize(offset)} / ${formatFileSize(size)})\n`;
+    } else if (progress < 100) {
       message += `<b>Progress:</b> ${progress}% (${formatFileSize(offset)} / ${formatFileSize(size)})\n`;
     } else {
       message += `<b>Progress:</b> 100% Complete!\n`;
     }
 
-    // Add upload speed if available and not a completed upload
-    if (!actuallyComplete && uploadSpeed !== undefined && uploadSpeed > 0) { // Check > 0
+    // Add upload speed if available and not a completed or terminated upload
+    if (!actuallyComplete && !isTerminated && uploadSpeed !== undefined && uploadSpeed > 0) {
       message += `<b>Speed:</b> ${formatSpeed(uploadSpeed)}\n`;
     }
 
@@ -393,8 +401,8 @@ export class TelegramBot {
       message += `<b>Project:</b> ${metadata.projectName}\n`;
     }
         
-    // Add estimated time remaining if not complete
-    if (!actuallyComplete && offset > 0 && size > offset) {
+    // Add estimated time remaining if not complete and not terminated
+    if (!actuallyComplete && !isTerminated && offset > 0 && size > offset) {
       if (uploadSpeed && uploadSpeed > 0) {
         // Calculate estimated time remaining based on current speed
         const remainingBytes = size - offset;
@@ -421,8 +429,8 @@ export class TelegramBot {
       }
     }
 
-    // Add completion timestamp and duration if completed
-    if (actuallyComplete) {
+    // Add completion timestamp and duration if completed or terminated
+    if (actuallyComplete || isTerminated) {
       const completedTime = new Date();
       message += `<b>Completed at:</b> ${completedTime.toLocaleString()}\n`;
       if (createdAt) { // Calculate duration if start time is known
@@ -454,18 +462,39 @@ export class TelegramBot {
     // Send message with upload ID for editing
     const success = await this.sendMessage(message, id);
     
-    // If upload is complete and the notification was sent/edited successfully,
+    // If upload is complete/terminated and the notification was sent/edited successfully,
     // schedule cleanup after a delay to ensure the completion message is visible
-    if (actuallyComplete && success) {
-      console.log(`[TELEGRAM-DEBUG] Upload ${id} is complete, scheduling cleanup in 5 minutes`);
+    if ((actuallyComplete || isTerminated) && success) {
+      const delayMinutes = isTerminated ? 2 : 5; // Shorter delay for terminated uploads
+      console.log(`[TELEGRAM-DEBUG] Upload ${id} is ${isTerminated ? 'terminated' : 'complete'}, scheduling cleanup in ${delayMinutes} minutes`);
       setTimeout(() => {
         this.cleanupUploadMessage(id).then(cleaned => {
           console.log(`[TELEGRAM-DEBUG] Cleanup for upload ${id} completed: ${cleaned}`);
         });
-      }, 5 * 60 * 1000); // 5 minutes delay
+      }, delayMinutes * 60 * 1000);
     }
     
     return success;
+  }
+
+  /**
+   * Handle a terminated upload
+   */
+  async handleTerminatedUpload(uploadId: string, metadata?: Record<string, string>, size?: number, offset?: number): Promise<boolean> {
+    logger.info(`[handleTerminatedUpload] Upload ${uploadId} was terminated`);
+    
+    // Get existing upload info from the database if available
+    let uploadInfo: any = {
+      id: uploadId,
+      terminated: true,
+      metadata: metadata || {},
+      size: size || 0,
+      offset: offset || 0,
+      isComplete: false
+    };
+    
+    // Send the notification with terminated flag
+    return this.sendUploadNotification(uploadInfo);
   }
 
   /**
