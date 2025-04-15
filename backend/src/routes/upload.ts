@@ -1600,26 +1600,8 @@ router.post('/hook-progress', async (req: Request, res: Response) => {
         // Prevent the default success response below.
         return;
 
-      case 'post-terminate':
-          logger.info(`[Hook Progress] Received 'post-terminate' hook for ${uploadId}. Cleaning up tracker/notifications.`);
-          // Clean up tracker state
-          uploadTracker.completeUpload(uploadId); // Mark as complete (or add a specific 'terminated' state)
-          // Clean up any persistent Telegram message (check if bot exists)
-          if (telegramBot) {
-              await telegramBot.cleanupUploadMessage(uploadId);
-          } else {
-              logger.warn(`[Hook Progress] Telegram bot not available, skipping message cleanup for terminated upload ${uploadId}`);
-          }
-          // Optionally, try to delete the orphaned .bin/.info files
-          try {
-              const infoPath = path.join(TUSD_DATA_DIR, `${uploadId}.info`);
-              const dataPath = path.join(TUSD_DATA_DIR, uploadId);
-              await fsPromises.unlink(infoPath).catch(e => logger.warn(`Failed to delete terminated info file ${infoPath}: ${e.message}`));
-              await fsPromises.unlink(dataPath).catch(e => logger.warn(`Failed to delete terminated data file ${dataPath}: ${e.message}`));
-          } catch (cleanupError) {
-              logger.error(`Error during post-terminate file cleanup for ${uploadId}:`, cleanupError);
-          }
-          break; // Allow default success response
+      // Removed the conflicting 'post-terminate' case from this handler.
+      // It is now correctly handled by TusdHooksController via tusdHooksRoutes.ts
 
       default:
         // Use hookType in the log message
