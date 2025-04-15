@@ -1514,11 +1514,11 @@ router.post('/hook-progress', async (req: Request, res: Response) => {
         //   filename: initialDetails.filename ?? 'Unknown Filename',
         //   clientName: initialDetails.clientName || 'Unknown Client',
         //   projectName: initialDetails.projectName || 'Unknown Project',
-            token: initialDetails.token, // Use initialDetails
-          },
-          storage: initialDetails.storage, // Use initialDetails
-          isComplete: false,
-        });
+        //    token: initialDetails.token, // Use initialDetails << Stray brace removed from here
+        //  }, << Stray comma removed from here
+        //  storage: initialDetails.storage, // Use initialDetails << Corrected indentation/placement
+        //  isComplete: false,
+        //}); << Corrected closing
         break;
 
       case 'post-receive':
@@ -1590,13 +1590,13 @@ router.post('/hook-progress', async (req: Request, res: Response) => {
         //   // Use client/project from details if available, otherwise default
         //   clientName: receivingDetails?.clientName || 'Unknown Client',
         //   projectName: receivingDetails?.projectName || 'Unknown Project',
-            // Include token if available
-            token: receivingDetails?.token || 'Unknown',
-          },
-          // Use storage from details if available, otherwise default
-          storage: receivingDetails?.storage || 'local',
-          isComplete: false,
-        });
+        //    // Include token if available
+        //    token: receivingDetails?.token || 'Unknown', << Stray brace removed from here
+        //  }, << Stray comma removed from here
+        //  // Use storage from details if available, otherwise default
+        //  storage: receivingDetails?.storage || 'local', << Corrected indentation/placement
+        //  isComplete: false,
+        //}); << Corrected closing
         break;
 
       case 'post-finish':
