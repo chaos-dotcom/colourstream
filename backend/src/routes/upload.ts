@@ -1491,11 +1491,24 @@ router.post('/hook-progress', async (req: Request, res: Response) => {
         logger.info(`[Hook Progress] Cached initial info for ${uploadId}`);
 
 
-        // Send initial Telegram message using fetched details
-        await telegramBot.sendUploadNotification({
-          id: uploadId,
-          size: initialDetails.size ?? 0,
-          offset: 0, // Starts at 0
+        // Send initial Telegram message using fetched details (check if bot exists)
+        if (telegramBot) {
+          await telegramBot.sendUploadNotification({
+            id: uploadId,
+            size: initialDetails.size ?? 0,
+            offset: 0, // Starts at 0
+            metadata: {
+              filename: initialDetails.filename ?? 'Unknown Filename',
+              clientName: initialDetails.clientName || 'Unknown Client',
+              projectName: initialDetails.projectName || 'Unknown Project',
+              token: initialDetails.token, // Use initialDetails
+            },
+            storage: initialDetails.storage, // Use initialDetails
+            isComplete: false,
+          });
+        } else {
+            logger.warn(`[Hook Progress] Telegram bot not available, skipping initial notification for ${uploadId}`);
+        }
           metadata: {
             filename: initialDetails.filename ?? 'Unknown Filename',
             clientName: initialDetails.clientName || 'Unknown Client',
@@ -1545,11 +1558,29 @@ router.post('/hook-progress', async (req: Request, res: Response) => {
           }
         }
 
-        // Send updated Telegram message using best available details (full or partial)
-        await telegramBot.sendUploadNotification({
-          id: uploadId,
-          // Use size from details if available and valid, otherwise default to 0
-          size: (receivingDetails?.size !== undefined && receivingDetails.size >= 0) ? receivingDetails.size : 0,
+        // Send updated Telegram message using best available details (check if bot exists)
+        if (telegramBot) {
+          await telegramBot.sendUploadNotification({
+            id: uploadId,
+            // Use size from details if available and valid, otherwise default to 0
+            size: (receivingDetails?.size !== undefined && receivingDetails.size >= 0) ? receivingDetails.size : 0,
+            offset: Number(offset),
+            metadata: {
+              // Use filename from details if available, otherwise default
+              filename: receivingDetails?.filename || 'Unknown Filename',
+              // Use client/project from details if available, otherwise default
+              clientName: receivingDetails?.clientName || 'Unknown Client',
+              projectName: receivingDetails?.projectName || 'Unknown Project',
+              // Include token if available
+              token: receivingDetails?.token || 'Unknown',
+            },
+            // Use storage from details if available, otherwise default
+            storage: receivingDetails?.storage || 'local',
+            isComplete: false,
+          });
+        } else {
+            logger.warn(`[Hook Progress] Telegram bot not available, skipping progress notification for ${uploadId}`);
+        }
           offset: Number(offset),
           metadata: {
             // Use filename from details if available, otherwise default
@@ -1589,9 +1620,11 @@ router.post('/hook-progress', async (req: Request, res: Response) => {
           logger.info(`[Hook Progress] Received 'post-terminate' hook for ${uploadId}. Cleaning up tracker/notifications.`);
           // Clean up tracker state
           uploadTracker.completeUpload(uploadId); // Mark as complete (or add a specific 'terminated' state)
-          // Clean up any persistent Telegram message
+          // Clean up any persistent Telegram message (check if bot exists)
           if (telegramBot) {
               await telegramBot.cleanupUploadMessage(uploadId);
+          } else {
+              logger.warn(`[Hook Progress] Telegram bot not available, skipping message cleanup for terminated upload ${uploadId}`);
           }
           // Optionally, try to delete the orphaned .bin/.info files
           try {
