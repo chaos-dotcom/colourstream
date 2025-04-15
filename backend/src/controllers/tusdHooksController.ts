@@ -151,10 +151,9 @@ export class TusdHooksController {
       const offset = hookData.Upload?.Offset || 0;
       const metadata = hookData.Upload?.MetaData || {};
       
-      logger.info('tusd post-terminate hook received', { uploadId, size, offset });
-      
-      // Get the upload info from the tracker before removing it
-      // Get the upload info *only* to check if we need to mark it terminated later
+      logger.info(`[handlePostTerminate] Received hook for uploadId: ${uploadId}`, { size, offset, metadata });
+
+      // Get the upload info *only* to check if we need to mark it terminated later.
       // Do not rely on it for sending the notification itself.
       const uploadInfo = uploadTracker.getUpload(uploadId);
       logger.info(`[handlePostTerminate] Checked tracker for ${uploadId}. Found: ${!!uploadInfo}`);
@@ -187,9 +186,8 @@ export class TusdHooksController {
             if (success) {
               // Log success from the controller side as well
               logger.info(`[handlePostTerminate] Successfully processed termination notification via TelegramBot for upload ${uploadId}`);
-              logger.info(`Successfully processed termination notification for upload ${uploadId}`);
             } else {
-              logger.error(`Failed to send termination notification via TelegramBot for upload ${uploadId}`);
+              // Log failure from the controller side as well
               logger.error(`[handlePostTerminate] Failed to send termination notification via TelegramBot for upload ${uploadId}`);
             }
           })

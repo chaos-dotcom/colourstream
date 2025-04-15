@@ -600,8 +600,6 @@ export class TelegramBot {
     return success;
   }
 
-  // Removed unused handleTerminatedUpload method
-
   /**
    * Format bytes to human-readable format
    */
