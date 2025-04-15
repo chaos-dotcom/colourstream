@@ -92,6 +92,14 @@ export class TusdHooksController {
         progress: `${Math.round((offset / size) * 100)}%` 
       });
       
+      // Check if this upload has been terminated
+      // If it has, we should not process any more receive hooks
+      const uploadInfo = uploadTracker.getUpload(uploadId);
+      if (uploadInfo?.terminated) {
+        logger.info(`Ignoring post-receive hook for terminated upload ${uploadId}`);
+        return res.status(200).json({ message: 'Upload already terminated, hook ignored' });
+      }
+      
       // Update the upload progress
       uploadTracker.trackUpload({
         id: uploadId,
@@ -186,9 +194,10 @@ export class TusdHooksController {
           });
       }
       
-      // Remove the upload from the tracker after notification
+      // Mark the upload as terminated in the tracker instead of removing it
+      // This will allow us to ignore subsequent post-receive hooks
       if (uploadInfo) {
-        uploadTracker.removeUpload(uploadId);
+        uploadTracker.markAsTerminated(uploadId);
       }
       
       res.status(200).json({ message: 'Post-terminate hook processed' });

@@ -14,6 +14,7 @@ interface UploadInfo {
   storage?: string;
   isComplete: boolean;
   completedAt?: Date;
+  terminated?: boolean; // Flag to indicate if upload was terminated
 }
 
 class UploadTracker {
@@ -143,6 +144,24 @@ class UploadTracker {
    */
   getUpload(id: string): UploadInfo | undefined {
     return this.uploads.get(id);
+  }
+  
+  /**
+   * Mark an upload as terminated
+   */
+  markAsTerminated(id: string): boolean {
+    const upload = this.uploads.get(id);
+    if (!upload) {
+      return false;
+    }
+    
+    // Mark as terminated and keep in the tracker to prevent further processing
+    upload.terminated = true;
+    upload.lastUpdated = new Date();
+    this.uploads.set(id, upload);
+    
+    logger.info(`Upload marked as terminated: ${id}`);
+    return true;
   }
   
   /**
