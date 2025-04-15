@@ -1764,8 +1764,7 @@ router.post('/hook-progress', async (req: Request, res: Response) => {
         });
         break;
 
-        // Remove the 'finished' case as it is no longer used
-        break;
+      // The 'finished' case block has been removed from here.
 
       default:
         logger.warn(`[Hook Progress] Received unknown status '${status}' for uploadId: ${uploadId}`);

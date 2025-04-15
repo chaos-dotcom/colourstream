@@ -60,7 +60,11 @@ const sanitizePathString = (str: string | undefined | null): string => {
 
 
 // --- Basic Payload Validation ---
-export const handleProcessFinishedUpload = async (req: Request, res: Response): Promise<void> => {
+// Removed the duplicate definition above this line.
+// The correct definition starts below.
+
+// --- Basic Payload Validation ---
+export const handleProcessFinishedUpload = async (req: Request, res: Response): Promise<void> => { // Ensure this is the only export of this function
   const infoPayload = req.body as TusInfoFilePayload;
   const uploadId = infoPayload?.ID;
 
@@ -397,4 +401,4 @@ export const handleProcessFinishedUpload = async (req: Request, res: Response): 
     }
   }
 };
-};
+// Removed the closing }; that ended the duplicate function definition.
