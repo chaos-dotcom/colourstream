@@ -146,6 +146,18 @@ class UploadTracker {
   }
   
   /**
+   * Remove an upload from tracking
+   */
+  removeUpload(id: string): boolean {
+    if (!this.uploads.has(id)) {
+      return false;
+    }
+    
+    this.uploads.delete(id);
+    return true;
+  }
+  
+  /**
    * Get all active uploads (not completed)
    */
   getActiveUploads(): UploadInfo[] {
