@@ -1540,11 +1540,24 @@ router.post('/hook-progress', async (req: Request, res: Response) => {
              receivingDetails = cachedInfo; // Use cached info, even if incomplete
           } else {
              logger.error(`[Hook Progress] No details found in getUploadDetails or cache for ${uploadId}. Sending notification with defaults.`);
-             // Send notification with defaults only if absolutely no info is available
-             await telegramBot.sendUploadNotification({
-               id: uploadId,
-               size: 0, // Unknown size
-               offset: Number(offset),
+             // Send notification with defaults only if absolutely no info is available AND bot exists
+             if (telegramBot) { // Add null check here
+               await telegramBot.sendUploadNotification({
+                 id: uploadId,
+                 size: 0, // Unknown size
+                 offset: Number(offset),
+                 metadata: {
+                   filename: 'Unknown Filename',
+                   clientName: 'Unknown Client',
+                   projectName: 'Unknown Project',
+                   token: 'Unknown',
+                 },
+                 storage: 'local', // Default storage
+                 isComplete: false,
+               });
+             } else {
+                 logger.warn(`[Hook Progress] Telegram bot not available, skipping default notification for ${uploadId}`);
+             }
                metadata: {
                  filename: 'Unknown Filename',
                  clientName: 'Unknown Client',
