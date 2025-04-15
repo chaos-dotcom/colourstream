@@ -138,6 +138,8 @@ services:
       S3_REGION: us-east-1 # Match SDK client config
       S3_BUCKET: uploads # Match SDK client config
       # --- End S3 config ---
+      TUSD_DATA_DIR: /srv/tusd-data # Directory Tusd uses (matches volume mount)
+      TUS_ORGANIZED_DIR: /app/organized # Directory for final local files (matches volume mount)
     depends_on:
       postgres:
         condition: service_healthy
@@ -149,7 +151,8 @@ services:
       # The ./backend/uploads mount is removed as it's redundant for the Tusd workflow.
       # Files are processed directly within the shared ./tusd-data volume.
       - ./backend/logs:/app/logs
-      - ./tusd-data:/tusd-data-external # Mount the shared tusd data volume
+      - /Volumes/Backup3/tusd-data:/srv/tusd-data # Mount the *same* host path as tusd service uses for its data
+      - ./organized-uploads:/app/organized # Mount host directory for final organized files (if using local storage)
     labels:
       - "traefik.enable=true"
       # API routes with higher priority
@@ -467,10 +470,7 @@ tusd:
 volumes:
   postgres_data:
     name: colourstream_postgres_data
-  uploads_data:
-    name: colourstream_uploads_data
-  organized_data:
-    name: colourstream_organized_data
+  # uploads_data and organized_data removed as bind mounts are used instead
   minio_data:
     name: colourstream_minio_data
   companion_data: # Ensure this volume is defined
