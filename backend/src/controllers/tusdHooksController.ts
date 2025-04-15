@@ -154,48 +154,56 @@ export class TusdHooksController {
       logger.info('tusd post-terminate hook received', { uploadId, size, offset });
       
       // Get the upload info from the tracker before removing it
+      // Get the upload info *only* to check if we need to mark it terminated later
+      // Do not rely on it for sending the notification itself.
       const uploadInfo = uploadTracker.getUpload(uploadId);
-      
+      logger.info(`[handlePostTerminate] Checked tracker for ${uploadId}. Found: ${!!uploadInfo}`);
+
       // Get the telegram bot service
       const telegramBot = getTelegramBot();
-      
+      logger.info(`[handlePostTerminate] Got TelegramBot instance for ${uploadId}: ${!!telegramBot}`);
+
       // If we have a telegram bot instance, notify about the termination
       if (telegramBot) {
-        logger.info(`Notifying Telegram about terminated upload ${uploadId}`);
-        
-        // Use the metadata from the upload tracker if available, as it might have more info
-        const enhancedMetadata = uploadInfo?.metadata || metadata;
-        
-        // Create the termination message
+        logger.info(`[handlePostTerminate] Attempting to send termination notification for ${uploadId}`);
+
+        // Create the termination message using ONLY data from the hook
+        // This avoids issues if the tracker state changes concurrently
         const terminatedMessage = `<b>❌ Upload Terminated</b>\n` +
-          `<b>File:</b> ${enhancedMetadata?.filename || 'Unknown File'}\n` +
+          `<b>File:</b> ${metadata?.filename || 'Unknown File'}\n` +
           `<b>Size:</b> ${formatFileSize(size || 0)}\n` +
           `<b>Progress:</b> Cancelled at ${calculateProgress(offset || 0, size || 0)}% (${formatFileSize(offset || 0)} / ${formatFileSize(size || 0)})\n` +
-          `<b>Client:</b> ${enhancedMetadata?.clientName || enhancedMetadata?.client || 'Unknown Client'}\n` +
-          `<b>Project:</b> ${enhancedMetadata?.projectName || enhancedMetadata?.project || 'Unknown Project'}\n` +
+          `<b>Client:</b> ${metadata?.clientName || metadata?.client || 'Unknown Client'}\n` +
+          `<b>Project:</b> ${metadata?.projectName || metadata?.project || 'Unknown Project'}\n` +
           `<b>Terminated at:</b> ${new Date().toLocaleString()}`;
+
+        logger.info(`[handlePostTerminate] Constructed termination message for ${uploadId}`);
+        console.log(`[TELEGRAM-DEBUG] [handlePostTerminate] Calling telegramBot.sendTerminationMessage for upload ${uploadId}`);
 
         // Send the termination message using the dedicated method in TelegramBot
         // This method handles sending a *new* message and cleaning up the old message ID.
-        console.log(`[TELEGRAM-DEBUG] Calling telegramBot.sendTerminationMessage for upload ${uploadId}`);
         telegramBot.sendTerminationMessage(uploadId, terminatedMessage)
           .then(success => {
             if (success) {
+              // Log success from the controller side as well
+              logger.info(`[handlePostTerminate] Successfully processed termination notification via TelegramBot for upload ${uploadId}`);
               logger.info(`Successfully processed termination notification for upload ${uploadId}`);
             } else {
               logger.error(`Failed to send termination notification via TelegramBot for upload ${uploadId}`);
+              logger.error(`[handlePostTerminate] Failed to send termination notification via TelegramBot for upload ${uploadId}`);
             }
           })
           .catch(err => {
             // Catch potential errors from the promise itself, though sendTerminationMessage handles internal errors
-            logger.error(`Error calling sendTerminationMessage for upload ${uploadId}:`, err);
-            console.error(`[TELEGRAM-DEBUG] Error calling sendTerminationMessage for ${uploadId}:`, err);
+            logger.error(`[handlePostTerminate] Error calling sendTerminationMessage for upload ${uploadId}:`, err);
+            console.error(`[TELEGRAM-DEBUG] [handlePostTerminate] Error calling sendTerminationMessage for ${uploadId}:`, err);
           });
       } else {
-         logger.warn(`Telegram bot instance not available, cannot send termination notification for upload ${uploadId}`);
+         // Log if the bot instance wasn't available
+         logger.warn(`[handlePostTerminate] Telegram bot instance not available, cannot send termination notification for upload ${uploadId}`);
       }
 
-      // Mark the upload as terminated in the tracker.
+      // Mark the upload as terminated in the tracker *if it was found initially*.
       // This should happen regardless of whether the Telegram notification succeeded.
       // This will allow us to ignore subsequent post-receive hooks
       if (uploadInfo) {

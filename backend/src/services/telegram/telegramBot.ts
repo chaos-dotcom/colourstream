@@ -600,81 +600,8 @@ export class TelegramBot {
     return success;
   }
 
-  /**
-   * Handle a terminated upload
-   */
-  async handleTerminatedUpload(uploadId: string, metadata?: Record<string, string>, size?: number, offset?: number): Promise<boolean> {
-    logger.info(`[handleTerminatedUpload] Upload ${uploadId} was terminated`);
-    
-    console.log(`[TELEGRAM-DEBUG] Handling terminated upload ${uploadId} with size=${size}, offset=${offset}`);
-    
-    try {
-      // Try to get existing info from cache first
-      const cachedInfo = this.uploadInfoCache?.get(uploadId);
-      
-      // Get metadata and size information from cache if not provided
-      const finalMetadata = metadata || (cachedInfo?.metadata || {});
-      const finalSize = size || (cachedInfo?.size || 0);
-      const finalOffset = offset || (cachedInfo?.offset || 0);
-      
-      // Extract filename and project info from metadata
-      // Check both standard metadata fields and the ones from the upload tracker
-      const filename = finalMetadata?.filename || 'Unknown File';
-      const clientName = finalMetadata?.clientName || finalMetadata?.client || 'Unknown Client';
-      const projectName = finalMetadata?.projectName || finalMetadata?.project || 'Unknown Project';
-      
-      // Create a special terminated message
-      let message = `<b>❌ Upload Terminated</b>\n`;
-      message += `<b>File:</b> ${filename}\n`;
-      message += `<b>Size:</b> ${this.formatBytes(finalSize)}\n`;
-      
-      // Calculate and show progress
-      const progress = finalSize > 0 ? Math.round((finalOffset / finalSize) * 100) : 0;
-      message += `<b>Progress:</b> Cancelled at ${progress}% (${this.formatBytes(finalOffset)} / ${this.formatBytes(finalSize)})\n`;
-      
-      // Add client and project information
-      message += `<b>Client:</b> ${clientName}\n`;
-      message += `<b>Project:</b> ${projectName}\n`;
-      
-      // Add timestamp
-      message += `<b>Terminated at:</b> ${new Date().toLocaleString()}\n`;
-      
-      // Log the message we're about to send
-      console.log(`[TELEGRAM-DEBUG] Sending terminated message for upload ${uploadId}:`, message);
-      
-      // IMPORTANT: First, delete the message ID from our cache and database
-      // This ensures we don't try to edit the existing message
-      console.log(`[TELEGRAM-DEBUG] Removing message ID for upload ${uploadId} before sending termination notice`);
-      await this.deleteMessageId(uploadId);
-      
-      // Remove from the in-memory cache as well to be extra sure
-      this.messageIdCache.delete(uploadId);
-      
-      // Send a completely new message without any reference to the upload ID
-      // This is crucial to prevent any attempt to edit the existing message
-      console.log(`[TELEGRAM-DEBUG] Sending brand new termination message for upload ${uploadId}`);
-      const success = await axios.post(`${this.baseUrl}/sendMessage`, {
-        chat_id: !isNaN(Number(this.chatId)) ? Number(this.chatId) : this.chatId,
-        text: message,
-        parse_mode: 'HTML',
-      }).then(response => {
-        console.log('[TELEGRAM-DEBUG] Termination message sent successfully:', response.data);
-        return true;
-      }).catch(error => {
-        console.error('[TELEGRAM-DEBUG] Failed to send termination message:', error);
-        return false;
-      });
-      
-      console.log(`[TELEGRAM-DEBUG] Sent terminated notification for ${uploadId} with result: ${success}`);
-      
-      return success;
-    } catch (error) {
-      console.error(`[TELEGRAM-DEBUG] Error in handleTerminatedUpload for ${uploadId}:`, error);
-      logger.error(`Error in handleTerminatedUpload for ${uploadId}:`, error);
-      return false;
-    }
-  }
-  
+  // Removed unused handleTerminatedUpload method
+
   /**
    * Format bytes to human-readable format
    */
