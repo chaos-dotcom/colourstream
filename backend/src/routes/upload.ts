@@ -1178,6 +1178,224 @@ router.post('/s3/multipart/abort', async (req: Request<{}, {}, AbortMultipartBod
 });
 // --- End NEW backend signing endpoints ---
 
+// --- NEW: Tusd Post-Finish Hook Handler ---
+// This endpoint is called by the Tusd server after an upload is completed.
+// Tusd must be configured with: -hooks-endpoint <this-url> -hooks-http-forward-headers Upload-Metadata
+router.post('/tusd-hook', async (req: Request, res: Response) => {
+  logger.info('[/tusd-hook] Received hook call from Tusd');
+  
+  // Tusd sends upload metadata in the 'Hook-Data' header or forwarded headers
+  // We configured Tusd to forward 'Upload-Metadata'
+  const metadataHeader = req.headers['upload-metadata'] as string;
+  const fileInfo = req.body; // Tusd sends file info in the request body
+
+  logger.info(`[/tusd-hook] Headers: ${JSON.stringify(req.headers)}`);
+  logger.info(`[/tusd-hook] Body: ${JSON.stringify(fileInfo)}`);
+
+  if (!metadataHeader || !fileInfo || !fileInfo.Storage || !fileInfo.Storage.Path) {
+    logger.error('[/tusd-hook] Missing required data from Tusd hook (Upload-Metadata header or file info body)');
+    return res.status(400).json({ status: 'error', message: 'Missing data from Tusd hook' });
+  }
+
+  try {
+    // 1. Parse Metadata
+    const metadata: Record<string, string> = {};
+    metadataHeader.split(',').forEach(pair => {
+      const [key, valueBase64] = pair.split(' ');
+      if (key && valueBase64) {
+        try {
+          // Decode base64 and then URI component
+          metadata[key] = decodeURIComponent(Buffer.from(valueBase64, 'base64').toString('utf-8'));
+        } catch (e) {
+          logger.warn(`[/tusd-hook] Failed to decode metadata pair: ${key}`, e);
+        }
+      }
+    });
+
+    const {
+      token,
+      clientCode, // Use clientCode directly
+      project: projectName, // Rename for clarity
+      filename: originalFilename, // Original filename from metadata
+      filetype: mimeType = 'application/octet-stream' // Default mime type
+    } = metadata;
+    
+    const tusId = fileInfo.ID;
+    const fileSize = fileInfo.Size;
+    const tusFilePath = fileInfo.Storage.Path; // Path where Tusd stored the file
+
+    logger.info(`[/tusd-hook] Parsed Metadata: ${JSON.stringify(metadata)}`);
+    logger.info(`[/tusd-hook] File Info: ID=${tusId}, Size=${fileSize}, Path=${tusFilePath}`);
+
+    if (!token || !clientCode || !projectName || !originalFilename) {
+      logger.error('[/tusd-hook] Missing required metadata fields (token, clientCode, project, filename)');
+      // Attempt to delete the orphaned file left by Tusd
+      try {
+        await fs.promises.unlink(tusFilePath);
+        logger.warn(`[/tusd-hook] Deleted orphaned Tusd file due to missing metadata: ${tusFilePath}`);
+      } catch (unlinkError) {
+        logger.error(`[/tusd-hook] Failed to delete orphaned Tusd file: ${tusFilePath}`, unlinkError);
+      }
+      return res.status(400).json({ status: 'error', message: 'Missing required metadata' });
+    }
+
+    // 2. Validate Token
+    const uploadLink = await prisma.uploadLink.findUnique({
+      where: { token },
+      include: { project: { include: { client: true } } } // Include client for validation/consistency
+    });
+
+    if (!uploadLink) {
+      logger.error(`[/tusd-hook] Invalid token: ${token}`);
+      // Attempt to delete the orphaned file
+      try {
+        await fs.promises.unlink(tusFilePath);
+        logger.warn(`[/tusd-hook] Deleted orphaned Tusd file due to invalid token: ${tusFilePath}`);
+      } catch (unlinkError) {
+        logger.error(`[/tusd-hook] Failed to delete orphaned Tusd file: ${tusFilePath}`, unlinkError);
+      }
+      return res.status(403).json({ status: 'error', message: 'Invalid upload token' });
+    }
+
+    // Optional: Verify clientCode and projectName from token match metadata
+    if (uploadLink.project.client.code !== clientCode || uploadLink.project.name !== projectName) {
+       logger.warn(`[/tusd-hook] Metadata mismatch for token ${token}: DB Client=${uploadLink.project.client.code}, DB Project=${uploadLink.project.name} vs Meta Client=${clientCode}, Meta Project=${projectName}`);
+       // Decide whether to proceed or reject based on policy
+    }
+
+    // Check expiry and usage limits
+    if (uploadLink.expiresAt < new Date() || (uploadLink.maxUses !== null && uploadLink.usedCount >= uploadLink.maxUses)) {
+       logger.warn(`[/tusd-hook] Expired or over-limit token used: ${token}`);
+       // Attempt to delete the orphaned file
+       try {
+         await fs.promises.unlink(tusFilePath);
+         logger.warn(`[/tusd-hook] Deleted orphaned Tusd file due to expired/over-limit token: ${tusFilePath}`);
+       } catch (unlinkError) {
+         logger.error(`[/tusd-hook] Failed to delete orphaned Tusd file: ${tusFilePath}`, unlinkError);
+       }
+       return res.status(403).json({ status: 'error', message: 'Upload link expired or limit reached' });
+    }
+
+    // 3. Determine Final Destination & Move/Upload File
+    let finalPath: string;
+    let finalUrl: string | null = null;
+    const storageType: 'local' | 's3' = process.env.TUS_STORAGE_TYPE === 's3' ? 's3' : 'local'; // Determine storage type (e.g., via env var)
+
+    // Generate a safe filename (similar to XHR route)
+    const safeFilename = originalFilename.replace(/[\/\\:*?"<>|]/g, '_');
+
+    if (storageType === 's3') {
+      // Upload from Tusd's path to S3
+      const s3Key = s3Service.generateKey(clientCode, projectName, safeFilename);
+      logger.info(`[/tusd-hook] Uploading Tusd file ${tusFilePath} to S3 key: ${s3Key}`);
+      
+      const fileBuffer = await fs.promises.readFile(tusFilePath);
+      finalUrl = await s3Service.uploadFile(
+        fileBuffer,
+        s3Key,
+        mimeType,
+        {
+          clientName: uploadLink.project.client.name, // Use name from DB lookup
+          projectName: uploadLink.project.name,
+          originalName: originalFilename // Keep original name in S3 metadata
+        }
+      );
+      finalPath = s3Key; // Store S3 key as the path
+
+      // Delete the local file left by Tusd after successful S3 upload
+      try {
+        await fs.promises.unlink(tusFilePath);
+        logger.info(`[/tusd-hook] Deleted local Tusd file after S3 upload: ${tusFilePath}`);
+      } catch (unlinkError) {
+        logger.error(`[/tusd-hook] Failed to delete local Tusd file after S3 upload: ${tusFilePath}`, unlinkError);
+        // Continue processing, but log the error
+      }
+
+    } else {
+      // Move file locally
+      const organizedDir = process.env.TUS_ORGANIZED_DIR || path.join(__dirname, '../../organized'); // Use a specific organized dir for Tusd files
+      const clientProjectDir = path.join(organizedDir, clientCode, projectName);
+      
+      if (!fs.existsSync(clientProjectDir)) {
+        await fs.promises.mkdir(clientProjectDir, { recursive: true });
+      }
+      
+      finalPath = path.join(clientProjectDir, safeFilename);
+      logger.info(`[/tusd-hook] Moving Tusd file from ${tusFilePath} to ${finalPath}`);
+      
+      try {
+        await fs.promises.rename(tusFilePath, finalPath);
+      } catch (renameError) {
+         // Handle potential cross-device link error (EXDEV) by copying and unlinking
+         if ((renameError as NodeJS.ErrnoException).code === 'EXDEV') {
+            logger.warn(`[/tusd-hook] Cross-device link error (EXDEV) moving ${tusFilePath} to ${finalPath}. Attempting copy/unlink.`);
+            await fs.promises.copyFile(tusFilePath, finalPath);
+            await fs.promises.unlink(tusFilePath);
+            logger.info(`[/tusd-hook] Successfully copied and unlinked file across devices.`);
+         } else {
+            logger.error(`[/tusd-hook] Failed to move Tusd file: ${renameError}`);
+            throw renameError; // Re-throw other errors
+         }
+      }
+    }
+
+    // 4. Calculate Hash (Optional but recommended)
+    // Note: Hashing large files here can be resource-intensive. Consider doing it async or skipping if not critical.
+    let fileHash = `tus-${tusId}`; // Default hash if calculation fails or is skipped
+    try {
+      const finalFileBuffer = await fs.promises.readFile(finalPath); // Read the *final* file if local
+      const xxhash64 = await xxhash();
+      fileHash = xxhash64.h64Raw(Buffer.from(finalFileBuffer)).toString(16);
+      logger.info(`[/tusd-hook] Calculated hash for ${finalPath}: ${fileHash}`);
+    } catch (hashError) {
+      logger.error(`[/tusd-hook] Failed to calculate hash for ${finalPath}:`, hashError);
+      // Use the default hash
+    }
+
+    // 5. Create Database Record
+    const uploadedFile = await prisma.uploadedFile.create({
+      data: {
+        name: originalFilename, // Store original filename
+        path: finalPath,
+        size: parseFloat(fileSize.toString()),
+        mimeType: mimeType,
+        hash: fileHash,
+        project: { connect: { id: uploadLink.projectId } },
+        status: 'completed',
+        completedAt: new Date(),
+        storage: storageType,
+        url: finalUrl
+      }
+    });
+    logger.info(`[/tusd-hook] Created database record for file: ${uploadedFile.id}`);
+
+    // 6. Update Upload Link Usage Count
+    await prisma.uploadLink.update({
+      where: { id: uploadLink.id },
+      data: { usedCount: { increment: 1 } }
+    });
+    logger.info(`[/tusd-hook] Incremented usage count for link: ${uploadLink.id}`);
+
+    // 7. Update Upload Tracker (Optional)
+    // Mark the corresponding upload tracked via frontend progress as complete
+    // Note: The 'uploadId' used in the progress endpoint might differ from tusId.
+    // We might need a way to correlate them if using the tracker this way.
+    // For simplicity, we can use the tusId here.
+    uploadTracker.completeUpload(tusId);
+    logger.info(`[/tusd-hook] Marked upload complete in tracker (using tusId): ${tusId}`);
+
+    // Respond to Tusd hook
+    res.status(200).json({ status: 'success', message: 'Tusd upload processed successfully' });
+
+  } catch (error) {
+    logger.error('[/tusd-hook] Error processing Tusd hook:', error);
+    // Don't delete the file here, as the error might be temporary (e.g., DB connection)
+    // Manual cleanup might be needed if processing fails permanently.
+    res.status(500).json({ status: 'error', message: 'Internal server error processing Tusd hook' });
+  }
+});
+// --- End Tusd Hook Handler ---
+
 
 // Endpoint for Companion to notify backend after successful S3 upload
 router.post('/s3-callback', async (req: Request, res: Response) => {
