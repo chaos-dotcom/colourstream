@@ -57,146 +57,34 @@ fi
 echo "Using Token: $TOKEN" >&2
 echo "Original Filename: $ORIGINAL_FILENAME" >&2
 
-# --- Fetch Client/Project Info from Backend ---
-BACKEND_API_URL="http://backend:5001/api/upload/upload-links/$TOKEN"
-echo "--- Attempting to fetch project info from backend ---" >&2
-echo "URL: $BACKEND_API_URL" >&2
+# --- Notify Backend of Completion ---
+# This script now ONLY notifies the backend that Tusd has finished receiving bytes.
+# Actual file processing (moving, DB update, final notification) is handled
+# by a separate backend endpoint triggered by a different hook mechanism.
 
-# Use wget to get the data. Add error handling.
-# -q: quiet mode, -O-: output to stdout
-echo "Executing wget..." >&2
-API_RESPONSE=$(wget -qO- "$BACKEND_API_URL")
-WGET_EXIT_CODE=$?
+echo "[post-finish] Notifying backend API of completion: $BACKEND_PROGRESS_API_URL" >&2
 
-if [ $WGET_EXIT_CODE -ne 0 ]; then
-    echo "Error: Failed to fetch data from backend API (wget exit code: $WGET_EXIT_CODE). URL: $BACKEND_API_URL" >&2
-    exit 1 # Exit with error
-fi
+# Construct JSON payload for completion
+JSON_PAYLOAD_FINISH=$(cat <<EOF
+{
+  "uploadId": "$UPLOAD_ID",
+  "status": "finished"
+}
+EOF
+)
 
-if [ -z "$API_RESPONSE" ]; then
-    echo "Error: Received empty response from backend API. URL: $BACKEND_API_URL" >&2
-    exit 1 # Exit with error
-fi
-echo "--- wget finished (Exit Code: $WGET_EXIT_CODE) ---" >&2
+# Use wget to send POST request for completion status
+wget -qO- --post-data="$JSON_PAYLOAD_FINISH" --header="Content-Type: application/json" "$BACKEND_PROGRESS_API_URL" > /dev/null
+WGET_FINISH_EXIT_CODE=$?
 
-echo "Received API Response: $API_RESPONSE" >&2
-
-# --- Parse Client Code and Project Name from JSON (Using jq) ---
-echo "--- Attempting to parse API response using jq ---" >&2
-# Use jq to safely parse the JSON response.
-# -e flag makes jq exit with non-zero status if the key path doesn't exist or value is null/false
-# -r flag outputs raw strings without quotes
-# Corrected jq paths based on actual API response structure
-CLIENT_CODE=$(echo "$API_RESPONSE" | jq -er '.data.clientCode')
-JQ_CLIENT_EXIT_CODE=$?
-PROJECT_NAME=$(echo "$API_RESPONSE" | jq -er '.data.projectName')
-JQ_PROJECT_EXIT_CODE=$?
-
-# Validate extracted values based on jq exit codes
-if [ $JQ_CLIENT_EXIT_CODE -ne 0 ]; then
-  echo "Error: Failed to parse Client Code from API response using jq (jq exit code: $JQ_CLIENT_EXIT_CODE)." >&2
-  echo "API Response was: $API_RESPONSE" >&2
-  exit 1 # Exit with error
-fi
-if [ $JQ_PROJECT_EXIT_CODE -ne 0 ]; then
-  echo "Error: Failed to parse Project Name from API response using jq (jq exit code: $JQ_PROJECT_EXIT_CODE)." >&2
-  echo "API Response was: $API_RESPONSE" >&2
-  exit 1 # Exit with error
-fi
-
-# Double-check if values are empty even if jq succeeded (e.g., empty strings in JSON)
-if [ -z "$CLIENT_CODE" ]; then
-  echo "Error: Failed to parse Client Code from API response." >&2
-  echo "Error: Parsed Client Code is empty." >&2
-  echo "API Response was: $API_RESPONSE" >&2
-  exit 1 # Exit with error
-fi
-if [ -z "$PROJECT_NAME" ]; then
-  echo "Error: Parsed Project Name is empty." >&2
-  echo "API Response was: $API_RESPONSE" >&2
-  exit 1 # Exit with error
-fi
-
-echo "Parsed Client Code: $CLIENT_CODE" >&2
-echo "Parsed Project Name: $PROJECT_NAME" >&2
-echo "--- Finished parsing API response ---" >&2
-
-# --- Sanitize Paths (Basic) ---
-echo "--- Sanitizing paths ---" >&2
-# Replace potentially problematic characters with underscores
-# A more robust solution might be needed depending on expected inputs
-SANITIZED_CLIENT_CODE=$(echo "$CLIENT_CODE" | sed 's/[^a-zA-Z0-9_-]/_/g')
-SANITIZED_PROJECT_NAME=$(echo "$PROJECT_NAME" | sed 's/[^a-zA-Z0-9_-]/_/g')
-# Prevent path traversal and replace slashes in filename
-SANITIZED_FILENAME=$(echo "$ORIGINAL_FILENAME" | sed 's#/#_#g' | sed 's#\\#_#g' | sed 's/\.\.//g')
-
-echo "Sanitized Client Code: $SANITIZED_CLIENT_CODE" >&2
-echo "Sanitized Project Name: $SANITIZED_PROJECT_NAME" >&2
-echo "Sanitized Filename: $SANITIZED_FILENAME" >&2
-
-# --- Define Paths ---
-SOURCE_FILE_PATH="$TUSD_DATA_DIR/$UPLOAD_ID"
-SOURCE_INFO_PATH="$TUSD_DATA_DIR/$UPLOAD_ID.info"
-DESTINATION_DIR="$TUSD_DATA_DIR/$SANITIZED_CLIENT_CODE/$SANITIZED_PROJECT_NAME"
-DESTINATION_METADATA_DIR="$DESTINATION_DIR/.metadata" # Subdirectory for info files
-DESTINATION_FILE_PATH="$DESTINATION_DIR/$SANITIZED_FILENAME"
-# Keep original filename for the info file, but place it in the metadata subdir
-DESTINATION_INFO_PATH="$DESTINATION_METADATA_DIR/$SANITIZED_FILENAME.info"
-
-echo "Source File: $SOURCE_FILE_PATH" >&2
-echo "Source Info: $SOURCE_INFO_PATH" >&2
-echo "Destination Dir: $DESTINATION_DIR" >&2
-echo "Destination Metadata Dir: $DESTINATION_METADATA_DIR" >&2
-echo "Destination File: $DESTINATION_FILE_PATH" >&2
-echo "Destination Info: $DESTINATION_INFO_PATH" >&2
-echo "--- Finished defining paths ---" >&2
-
-# --- Create Destination Directories ---
-echo "--- Creating destination directories ---" >&2
-echo "Creating destination directory: $DESTINATION_DIR" >&2
-if ! mkdir -p "$DESTINATION_DIR"; then
-  echo "Error: Failed to create destination directory '$DESTINATION_DIR'." >&2
-  exit 1 # Exit with error
-fi
-echo "Creating destination metadata directory: $DESTINATION_METADATA_DIR" >&2
-if ! mkdir -p "$DESTINATION_METADATA_DIR"; then
-  echo "Error: Failed to create destination metadata directory '$DESTINATION_METADATA_DIR'." >&2
-  exit 1 # Exit with error
-fi
-echo "Destination directories created or already exist." >&2
-echo "--- Finished creating directories ---" >&2
-
-# --- Move Files ---
-echo "--- Moving files ---" >&2
-# Check if source file exists
-echo "Checking for source file: $SOURCE_FILE_PATH" >&2
-if [ ! -f "$SOURCE_FILE_PATH" ]; then
-    echo "Error: Source file '$SOURCE_FILE_PATH' not found." >&2
-    exit 1 # Exit with error
-fi
-echo "Source file found." >&2
-
-echo "Moving data file from $SOURCE_FILE_PATH to $DESTINATION_FILE_PATH ..." >&2
-if ! mv "$SOURCE_FILE_PATH" "$DESTINATION_FILE_PATH"; then
-  echo "Error: Failed to move data file." >&2
-  exit 1 # Exit with error
-fi
-echo "Data file moved successfully." >&2
-
-# Check if source info file exists before moving (it should, but check anyway)
-echo "Checking for source info file: $SOURCE_INFO_PATH" >&2
-if [ -f "$SOURCE_INFO_PATH" ]; then
-    echo "Source info file found." >&2
-    echo "Moving info file from $SOURCE_INFO_PATH to $DESTINATION_INFO_PATH ..." >&2
-    if ! mv "$SOURCE_INFO_PATH" "$DESTINATION_INFO_PATH"; then
-      # Log warning but don't fail the hook if only info file move fails
-      echo "Warning: Failed to move info file." >&2
-    else
-      echo "Info file moved successfully." >&2
-    fi
+if [ $WGET_FINISH_EXIT_CODE -ne 0 ]; then
+    echo "[post-finish] Warning: Failed to notify backend API of completion (wget exit code: $WGET_FINISH_EXIT_CODE). URL: $BACKEND_PROGRESS_API_URL" >&2
+    # Log warning but continue
 else
-    echo "Warning: Source info file '$SOURCE_INFO_PATH' not found. Skipping move." >&2
+    echo "[post-finish] Backend notified of completion successfully." >&2
 fi
+
+# Exit with 0 to indicate success to tusd
 
 echo "Hook script finished successfully for upload ID: $UPLOAD_ID" >&2
 
