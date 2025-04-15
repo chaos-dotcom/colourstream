@@ -1509,16 +1509,7 @@ router.post('/hook-progress', async (req: Request, res: Response) => {
         } else {
             logger.warn(`[Hook Progress] Telegram bot not available, skipping initial notification for ${uploadId}`);
         }
-        // --- Removed duplicate metadata block below ---
-        // metadata: {
-        //   filename: initialDetails.filename ?? 'Unknown Filename',
-        //   clientName: initialDetails.clientName || 'Unknown Client',
-        //   projectName: initialDetails.projectName || 'Unknown Project',
-        //    token: initialDetails.token, // Use initialDetails << Stray brace removed from here
-        //  }, << Stray comma removed from here
-        //  storage: initialDetails.storage, // Use initialDetails << Corrected indentation/placement
-        //  isComplete: false,
-        //}); << Corrected closing
+        // The erroneous duplicate block and stray characters have been removed from here.
         break;
 
       case 'post-receive':
@@ -1558,17 +1549,9 @@ router.post('/hook-progress', async (req: Request, res: Response) => {
              } else {
                  logger.warn(`[Hook Progress] Telegram bot not available, skipping default notification for ${uploadId}`);
              }
-               metadata: {
-                 filename: 'Unknown Filename',
-                 clientName: 'Unknown Client',
-                 projectName: 'Unknown Project',
-                 token: 'Unknown',
-               },
-               storage: 'local', // Default storage
-               isComplete: false,
-             });
+             // The erroneous duplicate block and stray characters have been removed from here.
              // Allow hook to succeed even if details are missing
-             return res.status(200).json({ status: 'warning', message: 'Upload details not found, sent default notification.' });
+             return res.status(200).json({ status: 'warning', message: 'Upload details not found, default notification attempted.' });
           }
         }
 
@@ -1595,21 +1578,7 @@ router.post('/hook-progress', async (req: Request, res: Response) => {
         } else {
             logger.warn(`[Hook Progress] Telegram bot not available, skipping progress notification for ${uploadId}`);
         }
-        // --- Removed duplicate metadata block below ---
-        // offset: Number(offset),
-        // metadata: {
-        //   // Use filename from details if available, otherwise default
-        //   filename: receivingDetails?.filename || 'Unknown Filename',
-        //   // Use client/project from details if available, otherwise default
-        //   clientName: receivingDetails?.clientName || 'Unknown Client',
-        //   projectName: receivingDetails?.projectName || 'Unknown Project',
-        //    // Include token if available
-        //    token: receivingDetails?.token || 'Unknown', << Stray brace removed from here
-        //  }, << Stray comma removed from here
-        //  // Use storage from details if available, otherwise default
-        //  storage: receivingDetails?.storage || 'local', << Corrected indentation/placement
-        //  isComplete: false,
-        //}); << Corrected closing
+        // The erroneous duplicate block and stray characters have been removed from here.
         break;
 
       case 'post-finish':
