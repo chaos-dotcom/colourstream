@@ -3,12 +3,17 @@ import { Request, Response } from 'express';
 import fs from 'fs/promises';
 import path from 'path';
 import { PrismaClient } from '@prisma/client'; // Removed unused UploadedFile type
+import xxhash from 'xxhash-wasm'; // Import xxhash
 import { logger } from '../utils/logger';
 import { getTelegramBot } from '../services/telegram/telegramBot';
 import { s3FileProcessor } from '../services/s3/s3FileProcessor'; // Import S3 processor if needed
 
 // Initialize Prisma Client
 const prisma = new PrismaClient();
+// Initialize xxhash
+let xxhash64: Awaited<ReturnType<typeof xxhash>>;
+xxhash().then(instance => { xxhash64 = instance; });
+
 
 // Define the structure of the .info file JSON payload received from the hook
 interface TusInfoFilePayload {
@@ -213,7 +218,25 @@ export const handleProcessFinishedUpload = async (req: Request, res: Response): 
       throw new Error(`Unsupported storage type '${storageType}' for upload ${uploadId}.`);
     }
 
-    // 5. Update Database Record
+    // 5. Calculate File Hash
+    let fileHash: string;
+    if (finalStorageType === 'local' || finalStorageType === 'filestore') {
+        try {
+            const finalFileBuffer = await fs.readFile(absoluteDestFilePath); // Read the final local file
+            fileHash = xxhash64.h64Raw(Buffer.from(finalFileBuffer)).toString(16);
+            logger.info(`[ProcessFinished:${uploadId}] Calculated local file hash: ${fileHash}`);
+        } catch (hashError) {
+            logger.error(`[ProcessFinished:${uploadId}] Failed to calculate hash for local file ${absoluteDestFilePath}:`, hashError);
+            fileHash = `error-${uploadId}`; // Fallback hash on error
+        }
+    } else {
+        // Placeholder hash for S3 files as content isn't read here
+        fileHash = `s3-${uploadId}`;
+        logger.info(`[ProcessFinished:${uploadId}] Using placeholder hash for S3 file: ${fileHash}`);
+    }
+
+
+    // 6. Update Database Record
     logger.info(`[ProcessFinished:${uploadId}] Updating database record.`);
     const _updatedFileRecord = await prisma.uploadedFile.upsert({ // Prefix unused variable
         where: { id: uploadId },
@@ -233,9 +256,9 @@ export const handleProcessFinishedUpload = async (req: Request, res: Response): 
             url: finalUrl,
             size: infoPayload.Size,
             mimeType: metadata.filetype || metadata.type || 'application/octet-stream',
+            hash: fileHash, // Add the calculated or placeholder hash
             status: 'completed',
             storage: finalStorageType,
-            // token: token, // Removed - 'token' field likely doesn't exist on UploadedFile model
             projectId: project.id,
             completedAt: new Date(),
             // createdAt will be set automatically
@@ -244,7 +267,7 @@ export const handleProcessFinishedUpload = async (req: Request, res: Response): 
     logger.info(`[ProcessFinished:${uploadId}] Database record updated/created successfully.`);
 
 
-    // 6. Send "Upload Complete" Notification
+    // 7. Send "Upload Complete" Notification
     if (telegramBot) {
       logger.info(`[ProcessFinished:${uploadId}] Sending completion notification.`);
       await telegramBot.sendUploadNotification({
