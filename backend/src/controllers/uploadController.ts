@@ -137,6 +137,7 @@ export const handleProcessFinishedUpload = async (req: Request, res: Response): 
     let finalPath: string;
     let finalUrl: string | null = null;
     let finalStorageType = storageType; // May change if moved from local to S3 later
+    let absoluteDestFilePath: string | undefined = undefined; // Declare here
 
     // 4. Process based on Storage Type
     if (storageType === 'filestore') {
@@ -151,7 +152,7 @@ export const handleProcessFinishedUpload = async (req: Request, res: Response): 
       // Absolute paths for file operations
       // const absoluteDestDir = path.join(tusdDataDir, relativeDestDir); // Unused variable removed
       const absoluteDestMetadataDir = path.join(tusdDataDir, relativeDestMetadataDir);
-      const absoluteDestFilePath = path.join(tusdDataDir, relativeDestFilePath);
+      absoluteDestFilePath = path.join(tusdDataDir, relativeDestFilePath); // Assign value here
       const absoluteDestInfoPath = path.join(tusdDataDir, relativeDestInfoPath);
 
       logger.info(`[ProcessFinished:${uploadId}] Calculated paths:`);
@@ -220,7 +221,8 @@ export const handleProcessFinishedUpload = async (req: Request, res: Response): 
 
     // 5. Calculate File Hash
     let fileHash: string;
-    if (finalStorageType === 'local' || finalStorageType === 'filestore') {
+    // Only calculate hash from file if it's local and the path exists
+    if ((finalStorageType === 'local' || finalStorageType === 'filestore') && absoluteDestFilePath) {
         try {
             const finalFileBuffer = await fs.readFile(absoluteDestFilePath); // Read the final local file
             fileHash = xxhash64.h64Raw(Buffer.from(finalFileBuffer)).toString(16);
@@ -229,7 +231,7 @@ export const handleProcessFinishedUpload = async (req: Request, res: Response): 
             logger.error(`[ProcessFinished:${uploadId}] Failed to calculate hash for local file ${absoluteDestFilePath}:`, hashError);
             fileHash = `error-${uploadId}`; // Fallback hash on error
         }
-    } else {
+    } else { // For S3 or if local path is somehow missing
         // Placeholder hash for S3 files as content isn't read here
         fileHash = `s3-${uploadId}`;
         logger.info(`[ProcessFinished:${uploadId}] Using placeholder hash for S3 file: ${fileHash}`);
