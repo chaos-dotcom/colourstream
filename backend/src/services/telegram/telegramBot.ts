@@ -328,6 +328,9 @@ export class TelegramBot {
 
     logger.info(`[sendUploadNotification] Received data for ID ${id}: size=${size}, offset=${offset}, filename=${metadata?.filename}, client=${metadata?.clientName}, project=${metadata?.projectName}, isComplete=${isComplete}, speed=${uploadSpeed}, terminated=${terminated}`);
     
+    // Debug log for upload speed
+    console.log(`[TELEGRAM-DEBUG] Upload speed for ${id}: ${uploadSpeed} bytes/sec`);
+    
     // Force isComplete to true if offset equals size (upload is complete)
     const actuallyComplete = isComplete || (offset === size);
     
@@ -349,7 +352,19 @@ export class TelegramBot {
 
     // Format transfer speed in human-readable format
     const formatSpeed = (bytesPerSecond: number | undefined): string => {
-      if (bytesPerSecond === undefined || bytesPerSecond <= 0) return 'N/A'; // Handle undefined or zero speed
+      // Add extra debug logging
+      console.log(`[TELEGRAM-DEBUG] Formatting speed: ${bytesPerSecond} bytes/sec`);
+      
+      if (bytesPerSecond === undefined) {
+        console.log('[TELEGRAM-DEBUG] Speed is undefined');
+        return 'N/A';
+      }
+      
+      if (bytesPerSecond <= 0) {
+        console.log('[TELEGRAM-DEBUG] Speed is zero or negative');
+        return 'N/A';
+      }
+      
       if (bytesPerSecond < 1024) return `${bytesPerSecond.toFixed(2)} B/s`;
       if (bytesPerSecond < 1024 * 1024) return `${(bytesPerSecond / 1024).toFixed(2)} KB/s`;
       if (bytesPerSecond < 1024 * 1024 * 1024) return `${(bytesPerSecond / (1024 * 1024)).toFixed(2)} MB/s`;
@@ -388,8 +403,14 @@ export class TelegramBot {
     }
 
     // Add upload speed if available and not a completed or terminated upload
-    if (!actuallyComplete && !isTerminated && uploadSpeed !== undefined && uploadSpeed > 0) {
-      message += `<b>Speed:</b> ${formatSpeed(uploadSpeed)}\n`;
+    // Log whether we're showing speed
+    console.log(`[TELEGRAM-DEBUG] Upload speed check: complete=${actuallyComplete}, terminated=${isTerminated}, speed=${uploadSpeed}`);
+    
+    // Always show speed if it's available, even if it's very small
+    if (!actuallyComplete && !isTerminated && uploadSpeed !== undefined) {
+      // Force a minimum display value for very small speeds
+      const displaySpeed = uploadSpeed <= 0 ? undefined : Math.max(uploadSpeed, 1);
+      message += `<b>Speed:</b> ${formatSpeed(displaySpeed)}\n`;
     }
 
     // Add client and project information if available
