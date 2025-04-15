@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import multer from 'multer';
 import path from 'path';
-import fs from 'fs';
+import fs from 'fs/promises'; // Use promises version of fs
 import { v4 as uuidv4 } from 'uuid';
 import xxhash from 'xxhash-wasm';
 import { authenticateToken } from '../middleware/auth';
@@ -25,10 +25,99 @@ interface TusdUploadInfo {
   token: string;
   clientName?: string;
   projectName?: string;
-  storage: 'local' | 's3'; // Assuming tusd might eventually support S3 directly
+  storage: 'local' | 's3';
+  // Add optional fields for when info is fetched later
+  size?: number;
+  filename?: string;
 }
 const tusdProgressCache = new Map<string, TusdUploadInfo>();
+const TUSD_DATA_DIR = process.env.TUSD_DATA_DIR || '/srv/tusd-data'; // Get tusd data dir
 // --- End In-memory storage ---
+
+
+// --- Helper Function to Get Upload Details ---
+async function getUploadDetails(uploadId: string, providedToken?: string): Promise<TusdUploadInfo | null> {
+  logger.info(`[getUploadDetails] Fetching details for uploadId: ${uploadId}`);
+  // 1. Check cache first
+  const cachedInfo = tusdProgressCache.get(uploadId);
+  if (cachedInfo?.clientName && cachedInfo?.projectName) {
+    logger.info(`[getUploadDetails] Found complete info in cache for ${uploadId}`);
+    return cachedInfo;
+  }
+
+  let token = providedToken || cachedInfo?.token;
+  let size = cachedInfo?.size;
+  let filename = cachedInfo?.filename;
+  let storage = cachedInfo?.storage || 'local'; // Default to local if not cached
+
+  // 2. If token is missing, try reading from .info file
+  if (!token) {
+    const infoFilePath = path.join(TUSD_DATA_DIR, `${uploadId}.info`);
+    logger.info(`[getUploadDetails] Token not provided or cached, reading info file: ${infoFilePath}`);
+    try {
+      const infoContent = await fs.readFile(infoFilePath, 'utf-8');
+      const infoData = JSON.parse(infoContent);
+      token = infoData?.MetaData?.token; // Extract token
+      size = infoData?.Size; // Extract size
+      filename = infoData?.MetaData?.filename; // Extract filename
+      // storage = infoData?.Storage?.Type === 's3' ? 's3' : 'local'; // Potentially get storage type
+
+      if (!token) {
+        logger.error(`[getUploadDetails] Token not found in .info file for ${uploadId}`);
+        return null; // Cannot proceed without a token
+      }
+      logger.info(`[getUploadDetails] Extracted token, size, filename from .info file for ${uploadId}`);
+    } catch (err: any) {
+      if (err.code === 'ENOENT') {
+        logger.error(`[getUploadDetails] .info file not found for ${uploadId} at ${infoFilePath}`);
+      } else {
+        logger.error(`[getUploadDetails] Error reading or parsing .info file for ${uploadId}:`, err);
+      }
+      return null; // Cannot proceed if file reading fails
+    }
+  }
+
+  // 3. If we have a token, query the database
+  if (token) {
+    logger.info(`[getUploadDetails] Querying database with token for ${uploadId}`);
+    try {
+      const uploadLink = await prisma.uploadLink.findUnique({
+        where: { token },
+        include: { project: { include: { client: true } } }
+      });
+
+      if (uploadLink) {
+        const fullInfo: TusdUploadInfo = {
+          token: token,
+          clientName: uploadLink.project.client.name,
+          projectName: uploadLink.project.name,
+          // Use size/filename from cache/file if available, otherwise set defaults
+          size: size ?? 0,
+          filename: filename ?? 'Unknown Filename',
+          storage: storage,
+        };
+        // Update cache with full details
+        tusdProgressCache.set(uploadId, fullInfo);
+        logger.info(`[getUploadDetails] Successfully fetched info from DB and updated cache for ${uploadId}`);
+        return fullInfo;
+      } else {
+        logger.error(`[getUploadDetails] Invalid token '${token}' found for ${uploadId}. Cannot fetch DB details.`);
+        // Cache minimal info to avoid re-reading file, but mark as invalid?
+         tusdProgressCache.set(uploadId, { token, storage, size: size ?? 0, filename: filename ?? 'Unknown Filename', clientName: 'Invalid Token', projectName: 'Invalid Token' });
+        return null;
+      }
+    } catch (dbError) {
+      logger.error(`[getUploadDetails] Database error fetching details for token ${token} (uploadId ${uploadId}):`, dbError);
+      return null;
+    }
+  }
+
+  // Should not reach here if logic is correct, but return null as fallback
+  logger.warn(`[getUploadDetails] Could not retrieve details for ${uploadId}`);
+  return null;
+}
+// --- End Helper Function ---
+
 
 // Extend Express.Request to include files from multer
 interface MulterRequest extends Request {
@@ -1555,38 +1644,31 @@ router.post('/hook-progress', async (req: Request, res: Response) => {
            return res.status(400).json({ status: 'error', message: 'Missing token, filename, or size for created status' });
         }
 
-        // Fetch client/project info using the token
-        const uploadLink = await prisma.uploadLink.findUnique({
-          where: { token },
-          include: { project: { include: { client: true } } }
-        });
+        // Use helper function to get details and populate cache
+        const initialDetails = await getUploadDetails(uploadId, token);
 
-        if (!uploadLink) {
-          logger.error(`[Hook Progress] Invalid token '${token}' received for 'created' status on ${uploadId}`);
-          // Don't store invalid data
-          return res.status(403).json({ status: 'error', message: 'Invalid upload token' });
+        if (!initialDetails) {
+           logger.error(`[Hook Progress] Failed to get initial details for ${uploadId} with token ${token}`);
+           // Decide if we should fail the hook or proceed with defaults
+           return res.status(403).json({ status: 'error', message: 'Failed to validate upload token or get details' });
         }
 
-        const initialInfo: TusdUploadInfo = {
-          size: Number(size),
-          filename: filename,
-          token: token,
-          clientName: uploadLink.project.client.name,
-          projectName: uploadLink.project.name,
-          storage: 'local' // Assuming tusd currently uses local storage
-        };
-        tusdProgressCache.set(uploadId, initialInfo);
+        // Ensure size and filename from body are stored if helper didn't get them from file
+        initialDetails.size = Number(size);
+        initialDetails.filename = filename;
+        tusdProgressCache.set(uploadId, initialDetails); // Ensure cache is updated
         logger.info(`[Hook Progress] Cached initial info for ${uploadId}`);
 
-        // Send initial Telegram message
+
+        // Send initial Telegram message using fetched details
         await telegramBot.sendUploadNotification({
           id: uploadId,
-          size: initialInfo.size,
+          size: initialDetails.size ?? 0,
           offset: 0, // Starts at 0
           metadata: {
-            filename: initialInfo.filename,
-            clientName: initialInfo.clientName || 'Unknown Client',
-            projectName: initialInfo.projectName || 'Unknown Project',
+            filename: initialDetails.filename ?? 'Unknown Filename',
+            clientName: initialDetails.clientName || 'Unknown Client',
+            projectName: initialDetails.projectName || 'Unknown Project',
             token: initialInfo.token,
           },
           storage: initialInfo.storage,
@@ -1601,50 +1683,70 @@ router.post('/hook-progress', async (req: Request, res: Response) => {
           return res.status(400).json({ status: 'error', message: 'Missing offset for receiving status' });
         }
 
-        const receivingInfo = tusdProgressCache.get(uploadId);
-        if (!receivingInfo) {
-          logger.warn(`[Hook Progress] Received 'receiving' status for unknown uploadId: ${uploadId}. Ignoring.`);
-          // Maybe the 'created' hook failed or server restarted. Allow hook to succeed.
-          return res.status(200).json({ status: 'warning', message: 'Upload info not found in cache, ignoring progress.' });
+        // Use helper function to get details (checks cache first, then file/DB)
+        const receivingDetails = await getUploadDetails(uploadId);
+
+        if (!receivingDetails) {
+          logger.error(`[Hook Progress] Failed to get details for 'receiving' status, uploadId: ${uploadId}. Sending notification with defaults.`);
+          // Send notification with defaults if details can't be fetched
+          await telegramBot.sendUploadNotification({
+            id: uploadId,
+            size: 0, // Unknown size
+            offset: Number(offset),
+            metadata: {
+              filename: 'Unknown Filename',
+              clientName: 'Unknown Client',
+              projectName: 'Unknown Project',
+              token: 'Unknown',
+            },
+            storage: 'local',
+            isComplete: false,
+          });
+           // Allow hook to succeed even if details are missing
+           return res.status(200).json({ status: 'warning', message: 'Upload details not found, sent default notification.' });
         }
 
-        // Send updated Telegram message
+        // Send updated Telegram message using potentially refreshed details
         await telegramBot.sendUploadNotification({
           id: uploadId,
-          size: receivingInfo.size,
+          size: receivingDetails.size ?? 0,
           offset: Number(offset),
           metadata: {
-            filename: receivingInfo.filename,
-            clientName: receivingInfo.clientName || 'Unknown Client',
-            projectName: receivingInfo.projectName || 'Unknown Project',
-            token: receivingInfo.token,
+            filename: receivingDetails.filename ?? 'Unknown Filename',
+            clientName: receivingDetails.clientName || 'Unknown Client',
+            projectName: receivingDetails.projectName || 'Unknown Project',
+            token: receivingDetails.token,
           },
-          storage: receivingInfo.storage,
+          storage: receivingDetails.storage,
           isComplete: false,
-          // TODO: Calculate uploadSpeed if desired
         });
         break;
 
       case 'finished':
-        // Final notification when upload completes (before file move)
-        const finishedInfo = tusdProgressCache.get(uploadId);
-        if (!finishedInfo) {
-          logger.warn(`[Hook Progress] Received 'finished' status for unknown uploadId: ${uploadId}. Cannot send final notification or cleanup.`);
-           return res.status(200).json({ status: 'warning', message: 'Upload info not found in cache for finished status.' });
+        // Final notification when upload completes (before file move/processing)
+        // Use helper function to get details (checks cache first, then file/DB)
+        const finishedDetails = await getUploadDetails(uploadId);
+
+        if (!finishedDetails) {
+           logger.error(`[Hook Progress] Failed to get details for 'finished' status, uploadId: ${uploadId}. Cannot send final notification or cleanup.`);
+           // Attempt cleanup anyway? Or just warn?
+           await telegramBot.cleanupUploadMessage(uploadId); // Try cleanup even if details failed
+           tusdProgressCache.delete(uploadId); // Clean cache
+           return res.status(200).json({ status: 'warning', message: 'Upload details not found for finished status.' });
         }
 
-        // Send final "complete" Telegram message
+        // Send final "complete" Telegram message using potentially refreshed details
         await telegramBot.sendUploadNotification({
           id: uploadId,
-          size: finishedInfo.size,
-          offset: finishedInfo.size, // Mark as fully uploaded
+          size: finishedDetails.size ?? 0,
+          offset: finishedDetails.size ?? 0, // Mark as fully uploaded
           metadata: {
-            filename: finishedInfo.filename,
-            clientName: finishedInfo.clientName || 'Unknown Client',
-            projectName: finishedInfo.projectName || 'Unknown Project',
-            token: finishedInfo.token,
+            filename: finishedDetails.filename ?? 'Unknown Filename',
+            clientName: finishedDetails.clientName || 'Unknown Client',
+            projectName: finishedDetails.projectName || 'Unknown Project',
+            token: finishedDetails.token,
           },
-          storage: finishedInfo.storage,
+          storage: finishedDetails.storage,
           isComplete: true, // Mark as complete
         });
 
