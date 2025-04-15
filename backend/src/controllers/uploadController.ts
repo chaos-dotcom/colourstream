@@ -401,5 +401,4 @@ export const handleProcessFinishedUpload = async (req: Request, res: Response): 
     }
   }
 };
-// Removed the closing }; that ended the duplicate function definition.
-// The extra brace that was below this line has been removed.
+// Ensure no characters or lines exist after this closing brace.
