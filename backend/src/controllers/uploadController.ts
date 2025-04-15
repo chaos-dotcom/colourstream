@@ -397,6 +397,4 @@ export const handleProcessFinishedUpload = async (req: Request, res: Response): 
     }
   }
 };
-
-}; // End of the FIRST handleProcessFinishedUpload function definition (KEEP THIS ONE)
 };
