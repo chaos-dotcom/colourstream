@@ -124,19 +124,31 @@ export class TusdHooksController {
       
       logger.info('tusd post-terminate hook received', { uploadId, size, offset });
       
+      // Get the upload info from the tracker before removing it
+      const uploadInfo = uploadTracker.getUpload(uploadId);
+      
       // Get the telegram bot service
       const telegramBot = getTelegramBot();
       
       // If we have a telegram bot instance, notify about the termination
       if (telegramBot) {
         logger.info(`Notifying Telegram about terminated upload ${uploadId}`);
-        telegramBot.handleTerminatedUpload(uploadId, metadata, size, offset)
+        
+        // Use the metadata from the upload tracker if available, as it might have more info
+        const enhancedMetadata = uploadInfo?.metadata || metadata;
+        
+        telegramBot.handleTerminatedUpload(uploadId, enhancedMetadata, size, offset)
           .then((success: boolean) => {
             logger.info(`Telegram notification for terminated upload ${uploadId} ${success ? 'succeeded' : 'failed'}`);
           })
           .catch((err: Error) => {
             logger.error(`Error sending Telegram notification for terminated upload ${uploadId}:`, err);
           });
+      }
+      
+      // Remove the upload from the tracker after notification
+      if (uploadInfo) {
+        uploadTracker.removeUpload(uploadId);
       }
       
       res.status(200).json({ message: 'Post-terminate hook processed' });

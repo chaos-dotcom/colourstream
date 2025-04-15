@@ -534,9 +534,10 @@ export class TelegramBot {
     };
     
     // Extract filename and project info from metadata
+    // Check both standard metadata fields and the ones from the upload tracker
     const filename = metadata?.filename || 'Unknown File';
-    const clientName = metadata?.clientName || 'Unknown Client';
-    const projectName = metadata?.projectName || 'Unknown Project';
+    const clientName = metadata?.clientName || metadata?.client || 'Unknown Client';
+    const projectName = metadata?.projectName || metadata?.project || 'Unknown Project';
     
     // Create a special terminated message
     let message = `<b>❌ Upload Terminated</b>\n`;
@@ -553,6 +554,9 @@ export class TelegramBot {
     
     // Add timestamp
     message += `<b>Terminated at:</b> ${new Date().toLocaleString()}\n`;
+    
+    // Log the message we're about to send
+    console.log(`[TELEGRAM-DEBUG] Sending terminated message for upload ${uploadId}:`, message);
     
     // Send the message directly
     const success = await this.sendMessage(message, uploadId);
