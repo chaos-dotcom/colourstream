@@ -448,7 +448,7 @@ tusd:
      restart: unless-stopped # Restart policy
      volumes:
        - /Volumes/Backup3/tusd-data:/srv/tusd-data # Map a local directory for file storage
-       - ./tusd-hooks:/etc/tusd/hooks # Mount the hooks directory
+       # - ./tusd-hooks:/etc/tusd/hooks # Removed script hook directory mount
        - ./certs/certs/tusd.colourstream.${DOMAIN}.co.uk.crt:/etc/tusd/tusd.crt:ro # Mount the TLS certificate
        - ./certs/private/tusd.colourstream.${DOMAIN}.co.uk.key:/etc/tusd/tusd.key:ro # Mount the TLS key
      entrypoint: /usr/local/bin/tusd # Explicitly set the entrypoint
@@ -457,14 +457,22 @@ tusd:
      command: # Use YAML list format for command arguments
        - "-port=1080"
        - "-upload-dir=/srv/tusd-data"
-       # --- Use script hooks ---
-       - "-hooks-dir=/etc/tusd/hooks"
-
        - "-tls-certificate=/etc/tusd/tusd.crt"
        - "-tls-key=/etc/tusd/tusd.key"
-       - "-enable-h2c" # Enable HTTP/2 over cleartext
-       - "-hooks-dir=/etc/tusd/hooks" # Point to the mounted hooks directory"
-     networks: # Added network def\\inition
+       # --- Use HTTP hooks with specific URLs per event ---
+       - "-hooks-protocol=http"
+       # Point create/receive/terminate events to the progress endpoint
+       - "-hooks-http-post-create-url=http://backend:5001/api/upload/hook-progress"
+       - "-hooks-http-post-receive-url=http://backend:5001/api/upload/hook-progress"
+       - "-hooks-http-post-terminate-url=http://backend:5001/api/upload/hook-progress" # Can add specific handling later if needed
+       # Point finish event to the dedicated processing endpoint
+       - "-hooks-http-post-finish-url=http://backend:5001/api/upload/process-finished"
+       # Forward necessary headers for all HTTP hooks
+       - "-hooks-http-forward-headers=Upload-Concat,Upload-Defer-Length,Upload-Length,Upload-Metadata,Upload-Offset,Tus-Resumable"
+       # Specify which events trigger hooks
+       - "-hooks-enabled-events=post-create,post-receive,post-finish,post-terminate"
+       # - "-enable-h2c" # This might conflict with TLS, review if needed
+     networks: # Added network definition
        - network
 
 volumes:
