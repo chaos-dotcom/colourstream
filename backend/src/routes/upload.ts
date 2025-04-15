@@ -17,7 +17,7 @@ import { CompletedPart } from '@aws-sdk/client-s3';
 const router = express.Router();
 const prisma = new PrismaClient();
 
-// --- In-memory storage for Tusd upload progress ---
+router.post('/process-finished', handleProcessFinishedUpload);
 // Note: This is basic and will be lost on server restart.
 // Consider Redis or a database for production.
 interface TusdUploadInfo {
