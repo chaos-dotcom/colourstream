@@ -10,11 +10,25 @@ import { uploadTracker } from '../services/uploads/uploadTracker';
 import { s3Service } from '../services/s3/s3Service';
 import { s3FileProcessor } from '../services/s3/s3FileProcessor'; // Corrected casing
 import { logger } from '../utils/logger';
-import { getTelegramBot } from '../services/telegram/telegramBot'; // Import the function
-import { CompletedPart } from '@aws-sdk/client-s3'; // Import type for parts
+import { getTelegramBot } from '../services/telegram/telegramBot';
+import { CompletedPart } from '@aws-sdk/client-s3';
 
 const router = express.Router();
 const prisma = new PrismaClient();
+
+// --- In-memory storage for Tusd upload progress ---
+// Note: This is basic and will be lost on server restart.
+// Consider Redis or a database for production.
+interface TusdUploadInfo {
+  size: number;
+  filename: string;
+  token: string;
+  clientName?: string;
+  projectName?: string;
+  storage: 'local' | 's3'; // Assuming tusd might eventually support S3 directly
+}
+const tusdProgressCache = new Map<string, TusdUploadInfo>();
+// --- End In-memory storage ---
 
 // Extend Express.Request to include files from multer
 interface MulterRequest extends Request {
@@ -1512,10 +1526,156 @@ router.post('/cleanup-filenames', authenticateToken, async (_req: Request, res: 
   }
 });
 
-// New endpoint to receive progress updates from the frontend
-router.post('/progress/:token', async (req: Request, res: Response) => {
+
+// --- NEW: Tusd Hook Progress Handler ---
+// Endpoint called by post-create, post-receive, post-finish hooks
+router.post('/hook-progress', async (req: Request, res: Response) => {
+  const { uploadId, status, offset, token, filename, size } = req.body;
+  const telegramBot = getTelegramBot();
+
+  if (!telegramBot) {
+    logger.error('[Hook Progress] Telegram bot not initialized.');
+    // Don't fail the hook, just log
+    return res.status(200).json({ status: 'warning', message: 'Telegram bot not available, progress not sent.' });
+  }
+
+  if (!uploadId || !status) {
+    logger.warn('[Hook Progress] Received incomplete payload (missing uploadId or status):', req.body);
+    return res.status(400).json({ status: 'error', message: 'Missing uploadId or status' });
+  }
+
+  logger.info(`[Hook Progress] Received status '${status}' for uploadId: ${uploadId}`);
+
   try {
-    const { token } = req.params;
+    switch (status) {
+      case 'created':
+        // Initial notification when upload starts
+        if (token === undefined || filename === undefined || size === undefined) {
+           logger.warn(`[Hook Progress] 'created' status missing token, filename, or size for ${uploadId}`);
+           return res.status(400).json({ status: 'error', message: 'Missing token, filename, or size for created status' });
+        }
+
+        // Fetch client/project info using the token
+        const uploadLink = await prisma.uploadLink.findUnique({
+          where: { token },
+          include: { project: { include: { client: true } } }
+        });
+
+        if (!uploadLink) {
+          logger.error(`[Hook Progress] Invalid token '${token}' received for 'created' status on ${uploadId}`);
+          // Don't store invalid data
+          return res.status(403).json({ status: 'error', message: 'Invalid upload token' });
+        }
+
+        const initialInfo: TusdUploadInfo = {
+          size: Number(size),
+          filename: filename,
+          token: token,
+          clientName: uploadLink.project.client.name,
+          projectName: uploadLink.project.name,
+          storage: 'local' // Assuming tusd currently uses local storage
+        };
+        tusdProgressCache.set(uploadId, initialInfo);
+        logger.info(`[Hook Progress] Cached initial info for ${uploadId}`);
+
+        // Send initial Telegram message
+        await telegramBot.sendUploadNotification({
+          id: uploadId,
+          size: initialInfo.size,
+          offset: 0, // Starts at 0
+          metadata: {
+            filename: initialInfo.filename,
+            clientName: initialInfo.clientName || 'Unknown Client',
+            projectName: initialInfo.projectName || 'Unknown Project',
+            token: initialInfo.token,
+          },
+          storage: initialInfo.storage,
+          isComplete: false,
+        });
+        break;
+
+      case 'receiving':
+        // Update progress as chunks arrive
+        if (offset === undefined) {
+          logger.warn(`[Hook Progress] 'receiving' status missing offset for ${uploadId}`);
+          return res.status(400).json({ status: 'error', message: 'Missing offset for receiving status' });
+        }
+
+        const receivingInfo = tusdProgressCache.get(uploadId);
+        if (!receivingInfo) {
+          logger.warn(`[Hook Progress] Received 'receiving' status for unknown uploadId: ${uploadId}. Ignoring.`);
+          // Maybe the 'created' hook failed or server restarted. Allow hook to succeed.
+          return res.status(200).json({ status: 'warning', message: 'Upload info not found in cache, ignoring progress.' });
+        }
+
+        // Send updated Telegram message
+        await telegramBot.sendUploadNotification({
+          id: uploadId,
+          size: receivingInfo.size,
+          offset: Number(offset),
+          metadata: {
+            filename: receivingInfo.filename,
+            clientName: receivingInfo.clientName || 'Unknown Client',
+            projectName: receivingInfo.projectName || 'Unknown Project',
+            token: receivingInfo.token,
+          },
+          storage: receivingInfo.storage,
+          isComplete: false,
+          // TODO: Calculate uploadSpeed if desired
+        });
+        break;
+
+      case 'finished':
+        // Final notification when upload completes (before file move)
+        const finishedInfo = tusdProgressCache.get(uploadId);
+        if (!finishedInfo) {
+          logger.warn(`[Hook Progress] Received 'finished' status for unknown uploadId: ${uploadId}. Cannot send final notification or cleanup.`);
+           return res.status(200).json({ status: 'warning', message: 'Upload info not found in cache for finished status.' });
+        }
+
+        // Send final "complete" Telegram message
+        await telegramBot.sendUploadNotification({
+          id: uploadId,
+          size: finishedInfo.size,
+          offset: finishedInfo.size, // Mark as fully uploaded
+          metadata: {
+            filename: finishedInfo.filename,
+            clientName: finishedInfo.clientName || 'Unknown Client',
+            projectName: finishedInfo.projectName || 'Unknown Project',
+            token: finishedInfo.token,
+          },
+          storage: finishedInfo.storage,
+          isComplete: true, // Mark as complete
+        });
+
+        // Clean up the message ID storage in the bot
+        await telegramBot.cleanupUploadMessage(uploadId);
+
+        // Remove from cache
+        tusdProgressCache.delete(uploadId);
+        logger.info(`[Hook Progress] Processed 'finished' status and cleaned up cache for ${uploadId}`);
+        break;
+
+      default:
+        logger.warn(`[Hook Progress] Received unknown status '${status}' for uploadId: ${uploadId}`);
+        return res.status(400).json({ status: 'error', message: `Unknown status: ${status}` });
+    }
+
+    // Respond successfully to the hook
+    res.status(200).json({ status: 'success', message: `Status '${status}' processed for ${uploadId}` });
+
+  } catch (error) {
+    logger.error(`[Hook Progress] Error processing status '${status}' for ${uploadId}:`, error);
+    // Respond with error but allow hook to potentially succeed on Tusd side
+    res.status(500).json({ status: 'error', message: 'Internal server error processing hook progress' });
+  }
+});
+// --- End Tusd Hook Progress Handler ---
+
+
+// Endpoint for Companion to notify backend after successful S3 upload
+// NOTE: This endpoint remains separate from the Tusd hook handler
+router.post('/s3-callback', async (req: Request, res: Response) => {
     const { uploadId, bytesUploaded, bytesTotal, filename, clientName, projectName } = req.body;
 
     // Basic validation
