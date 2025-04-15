@@ -156,6 +156,17 @@ export class TusdHooksController {
         // Use the metadata from the upload tracker if available, as it might have more info
         const enhancedMetadata = uploadInfo?.metadata || metadata;
         
+        // First, delete any existing message for this upload to prevent updates
+        if (uploadId) {
+          telegramBot.cleanupUploadMessage(uploadId)
+            .then(() => {
+              logger.info(`Cleaned up existing message for terminated upload ${uploadId}`);
+            })
+            .catch((err: Error) => {
+              logger.error(`Error cleaning up message for terminated upload ${uploadId}:`, err);
+            });
+        }
+        
         // Create a new message instead of updating the existing one
         const terminatedMessage = `<b>❌ Upload Terminated</b>\n` +
           `<b>File:</b> ${enhancedMetadata?.filename || 'Unknown File'}\n` +
@@ -165,7 +176,7 @@ export class TusdHooksController {
           `<b>Project:</b> ${enhancedMetadata?.projectName || enhancedMetadata?.project || 'Unknown Project'}\n` +
           `<b>Terminated at:</b> ${new Date().toLocaleString()}`;
         
-        // Send a new message directly
+        // Send a new message directly WITHOUT the upload ID to prevent editing
         telegramBot.sendMessage(terminatedMessage)
           .then((success: boolean) => {
             logger.info(`Telegram notification for terminated upload ${uploadId} ${success ? 'succeeded' : 'failed'}`);
