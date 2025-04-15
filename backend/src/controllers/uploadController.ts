@@ -66,12 +66,12 @@ const sanitizePathString = (str: string | undefined | null): string => {
 
 // --- Basic Payload Validation ---
 export const handleProcessFinishedUpload = async (req: Request, res: Response): Promise<void> => {
-  // Extract uploadId from the hook payload (sent to /hook-progress)
-  const hookPayload = req.body;
-  const uploadId = hookPayload?.uploadId;
+  // Extract uploadId - it might be directly in req.body (if called from post-finish case)
+  // or nested if the original hook payload was passed through somehow (less likely now).
+  const uploadId = req.body?.uploadId || req.body?.Event?.Upload?.ID; // Check both possibilities
 
   if (!uploadId) {
-    logger.error('[ProcessFinished] Received hook call without uploadId.');
+    logger.error('[ProcessFinished] Could not extract uploadId from request body:', JSON.stringify(req.body));
     // Send response directly as this function is now called by the route handler
     res.status(400).send({ message: 'Missing uploadId in hook payload.' });
     return;

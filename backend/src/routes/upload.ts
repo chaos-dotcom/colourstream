@@ -1431,31 +1431,45 @@ router.post('/cleanup-filenames', authenticateToken, async (_req: Request, res: 
 
 
 // --- NEW: Tusd Hook Progress Handler ---
-// Endpoint called by post-create, post-receive, post-finish hooks
+// Endpoint called by Tusd HTTP hooks (post-create, post-receive, post-finish, post-terminate)
 router.post('/hook-progress', async (req: Request, res: Response) => {
-  const { uploadId, status, offset, token, filename, size } = req.body;
+  // Extract data from the Tusd HTTP hook payload structure
+  const hookPayload = req.body;
+  const hookType = hookPayload?.Type; // e.g., "post-create", "post-finish"
+  const uploadData = hookPayload?.Event?.Upload;
+  const uploadId = uploadData?.ID;
+  const offset = uploadData?.Offset;
+  const size = uploadData?.Size;
+  const metadata = uploadData?.MetaData;
+  const token = metadata?.token;
+  const filename = metadata?.filename || metadata?.name;
+
   const telegramBot = getTelegramBot();
 
   if (!telegramBot) {
-    logger.error('[Hook Progress] Telegram bot not initialized.');
+    logger.error(`[Hook Progress:${uploadId}] Telegram bot not initialized.`);
     // Don't fail the hook, just log
-    return res.status(200).json({ status: 'warning', message: 'Telegram bot not available, progress not sent.' });
+    // Don't fail the hook, just log
+    // Allow processing to continue without Telegram if needed
   }
 
-  if (!uploadId || !status) {
-    logger.warn('[Hook Progress] Received incomplete payload (missing uploadId or status):', req.body);
+  // Validate the essential parts extracted from the hook payload
+  if (!uploadId || !hookType) {
+    logger.warn('[Hook Progress] Received incomplete hook payload (missing Upload.ID or Type):', JSON.stringify(hookPayload));
+    // Use the correct message based on previous logs
     return res.status(400).json({ status: 'error', message: 'Missing uploadId or status' });
   }
 
-  logger.info(`[Hook Progress] Received status '${status}' for uploadId: ${uploadId}`);
+  logger.info(`[Hook Progress] Received hook type '${hookType}' for uploadId: ${uploadId}`);
 
   try {
-    switch (status) {
-      case 'created':
+    // Use hookType (e.g., "post-create") instead of the old 'status' variable
+    switch (hookType) {
+      case 'post-create':
         // Initial notification when upload starts
         if (token === undefined || filename === undefined || size === undefined) {
-           logger.warn(`[Hook Progress] 'created' status missing token, filename, or size for ${uploadId}`);
-           return res.status(400).json({ status: 'error', message: 'Missing token, filename, or size for created status' });
+           logger.warn(`[Hook Progress] 'post-create' hook missing token, filename, or size in metadata/upload data for ${uploadId}`);
+           return res.status(400).json({ status: 'error', message: 'Missing token, filename, or size for post-create hook' });
         }
 
         // Use helper function to get details and populate cache
@@ -1493,11 +1507,11 @@ router.post('/hook-progress', async (req: Request, res: Response) => {
         });
         break;
 
-      case 'receiving':
+      case 'post-receive':
         // Update progress as chunks arrive
         if (offset === undefined) {
-          logger.warn(`[Hook Progress] 'receiving' status missing offset for ${uploadId}`);
-          return res.status(400).json({ status: 'error', message: 'Missing offset for receiving status' });
+          logger.warn(`[Hook Progress] 'post-receive' hook missing offset for ${uploadId}`);
+          return res.status(400).json({ status: 'error', message: 'Missing offset for post-receive hook' });
         }
 
         // Use helper function to get details (checks cache first, then file/DB)
@@ -1552,29 +1566,56 @@ router.post('/hook-progress', async (req: Request, res: Response) => {
         });
         break;
 
-      case 'finished':
+      case 'post-finish':
         // Upload is fully received by Tusd. Trigger final processing.
-        logger.info(`[Hook Progress] Received 'finished' status for ${uploadId}. Triggering final processing.`);
-        // Call the controller function responsible for handling the finished state.
-        // We pass the request and response objects along, but the controller
-        // will now primarily use the uploadId from the body to fetch details.
-        // Note: handleProcessFinishedUpload needs modification to read the .info file itself.
+        logger.info(`[Hook Progress] Received 'post-finish' hook for ${uploadId}. Triggering final processing.`);
+        // Call the controller function, passing the correct uploadId extracted from the hook payload.
+        // The controller will read the .info file using this ID.
+        // We need to pass a modified request or just the ID. Let's pass req/res for now.
+        // The controller already expects to extract uploadId from req.body (which we set up for the 'finished' case previously).
+        // We need to ensure the controller *can* get the ID from the *actual* hook payload structure.
+        // Let's modify the call to pass the ID explicitly for clarity, and adjust the controller.
+        // handleProcessFinishedUpload(req, res); // Old call
+        // Instead of passing req/res, we'll just trigger the logic.
+        // The controller needs refactoring to accept just the ID and fetch info.
+        // For now, let's adapt the controller call slightly:
+        // Create a simplified body for the controller to parse temporarily
+        req.body = { uploadId: uploadId }; // Overwrite req.body for the controller
         handleProcessFinishedUpload(req, res);
-        // We don't break here because handleProcessFinishedUpload will send its own response.
-        // However, we need to prevent the default success response below from being sent.
-        // Let's return here to stop further execution in this handler for the 'finished' case.
+        // Prevent the default success response below.
         return;
 
+      case 'post-terminate':
+          logger.info(`[Hook Progress] Received 'post-terminate' hook for ${uploadId}. Cleaning up tracker/notifications.`);
+          // Clean up tracker state
+          uploadTracker.completeUpload(uploadId); // Mark as complete (or add a specific 'terminated' state)
+          // Clean up any persistent Telegram message
+          if (telegramBot) {
+              await telegramBot.cleanupUploadMessage(uploadId);
+          }
+          // Optionally, try to delete the orphaned .bin/.info files
+          try {
+              const infoPath = path.join(TUSD_DATA_DIR, `${uploadId}.info`);
+              const dataPath = path.join(TUSD_DATA_DIR, uploadId);
+              await fsPromises.unlink(infoPath).catch(e => logger.warn(`Failed to delete terminated info file ${infoPath}: ${e.message}`));
+              await fsPromises.unlink(dataPath).catch(e => logger.warn(`Failed to delete terminated data file ${dataPath}: ${e.message}`));
+          } catch (cleanupError) {
+              logger.error(`Error during post-terminate file cleanup for ${uploadId}:`, cleanupError);
+          }
+          break; // Allow default success response
+
       default:
-        logger.warn(`[Hook Progress] Received unknown status '${status}' for uploadId: ${uploadId}`);
-        return res.status(400).json({ status: 'error', message: `Unknown status: ${status}` });
+        // Use hookType in the log message
+        logger.warn(`[Hook Progress] Received unknown hook type '${hookType}' for uploadId: ${uploadId}`);
+        return res.status(400).json({ status: 'error', message: `Unknown hook type: ${hookType}` });
     }
 
-    // Respond successfully to the hook
-    res.status(200).json({ status: 'success', message: `Status '${status}' processed for ${uploadId}` });
+    // Respond successfully to the hook (for non-finished cases or successful terminate)
+    res.status(200).json({ status: 'success', message: `Hook type '${hookType}' processed for ${uploadId}` });
 
   } catch (error) {
-    logger.error(`[Hook Progress] Error processing status '${status}' for ${uploadId}:`, error);
+    // Use hookType in the log message
+    logger.error(`[Hook Progress] Error processing hook type '${hookType}' for ${uploadId}:`, error);
     // Respond with error but allow hook to potentially succeed on Tusd side
     res.status(500).json({ status: 'error', message: 'Internal server error processing hook progress' });
   }
