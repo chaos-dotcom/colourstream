@@ -1509,10 +1509,11 @@ router.post('/hook-progress', async (req: Request, res: Response) => {
         } else {
             logger.warn(`[Hook Progress] Telegram bot not available, skipping initial notification for ${uploadId}`);
         }
-          metadata: {
-            filename: initialDetails.filename ?? 'Unknown Filename',
-            clientName: initialDetails.clientName || 'Unknown Client',
-            projectName: initialDetails.projectName || 'Unknown Project',
+        // --- Removed duplicate metadata block below ---
+        // metadata: {
+        //   filename: initialDetails.filename ?? 'Unknown Filename',
+        //   clientName: initialDetails.clientName || 'Unknown Client',
+        //   projectName: initialDetails.projectName || 'Unknown Project',
             token: initialDetails.token, // Use initialDetails
           },
           storage: initialDetails.storage, // Use initialDetails
@@ -1581,13 +1582,14 @@ router.post('/hook-progress', async (req: Request, res: Response) => {
         } else {
             logger.warn(`[Hook Progress] Telegram bot not available, skipping progress notification for ${uploadId}`);
         }
-          offset: Number(offset),
-          metadata: {
-            // Use filename from details if available, otherwise default
-            filename: receivingDetails?.filename || 'Unknown Filename',
-            // Use client/project from details if available, otherwise default
-            clientName: receivingDetails?.clientName || 'Unknown Client',
-            projectName: receivingDetails?.projectName || 'Unknown Project',
+        // --- Removed duplicate metadata block below ---
+        // offset: Number(offset),
+        // metadata: {
+        //   // Use filename from details if available, otherwise default
+        //   filename: receivingDetails?.filename || 'Unknown Filename',
+        //   // Use client/project from details if available, otherwise default
+        //   clientName: receivingDetails?.clientName || 'Unknown Client',
+        //   projectName: receivingDetails?.projectName || 'Unknown Project',
             // Include token if available
             token: receivingDetails?.token || 'Unknown',
           },
