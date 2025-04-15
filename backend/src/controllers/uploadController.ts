@@ -402,4 +402,4 @@ export const handleProcessFinishedUpload = async (req: Request, res: Response): 
   }
 };
 // Removed the closing }; that ended the duplicate function definition.
-// The extra brace below this line is the cause of the TS1128 error and will be removed.
+// The extra brace that was below this line has been removed.
