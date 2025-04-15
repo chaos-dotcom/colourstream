@@ -1,12 +1,13 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */ // Remove if using the commented out handlers
 import { Request, Response } from 'express';
-import fs from 'fs/promises';
-import path from 'path';
-import { PrismaClient } from '@prisma/client'; // Removed unused UploadedFile type
-import xxhash from 'xxhash-wasm'; // Import xxhash
-import { logger } from '../utils/logger';
+import fs from 'fs/promises'; // Needed for filestore operations
+import path from 'path'; // Needed for path manipulation
+import { PrismaClient, Project, Client } from '@prisma/client'; // Add Project, Client types
+import xxhash from 'xxhash-wasm';
+import { logger } from '../utils/logger'; // Correct path
 import { getTelegramBot } from '../services/telegram/telegramBot';
-import { s3FileProcessor } from '../services/s3/s3FileProcessor'; // Import S3 processor if needed
+import { s3FileProcessor } from '../services/s3/s3FileProcessor'; // Needed for S3 processing
+import { uploadTracker } from '../services/uploads/uploadTracker'; // Import uploadTracker
 
 // Initialize Prisma Client
 const prisma = new PrismaClient();
