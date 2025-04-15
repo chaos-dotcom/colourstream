@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { logger } from '../utils/logger';
 import { uploadTracker } from '../services/uploads/uploadTracker';
 import { getTelegramBot } from '../services/telegram/telegramBot';
+import axios from 'axios';
 
 /**
  * Format bytes to human-readable format
