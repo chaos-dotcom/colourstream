@@ -13,6 +13,8 @@ import { s3FileProcessor } from '../services/s3/s3FileProcessor'; // Corrected c
 import { logger } from '../utils/logger';
 import { getTelegramBot } from '../services/telegram/telegramBot';
 import { CompletedPart } from '@aws-sdk/client-s3';
+// Import the controller function for the finished upload hook
+import { handleProcessFinishedUpload } from '../controllers/uploadController';
 
 const router = express.Router();
 const prisma = new PrismaClient();
