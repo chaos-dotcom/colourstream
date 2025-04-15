@@ -97,7 +97,8 @@ export class TusdHooksController {
       const uploadInfo = uploadTracker.getUpload(uploadId);
       if (uploadInfo?.terminated) {
         logger.info(`Ignoring post-receive hook for terminated upload ${uploadId}`);
-        return res.status(200).json({ message: 'Upload already terminated, hook ignored' });
+        res.status(200).json({ message: 'Upload already terminated, hook ignored' });
+        return;
       }
       
       // Update the upload progress
