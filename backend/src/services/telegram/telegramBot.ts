@@ -326,6 +326,9 @@ export class TelegramBot {
     const { id, size, offset, metadata, isComplete, uploadSpeed, createdAt } = uploadInfo; // Add createdAt
 
     logger.info(`[sendUploadNotification] Received data for ID ${id}: size=${size}, offset=${offset}, filename=${metadata?.filename}, client=${metadata?.clientName}, project=${metadata?.projectName}, isComplete=${isComplete}, speed=${uploadSpeed}`); // Log received data
+    
+    // Force isComplete to true if offset equals size (upload is complete)
+    const actuallyComplete = isComplete || (offset === size);
 
     console.log('[TELEGRAM-DEBUG] Creating/Updating upload notification message for upload:', id);
 
@@ -359,7 +362,7 @@ export class TelegramBot {
 
     // Create message with upload details and fewer emojis
     let message = '';
-    if (isComplete) {
+    if (actuallyComplete) {
       message = `<b>✅ Upload Completed!</b>\n`;
     } else {
       const progressEmoji = getProgressEmoji(progress);
@@ -391,7 +394,7 @@ export class TelegramBot {
     }
         
     // Add estimated time remaining if not complete
-    if (!isComplete && offset > 0 && size > offset) {
+    if (!actuallyComplete && offset > 0 && size > offset) {
       if (uploadSpeed && uploadSpeed > 0) {
         // Calculate estimated time remaining based on current speed
         const remainingBytes = size - offset;
@@ -419,7 +422,7 @@ export class TelegramBot {
     }
 
     // Add completion timestamp and duration if completed
-    if (isComplete) {
+    if (actuallyComplete) {
       const completedTime = new Date();
       message += `<b>Completed at:</b> ${completedTime.toLocaleString()}\n`;
       if (createdAt) { // Calculate duration if start time is known
@@ -446,9 +449,15 @@ export class TelegramBot {
     const success = await this.sendMessage(message, id);
     
     // If upload is complete and the notification was sent/edited successfully,
-    // the backend should now handle calling `cleanupUploadMessage(id)`
-    // based on receiving the "finished" status from the post-finish hook.
-    // The timeout logic is removed from here.
+    // schedule cleanup after a delay to ensure the completion message is visible
+    if (actuallyComplete && success) {
+      console.log(`[TELEGRAM-DEBUG] Upload ${id} is complete, scheduling cleanup in 5 minutes`);
+      setTimeout(() => {
+        this.cleanupUploadMessage(id).then(cleaned => {
+          console.log(`[TELEGRAM-DEBUG] Cleanup for upload ${id} completed: ${cleaned}`);
+        });
+      }, 5 * 60 * 1000); // 5 minutes delay
+    }
     
     return success;
   }
