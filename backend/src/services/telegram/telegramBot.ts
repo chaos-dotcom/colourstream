@@ -16,6 +16,7 @@ export class TelegramBot {
   private chatId: string;
   private baseUrl: string;
   private messageIdCache: Map<string, number>; // In-memory cache for message IDs
+  private uploadInfoCache: Map<string, any> = new Map<string, any>(); // Cache for upload information
 
   constructor(config: TelegramConfig) {
     this.botToken = config.botToken;
@@ -26,6 +27,20 @@ export class TelegramBot {
     // Log initialization
     console.log('[TELEGRAM-DEBUG] Telegram API Base URL:', `https://api.telegram.org/bot${this.botToken.substring(0, 10)}...`);
     logger.info('Telegram API Base URL:', `https://api.telegram.org/bot${this.botToken.substring(0, 10)}...`);
+  }
+  
+  /**
+   * Get the chat ID for this bot
+   */
+  getChatId(): string {
+    return this.chatId;
+  }
+  
+  /**
+   * Get the bot token (masked for security)
+   */
+  getBotToken(): string {
+    return this.botToken;
   }
 
   /**
@@ -107,39 +122,46 @@ export class TelegramBot {
   }
 
   /**
-   * Delete a stored message ID when it's no longer needed
+   * Delete a stored message ID when it's no longer needed (from cache and DB)
+   * Made public for use after sending termination/completion messages.
    */
-  private async deleteMessageId(uploadId: string): Promise<boolean> {
+  public async cleanupUploadMessage(uploadId: string): Promise<boolean> {
+    console.log(`[TELEGRAM-DEBUG] Cleaning up message ID for upload ${uploadId}`);
     try {
       // Remove from the in-memory cache first
       this.messageIdCache.delete(uploadId);
-      
+      this.uploadInfoCache.delete(uploadId); // Also clear related upload info cache
+
       // Check if our model exists yet (after migration) to avoid runtime errors
       // @ts-ignore - We're checking this at runtime
       if (!prisma.telegramMessage) {
-        console.log(`[TELEGRAM-DEBUG] TelegramMessage model not yet available in Prisma client, using memory cache only`);
+        console.log(`[TELEGRAM-DEBUG] TelegramMessage model not yet available in Prisma client, using memory cache only for cleanup`);
         return true;
       }
-      
-      // Then remove from the database
+
+      // Then remove from the database if the record exists
       // @ts-ignore - We've checked it exists at runtime
-      await prisma.telegramMessage.delete({
-        where: { uploadId }
-      });
-      
-      console.log(`[TELEGRAM-DEBUG] Deleted message ID for upload ${uploadId} from database`);
-      return true;
-    } catch (error: any) { // Added :any type annotation
-      // Check if the error is the specific "Record to delete does not exist" error
-      if (error.code === 'P2025') {
-        console.log(`[TELEGRAM-DEBUG] Message ID for upload ${uploadId} already deleted or never existed.`);
-        return true; // Consider this a success as the record is gone
+      const existing = await prisma.telegramMessage.findUnique({ where: { uploadId } });
+      if (existing) {
+        // @ts-ignore - We've checked it exists at runtime
+        await prisma.telegramMessage.delete({
+          where: { uploadId }
+        });
+        console.log(`[TELEGRAM-DEBUG] Deleted message ID for upload ${uploadId} from database`);
+      } else {
+        console.log(`[TELEGRAM-DEBUG] No message ID found in database for upload ${uploadId} to delete.`);
       }
-      // Log other errors
+
+      return true;
+    } catch (error) {
+      // Log error but don't throw, cleanup failure shouldn't break main flow
       console.error(`[TELEGRAM-DEBUG] Error deleting message ID for upload ${uploadId}:`, error);
-      return false;
+      logger.error(`[TELEGRAM-DEBUG] Error cleaning up message ID for ${uploadId}: ${error instanceof Error ? error.message : error}`);
+      return false; // Indicate cleanup failed
     }
   }
+
+  // Removed unused private deleteMessageId method. Use cleanupUploadMessage instead.
 
   /**
    * Send a message to the configured Telegram chat
@@ -172,72 +194,152 @@ export class TelegramBot {
           console.log('[TELEGRAM-DEBUG] Successfully edited message');
         } catch (editError: any) {
           console.error('[TELEGRAM-DEBUG] Error editing message:', editError.message);
-          console.log('[TELEGRAM-DEBUG] Edit error response:', editError.response?.data || 'No response data');
-          
-          // If editing fails, send a new message instead
-          console.log(`[TELEGRAM-DEBUG] Falling back to sending a new message for ${uploadId}`);
-          response = await axios.post(`${this.baseUrl}/sendMessage`, {
-            chat_id: chatId,
-            text: message,
-            parse_mode: 'HTML',
-          });
-          
-          // Update the message ID for this upload
-          if (uploadId && response.data.ok && response.data.result && response.data.result.message_id) {
-            await this.storeMessageId(uploadId, response.data.result.message_id);
-          }
-        }
-      } else {
-        // Send new message
-        console.log(`[TELEGRAM-DEBUG] No existing message found for ${uploadId || 'unknown'}, sending new message`);
-        response = await axios.post(`${this.baseUrl}/sendMessage`, {
-          chat_id: chatId,
-          text: message,
-          parse_mode: 'HTML',
-        });
-        
-        // Store the message ID if this is for a specific upload
-        if (uploadId && response.data.ok && response.data.result && response.data.result.message_id) {
-          await this.storeMessageId(uploadId, response.data.result.message_id);
-        }
-      }
-      
-      console.log('[TELEGRAM-DEBUG] Telegram API response:', JSON.stringify(response.data));
-      
+          const errorData = editError.response?.data;
+          console.log('[TELEGRAM-DEBUG] Edit error response:', errorData || 'No response data');
+
+          // Check if the error is specifically "message is not modified"
+          if (errorData?.error_code === 400 && errorData?.description?.includes('message is not modified')) {
+            console.log(`[TELEGRAM-DEBUG] Edit failed because message content is identical. Treating as success for upload ${uploadId}.`);
+            // Message is already correct, no need to send a new one. Return true.
+            return true; 
+          } else {
+            // For other edit errors, fall back to sending a new message
+            console.log(`[TELEGRAM-DEBUG] Falling back to sending a new message for ${uploadId} due to edit error.`);
+            response = await axios.post(`${this.baseUrl}/sendMessage`, {
+              chat_id: chatId,
+              text: message,
+              parse_mode: 'HTML',
+            });
+             
+            // Update the message ID for this upload if fallback succeeds
+            if (uploadId && response.data.ok && response.data.result && response.data.result.message_id) {
+              await this.storeMessageId(uploadId, response.data.result.message_id);
+           }
+         }
+       }
+     } // End of the 'if (messageId)' block
+
+     // If no messageId existed OR editing failed and fell through, send a new message
+     if (!response) { // Check if 'response' is still undefined (meaning we need to send new)
+       console.log(`[TELEGRAM-DEBUG] No existing message found or edit failed for ${uploadId || 'unknown'}, sending new message`);
+       response = await axios.post(`${this.baseUrl}/sendMessage`, {
+         chat_id: chatId,
+         text: message, // Corrected syntax
+         parse_mode: 'HTML', // Corrected syntax
+       }); // Correctly close the axios data object
+
+       // Store the message ID if this is for a specific upload and the call was successful
+       if (uploadId && response.data.ok && response.data.result && response.data.result.message_id) {
+         await this.storeMessageId(uploadId, response.data.result.message_id);
+       }
+     } // This closing brace corresponds to the 'if (!response)' block
+
+     // Ensure response is defined before proceeding (it should be after the above block)
+     if (!response) {
+        // This should ideally not happen if the logic above is correct, but log an error if it does
+        logger.error(`[TELEGRAM-DEBUG] Critical error: Response object is unexpectedly undefined after attempting send/edit for upload ${uploadId || 'unknown'}`);
+        return false; // Cannot proceed without a response object
+     }
+
+     console.log('[TELEGRAM-DEBUG] Telegram API response:', JSON.stringify(response.data));
+
+     // Store the message ID *again* if it was a *new* message (messageId was null initially)
+     // This might be slightly redundant if the store inside the `if (!response)` block worked,
+     // but ensures it's stored if the initial edit failed and the fallback send worked.
+     if (!messageId && uploadId && response.data.ok && response.data.result && response.data.result.message_id) {
+         await this.storeMessageId(uploadId, response.data.result.message_id);
+     }
+
       return response.data.ok;
-    } catch (error: any) {
+    } catch (error: any) { // This is the main catch block for sendMessage
       console.error('[TELEGRAM-DEBUG] Failed to send/edit Telegram message:', error.message);
       logger.error('Failed to send/edit Telegram message:', error.message);
-      
-      // If all else fails, try sending a new message
-      if (uploadId) {
-        try {
-          console.log(`[TELEGRAM-DEBUG] Final fallback: sending new message for upload ${uploadId}`);
-          const chatId = !isNaN(Number(this.chatId)) ? Number(this.chatId) : this.chatId;
-          
-          const response = await axios.post(`${this.baseUrl}/sendMessage`, {
-            chat_id: chatId,
-            text: message,
-            parse_mode: 'HTML',
-          });
-          
-          // Store the new message ID
-          if (response.data.ok && response.data.result && response.data.result.message_id) {
-            await this.storeMessageId(uploadId, response.data.result.message_id);
-          }
-          
-          return response.data.ok;
-        } catch (fallbackError) {
-          console.error('[TELEGRAM-DEBUG] Fallback message send also failed:', fallbackError);
-        }
-      }
-      
+
       if (error.response) {
         console.error('[TELEGRAM-DEBUG] Error response data:', JSON.stringify(error.response.data));
       }
+
+      // --- Final Fallback Logic ---
+      // If the initial send/edit failed, try sending a completely new message as a last resort.
+      // This is useful if the original error was related to editing a non-existent message ID.
+      if (uploadId) {
+        console.log(`[TELEGRAM-DEBUG] Entering final fallback: attempting to send a new message for upload ${uploadId}`);
+        try { // Start a new try block specifically for the fallback
+          const chatId = !isNaN(Number(this.chatId)) ? Number(this.chatId) : this.chatId;
+          const fallbackResponse = await axios.post(`${this.baseUrl}/sendMessage`, { // Use a different variable name
+            chat_id: chatId,
+            text: message, // Use the original message content
+            parse_mode: 'HTML',
+          });
+
+          console.log('[TELEGRAM-DEBUG] Fallback sendMessage API response:', JSON.stringify(fallbackResponse.data));
+
+          // Store the new message ID if the fallback was successful
+          if (fallbackResponse.data.ok && fallbackResponse.data.result && fallbackResponse.data.result.message_id) {
+            await this.storeMessageId(uploadId, fallbackResponse.data.result.message_id);
+            return true; // Fallback succeeded
+          } else {
+             console.error('[TELEGRAM-DEBUG] Fallback message send failed (API returned not ok):', fallbackResponse.data);
+             return false; // Fallback failed (API error)
+          }
+        } catch (fallbackError: any) { // Catch errors specifically from the fallback attempt
+          console.error('[TELEGRAM-DEBUG] Fallback message send attempt threw an error:', fallbackError.message);
+          if (fallbackError.response) {
+            console.error('[TELEGRAM-DEBUG] Fallback error response data:', JSON.stringify(fallbackError.response.data));
+          }
+          return false; // Fallback failed (exception)
+        }
+      }
+      // --- End Final Fallback Logic ---
+
+      // If no uploadId or fallback failed, return false from the main catch block
+      return false;
+    } // End of the main catch block
+  } // End of sendMessage method
+
+
+  /**
+   * Sends a dedicated termination message for an upload.
+   * This method ALWAYS sends a new message and does NOT attempt to edit.
+   * It also cleans up any stored message ID for the upload afterwards.
+   */
+  async sendTerminationMessage(uploadId: string, message: string): Promise<boolean> {
+    const chatId = !isNaN(Number(this.chatId)) ? Number(this.chatId) : this.chatId;
+    console.log(`[TELEGRAM-DEBUG] Sending dedicated termination message for upload ${uploadId}`);
+
+    try {
+      // Always send a new message for termination
+      const response = await axios.post(`${this.baseUrl}/sendMessage`, {
+        chat_id: chatId,
+        text: message,
+        parse_mode: 'HTML',
+      });
+
+      console.log('[TELEGRAM-DEBUG] Termination message sent via API. Response:', JSON.stringify(response.data));
+
+      if (response.data.ok) {
+        logger.info(`Successfully sent termination notification for upload ${uploadId}`);
+        // Crucially, clean up any old message ID *after* sending the new one
+        await this.cleanupUploadMessage(uploadId);
+        return true;
+      } else {
+        logger.error(`Telegram API failed to send termination message for ${uploadId}: ${response.data.description}`);
+        // Attempt cleanup even if sending failed, to prevent future issues
+        await this.cleanupUploadMessage(uploadId);
+        return false;
+      }
+    } catch (error: any) {
+      console.error(`[TELEGRAM-DEBUG] Failed to send termination message for upload ${uploadId}:`, error.message);
+      logger.error(`Failed to send termination message for ${uploadId}:`, error.message);
+      if (error.response) {
+        console.error('[TELEGRAM-DEBUG] Error response data:', JSON.stringify(error.response.data));
+      }
+      // Attempt cleanup even if sending failed, to prevent future issues
+      await this.cleanupUploadMessage(uploadId);
       return false;
     }
   }
+
 
   /**
    * Edit an existing message
@@ -282,11 +384,33 @@ export class TelegramBot {
     createdAt?: Date;
     uploadSpeed?: number;
     storage?: string;
+    terminated?: boolean;
   }): Promise<boolean> {
-    const { id, size, offset, metadata, isComplete, uploadSpeed } = uploadInfo;
+    const { id, size, offset, metadata, isComplete, uploadSpeed, createdAt, terminated } = uploadInfo;
+
+    logger.info(`[sendUploadNotification] Received data for ID ${id}: size=${size}, offset=${offset}, filename=${metadata?.filename}, client=${metadata?.clientName}, project=${metadata?.projectName}, isComplete=${isComplete}, speed=${uploadSpeed}, terminated=${terminated}`);
     
-    console.log('[TELEGRAM-DEBUG] Creating upload notification message for upload:', id);
+    // Debug log for upload speed
+    console.log(`[TELEGRAM-DEBUG] Upload speed for ${id}: ${uploadSpeed} bytes/sec`);
     
+    // Calculate speed if not provided but we have enough data
+    let effectiveSpeed = uploadSpeed;
+    if (!effectiveSpeed && offset > 0 && createdAt) {
+      const elapsedSeconds = (Date.now() - createdAt.getTime()) / 1000;
+      if (elapsedSeconds > 0) {
+        effectiveSpeed = offset / elapsedSeconds;
+        console.log(`[TELEGRAM-DEBUG] Calculated speed for ${id}: ${effectiveSpeed} bytes/sec (${offset} bytes in ${elapsedSeconds} seconds)`);
+      }
+    }
+    
+    // Force isComplete to true if offset equals size (upload is complete)
+    const actuallyComplete = isComplete || (offset === size);
+    
+    // Handle terminated uploads
+    const isTerminated = terminated === true;
+
+    console.log('[TELEGRAM-DEBUG] Creating/Updating upload notification message for upload:', id);
+
     // Calculate progress percentage
     const progress = size > 0 ? Math.round((offset / size) * 100) : 0;
     
@@ -299,7 +423,20 @@ export class TelegramBot {
     };
 
     // Format transfer speed in human-readable format
-    const formatSpeed = (bytesPerSecond: number): string => {
+    const formatSpeed = (bytesPerSecond: number | undefined): string => {
+      // Add extra debug logging
+      console.log(`[TELEGRAM-DEBUG] Formatting speed: ${bytesPerSecond} bytes/sec`);
+      
+      if (bytesPerSecond === undefined) {
+        console.log('[TELEGRAM-DEBUG] Speed is undefined');
+        return 'N/A';
+      }
+      
+      if (bytesPerSecond <= 0) {
+        console.log('[TELEGRAM-DEBUG] Speed is zero or negative');
+        return 'N/A';
+      }
+      
       if (bytesPerSecond < 1024) return `${bytesPerSecond.toFixed(2)} B/s`;
       if (bytesPerSecond < 1024 * 1024) return `${(bytesPerSecond / 1024).toFixed(2)} KB/s`;
       if (bytesPerSecond < 1024 * 1024 * 1024) return `${(bytesPerSecond / (1024 * 1024)).toFixed(2)} MB/s`;
@@ -316,7 +453,9 @@ export class TelegramBot {
 
     // Create message with upload details and fewer emojis
     let message = '';
-    if (isComplete) {
+    if (isTerminated) {
+      message = `<b>❌ Upload Terminated</b>\n`;
+    } else if (actuallyComplete) {
       message = `<b>✅ Upload Completed!</b>\n`;
     } else {
       const progressEmoji = getProgressEmoji(progress);
@@ -325,20 +464,29 @@ export class TelegramBot {
     
     message += `<b>File:</b> ${metadata?.filename || 'Unknown'}\n`;
     message += `<b>Size:</b> ${formatFileSize(size)}\n`;
-    message += `<b>ID:</b> ${id}\n`;
     
     // Add specific details about progress
-    if (progress < 100) {
+    if (isTerminated) {
+      message += `<b>Progress:</b> Cancelled at ${progress}% (${formatFileSize(offset)} / ${formatFileSize(size)})\n`;
+    } else if (progress < 100) {
       message += `<b>Progress:</b> ${progress}% (${formatFileSize(offset)} / ${formatFileSize(size)})\n`;
     } else {
       message += `<b>Progress:</b> 100% Complete!\n`;
     }
+
+    // Add upload speed if available and not a completed or terminated upload
+    // Log whether we're showing speed
+    console.log(`[TELEGRAM-DEBUG] Upload speed check: complete=${actuallyComplete}, terminated=${isTerminated}, speed=${uploadSpeed}`);
     
-    // Add upload speed if available and not a completed upload
-    if (uploadSpeed && !isComplete && uploadSpeed > 0) {
-      message += `<b>Speed:</b> ${formatSpeed(uploadSpeed)}\n`;
+    // Always show speed if it's available, even if it's very small
+    if (!actuallyComplete && !isTerminated && (uploadSpeed !== undefined || effectiveSpeed !== undefined)) {
+      // Force a minimum display value for very small speeds
+      const speedToUse = uploadSpeed !== undefined ? uploadSpeed : effectiveSpeed;
+      // Only use Math.max if speedToUse is defined and not zero/negative
+      const displaySpeed = speedToUse !== undefined && speedToUse > 0 ? Math.max(speedToUse, 1) : undefined;
+      message += `<b>Speed:</b> ${formatSpeed(displaySpeed)}\n`;
     }
-    
+
     // Add client and project information if available
     if (metadata?.clientName) {
       message += `<b>Client:</b> ${metadata.clientName}\n`;
@@ -347,16 +495,9 @@ export class TelegramBot {
     if (metadata?.projectName) {
       message += `<b>Project:</b> ${metadata.projectName}\n`;
     }
-    
-    // Add upload type/method if available
-    if (id.startsWith('xhr-')) {
-      message += `<b>Method:</b> XHR Upload\n`;
-    } else {
-      message += `<b>Method:</b> TUS Upload\n`;
-    }
-    
-    // Add estimated time remaining if not complete
-    if (!isComplete && offset > 0 && size > offset) {
+        
+    // Add estimated time remaining if not complete and not terminated
+    if (!actuallyComplete && !isTerminated && offset > 0 && size > offset) {
       if (uploadSpeed && uploadSpeed > 0) {
         // Calculate estimated time remaining based on current speed
         const remainingBytes = size - offset;
@@ -382,11 +523,24 @@ export class TelegramBot {
         message += `<b>Time remaining:</b> ${remainingTime}\n`;
       }
     }
-    
-    // Add completion timestamp if completed
-    if (isComplete) {
-      const now = new Date();
-      message += `<b>Completed at:</b> ${now.toLocaleString()}\n`;
+
+    // Add completion timestamp and duration if completed or terminated
+    if (actuallyComplete || isTerminated) {
+      const completedTime = new Date();
+      message += `<b>Completed at:</b> ${completedTime.toLocaleString()}\n`;
+      if (createdAt) { // Calculate duration if start time is known
+         const durationMs = completedTime.getTime() - createdAt.getTime();
+         const durationSeconds = Math.round(durationMs / 1000);
+         const durationMinutes = Math.floor(durationSeconds / 60);
+         const remainingSeconds = durationSeconds % 60;
+         message += `<b>Duration:</b> ${durationMinutes}m ${remainingSeconds}s\n`;
+         
+         // Calculate and show average speed for completed uploads
+         if (durationSeconds > 0) {
+           const avgSpeedBps = size / durationSeconds;
+           message += `<b>Average Speed:</b> ${formatSpeed(avgSpeedBps)}\n`;
+         }
+      }
     }
 
     // Check if there's already a message ID for this upload before sending
@@ -403,19 +557,22 @@ export class TelegramBot {
     // Send message with upload ID for editing
     const success = await this.sendMessage(message, id);
     
-    // If upload is complete, we should clean up the message ID after a delay
-    // to ensure proper editing has occurred
-    if (isComplete && success) {
-      // Wait 10 seconds before removing the message ID 
-      // to ensure edit operations have completed
-      setTimeout(async () => {
-        console.log(`[TELEGRAM-DEBUG] Cleaning up message ID after completion for ${id}`);
-        await this.deleteMessageId(id);
-      }, 10000);
+    // If upload is complete/terminated and the notification was sent/edited successfully,
+    // schedule cleanup after a delay to ensure the completion message is visible
+    if ((actuallyComplete || isTerminated) && success) {
+      const delayMinutes = isTerminated ? 2 : 5; // Shorter delay for terminated uploads
+      console.log(`[TELEGRAM-DEBUG] Upload ${id} is ${isTerminated ? 'terminated' : 'complete'}, scheduling cleanup in ${delayMinutes} minutes`);
+      setTimeout(() => {
+        this.cleanupUploadMessage(id).then(cleaned => {
+          console.log(`[TELEGRAM-DEBUG] Cleanup for upload ${id} completed: ${cleaned}`);
+        });
+      }, delayMinutes * 60 * 1000);
     }
     
     return success;
   }
+
+  // Removed unused private formatBytes method. Formatting is done within sendUploadNotification.
 
   /**
    * Send a test message to verify the bot is working

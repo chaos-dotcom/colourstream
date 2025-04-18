@@ -1,0 +1,195 @@
+Runtime configuration loaded: 
+Object { API_URL: "https://live.colourstream.johnrogerscolour.co.uk/api", OIDC_AUTH_ENDPOINT: "https://sso.johnrogerscolour.co.uk/authorize", WEBRTC_WS_HOST: "live.colourstream.johnrogerscolour.co.uk", WEBRTC_WS_PORT: "3334", WEBRTC_WS_PROTOCOL: "wss", WEBRTC_APP_PATH: "app", VIDEO_URL: "https://video.colourstream.johnrogerscolour.co.uk/join", OVENPLAYER_SCRIPT_URL: "https://cdn.jsdelivr.net/npm/ovenplayer/dist/ovenplayer.js", UPLOAD_ENDPOINT_URL: "https://upload.colourstream.johnrogerscolour.co.uk/files/", NAMEFORUPLOADCOMPLETION: "John", … }
+runtime-config.js:24:9
+Config loaded: 
+Object { API_URL: "https://live.colourstream.johnrogerscolour.co.uk/api", OIDC_AUTH_ENDPOINT: "https://sso.johnrogerscolour.co.uk/authorize", WEBRTC_WS_HOST: "live.colourstream.johnrogerscolour.co.uk", WEBRTC_WS_PORT: "3334", WEBRTC_WS_PROTOCOL: "wss", WEBRTC_APP_PATH: "app", VIDEO_URL: "https://video.colourstream.johnrogerscolour.co.uk/join", OVENPLAYER_SCRIPT_URL: "https://cdn.jsdelivr.net/npm/ovenplayer/dist/ovenplayer.js", UPLOAD_ENDPOINT_URL: "https://upload.colourstream.johnrogerscolour.co.uk/files/", NAMEFORUPLOADCOMPLETION: "John", … }
+index-CbOXR3XN.js:136:4344
+App component rendering index-CbOXR3XN.js:176:49722
+API Request: GET /upload/upload-links/DFF73EEA-871F-47ED-B6C7 
+Object { transitional: {…}, adapter: (3) […], transformRequest: (1) […], transformResponse: (1) […], timeout: 0, xsrfCookieName: "XSRF-TOKEN", xsrfHeaderName: "X-XSRF-TOKEN", maxContentLength: -1, maxBodyLength: -1, env: {…}, … }
+index-CbOXR3XN.js:136:5024
+API Response: 200 /upload/upload-links/DFF73EEA-871F-47ED-B6C7 
+Object { status: "success", data: {…} }
+index-CbOXR3XN.js:136:5145
+[Uppy] [15:52:13] Using Core v4.4.2 index-CbOXR3XN.js:152:9855
+Using AwsS3 plugin for direct-to-S3 uploads via backend presigned URLs index-CbOXR3XN.js:176:22532
+[Uppy] [15:52:13] Using AwsS3Multipart v4.2.3 index-CbOXR3XN.js:152:9855
+[Uppy] [15:52:13] Using Dashboard v4.3.2 index-CbOXR3XN.js:152:9855
+[Uppy] [15:52:13] Installing Dashboard to a DOM element '[object HTMLDivElement]' index-CbOXR3XN.js:152:9855
+[Uppy] [15:52:13] Using Dashboard:StatusBar v4.1.2 index-CbOXR3XN.js:152:9855
+[Uppy] [15:52:13] Installing Dashboard:StatusBar to Dashboard index-CbOXR3XN.js:152:9855
+[Uppy] [15:52:13] Using Dashboard:Informer v4.2.1 index-CbOXR3XN.js:152:9855
+[Uppy] [15:52:13] Installing Dashboard:Informer to Dashboard index-CbOXR3XN.js:152:9855
+[Uppy] [15:52:13] Using Dashboard:ThumbnailGenerator v4.1.1 index-CbOXR3XN.js:152:9855
+[Uppy] [15:52:13] [Dashboard] Dark mode is on index-CbOXR3XN.js:152:9855
+[Uppy] [15:52:17] [Dashboard] Files selected through input index-CbOXR3XN.js:152:9855
+[Uppy] [15:52:17] Added file: Clip_5_4K_SLIGHTLY_LONGER.mov
+ id: clientUploader-clip/5/4k/slightly/longer/mov-2v-2v-2v-2v-1e-video/quicktime-379068036-1741543672024
+ type: video/quicktime index-CbOXR3XN.js:152:9855
+Upload process started index-CbOXR3XN.js:176:27793
+Upload data object: {"fileCount":"unknown","dataType":"string"} index-CbOXR3XN.js:176:27831
+Current files in Uppy: 1 files index-CbOXR3XN.js:176:28006
+- Clip_5_4K_SLIGHTLY_LONGER.mov (379068036 bytes) index-CbOXR3XN.js:176:28076
+[Uppy] [15:52:17] Error: Expected a `endpoint` option containing a URL, or if you are not using Companion, a custom `createMultipartUpload` implementation.
+    GK index.js:569
+    createMultipartUpload index.js:270
+    a RateLimitedQueue.js:148
+    bK RateLimitedQueue.js:231
+    run RateLimitedQueue.js:113
+    l RateLimitedQueue.js:144
+    wrapPromiseFunction RateLimitedQueue.js:143
+    getUploadId HTTPCommunicationQueue.js:142
+    uploadFile HTTPCommunicationQueue.js:189
+    OK MultipartUploader.js:251
+    start MultipartUploader.js:182
+    KK index.js:679
+    KK index.js:601
+    u index.js:178
+    value index.js:158
+    rH Uppy.js:1751
+    upload Uppy.js:1228
+    promise callback*upload Uppy.js:1213
+    upload UploadPortal.tsx:87
+    scheduledAutoProceed Uppy.js:1354
+    setTimeout handler*K9 Uppy.js:1352
+    addFiles Uppy.js:757
+    addFiles Dashboard.js:407
+    handleInputChange Dashboard.js:558
+    onFileInputChange AddFiles.js:27
+    Preact 21
+    mount UIPlugin.js:111
+    install Dashboard.js:1071
+    use Uppy.js:1002
+    installPlugin Dashboard.js:44
+    componentDidMount Dashboard.js:12
+    React 6
+    Ce scheduler.production.min.js:13
+    ft scheduler.production.min.js:14
+    hd scheduler.production.min.js:14
+    hd scheduler.production.min.js:19
+    md index.js:4
+    React 3
+index-CbOXR3XN.js:152:9855
+[Uppy] [15:52:17] Expected a `endpoint` option containing a URL, or if you are not using Companion, a custom `createMultipartUpload` implementation. index-CbOXR3XN.js:152:10125
+Uppy error: Error: Failed to upload Clip_5_4K_SLIGHTLY_LONGER.mov
+    Z9 Uppy.js:1512
+    o index.js:131
+    emit index.js:33
+    emit Uppy.js:351
+    s index.js:613
+    value MultipartUploader.js:119
+    promise callback*OK MultipartUploader.js:251
+    start MultipartUploader.js:182
+    KK index.js:679
+    KK index.js:601
+    u index.js:178
+    value index.js:158
+    rH Uppy.js:1751
+    upload Uppy.js:1228
+    promise callback*upload Uppy.js:1213
+    upload UploadPortal.tsx:87
+    scheduledAutoProceed Uppy.js:1354
+    setTimeout handler*K9 Uppy.js:1352
+    addFiles Uppy.js:757
+    addFiles Dashboard.js:407
+    handleInputChange Dashboard.js:558
+    onFileInputChange AddFiles.js:27
+    Preact 21
+    mount UIPlugin.js:111
+    install Dashboard.js:1071
+    use Uppy.js:1002
+    installPlugin Dashboard.js:44
+    componentDidMount Dashboard.js:12
+    React 6
+    Ce scheduler.production.min.js:13
+    ft scheduler.production.min.js:14
+    hd scheduler.production.min.js:14
+    hd scheduler.production.min.js:19
+    md index.js:4
+    React 3
+index-CbOXR3XN.js:176:27583
+Uppy error: Error: Failed to upload Clip_5_4K_SLIGHTLY_LONGER.mov
+    Z9 Uppy.js:1512
+    o index.js:131
+    emit index.js:33
+    emit Uppy.js:351
+    s index.js:613
+    value MultipartUploader.js:119
+    promise callback*OK MultipartUploader.js:251
+    start MultipartUploader.js:182
+    KK index.js:679
+    KK index.js:601
+    u index.js:178
+    value index.js:158
+    rH Uppy.js:1751
+    upload Uppy.js:1228
+    promise callback*upload Uppy.js:1213
+    upload UploadPortal.tsx:87
+    scheduledAutoProceed Uppy.js:1354
+    setTimeout handler*K9 Uppy.js:1352
+    addFiles Uppy.js:757
+    addFiles Dashboard.js:407
+    handleInputChange Dashboard.js:558
+    onFileInputChange AddFiles.js:27
+    Preact 21
+    mount UIPlugin.js:111
+    install Dashboard.js:1071
+    use Uppy.js:1002
+    installPlugin Dashboard.js:44
+    componentDidMount Dashboard.js:12
+    React 6
+    Ce scheduler.production.min.js:13
+    ft scheduler.production.min.js:14
+    hd scheduler.production.min.js:14
+    hd scheduler.production.min.js:19
+    md index.js:4
+    React 3
+index-CbOXR3XN.js:176:28244
+MULTIPART UPLOAD ERROR: index-CbOXR3XN.js:176:26127
+File: Clip_5_4K_SLIGHTLY_LONGER.mov 379068036 video/quicktime index-CbOXR3XN.js:176:26168
+Error message: Expected a `endpoint` option containing a URL, or if you are not using Companion, a custom `createMultipartUpload` implementation. index-CbOXR3XN.js:176:26257
+File error: Clip_5_4K_SLIGHTLY_LONGER.mov Error: Expected a `endpoint` option containing a URL, or if you are not using Companion, a custom `createMultipartUpload` implementation.
+    GK index.js:569
+    createMultipartUpload index.js:270
+    a RateLimitedQueue.js:148
+    bK RateLimitedQueue.js:231
+    run RateLimitedQueue.js:113
+    l RateLimitedQueue.js:144
+    wrapPromiseFunction RateLimitedQueue.js:143
+    getUploadId HTTPCommunicationQueue.js:142
+    uploadFile HTTPCommunicationQueue.js:189
+    OK MultipartUploader.js:251
+    start MultipartUploader.js:182
+    KK index.js:679
+    KK index.js:601
+    u index.js:178
+    value index.js:158
+    rH Uppy.js:1751
+    upload Uppy.js:1228
+    promise callback*upload Uppy.js:1213
+    upload UploadPortal.tsx:87
+    scheduledAutoProceed Uppy.js:1354
+    setTimeout handler*K9 Uppy.js:1352
+    addFiles Uppy.js:757
+    addFiles Dashboard.js:407
+    handleInputChange Dashboard.js:558
+    onFileInputChange AddFiles.js:27
+    Preact 21
+    mount UIPlugin.js:111
+    install Dashboard.js:1071
+    use Uppy.js:1002
+    installPlugin Dashboard.js:44
+    componentDidMount Dashboard.js:12
+    React 6
+    Ce scheduler.production.min.js:13
+    ft scheduler.production.min.js:14
+    hd scheduler.production.min.js:14
+    hd scheduler.production.min.js:19
+    md index.js:4
+    React 3
+index-CbOXR3XN.js:176:28351
+Upload error response: undefined index-CbOXR3XN.js:176:28389
+[Uppy] [15:52:17] Removing plugin Dashboard index-CbOXR3XN.js:152:9855
+[Uppy] [15:52:17] Removing plugin Dashboard:Informer index-CbOXR3XN.js:152:9855
+[Uppy] [15:52:17] Removing plugin Dashboard:StatusBar index-CbOXR3XN.js:152:9855
+[Uppy] [15:52:17] Removing plugin Dashboard:ThumbnailGenerator index-CbOXR3XN.js:152:9855

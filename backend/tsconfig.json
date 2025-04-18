@@ -21,5 +21,10 @@
     "allowJs": true
   },
   "include": ["src/**/*", "prisma/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.mjs"]
+  "exclude": [
+    "node_modules", 
+    "dist", 
+    "**/*.mjs",
+    "src/scripts/fix-s3-filenames.ts" // Exclude the unused script
+  ]
 } 

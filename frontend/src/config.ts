@@ -11,13 +11,13 @@ interface RuntimeConfig {
   UPLOAD_ENDPOINT_URL: string;
   NAMEFORUPLOADCOMPLETION: string;
   // S3 configuration
-  S3_ENDPOINT: string;
+  S3_PUBLIC_ENDPOINT: string;
   S3_REGION: string;
   S3_BUCKET: string;
   // Companion configuration
-  COMPANION_URL: string;
-  COMPANION_AWS_ENDPOINT: string;
-  USE_COMPANION: string;
+  COMPANION_URL: string; // URL for Companion (used by Dropbox, Google Drive, etc.)
+  // COMPANION_AWS_ENDPOINT: string; // Removed - Not used by @uppy/aws-s3 with backend signing
+  USE_COMPANION: string; // Still relevant for providers like Dropbox/Google Drive
   // Provider configuration
   ENABLE_DROPBOX: string;
   ENABLE_GOOGLE_DRIVE: string;
@@ -71,7 +71,7 @@ const getConfig = (key: keyof RuntimeConfig): string => {
     case 'NAMEFORUPLOADCOMPLETION':
       return envValue || 'John';
     // S3 configuration defaults
-    case 'S3_ENDPOINT':
+    case 'S3_PUBLIC_ENDPOINT':
       return envValue || 'https://s3.colourstream.johnrogerscolour.co.uk';
     case 'S3_REGION':
       return envValue || 'us-east-1';
@@ -79,9 +79,9 @@ const getConfig = (key: keyof RuntimeConfig): string => {
       return envValue || 'uploads';
     // Companion configuration defaults
     case 'COMPANION_URL':
-      return envValue || 'https://upload.colourstream.johnrogerscolour.co.uk/companion';
-    case 'COMPANION_AWS_ENDPOINT':
-      return envValue || 'https://upload.colourstream.johnrogerscolour.co.uk/companion';
+      // Use VITE_COMPANION_URL from env if available, otherwise default based on current domain
+      return envValue || `https://companion.${window.location.hostname.replace(/^[^.]+\./, '')}`;
+    // Removed case for 'COMPANION_AWS_ENDPOINT' as it's no longer in RuntimeConfig
     case 'USE_COMPANION':
       return envValue || 'true';
     // Provider configuration defaults
@@ -112,13 +112,13 @@ export const OVENPLAYER_SCRIPT_URL = getConfig('OVENPLAYER_SCRIPT_URL');
 export const UPLOAD_ENDPOINT_URL = getConfig('UPLOAD_ENDPOINT_URL');
 export const NAMEFORUPLOADCOMPLETION = getConfig('NAMEFORUPLOADCOMPLETION');
 // Export S3 configuration
-export const S3_ENDPOINT = getConfig('S3_ENDPOINT');
+export const S3_PUBLIC_ENDPOINT = getConfig('S3_PUBLIC_ENDPOINT');
 export const S3_REGION = getConfig('S3_REGION');
 export const S3_BUCKET = getConfig('S3_BUCKET');
 // Export Companion configuration
-export const COMPANION_URL = getConfig('COMPANION_URL');
-export const COMPANION_AWS_ENDPOINT = getConfig('COMPANION_AWS_ENDPOINT');
-export const USE_COMPANION = getConfig('USE_COMPANION') === 'true';
+export const COMPANION_URL = getConfig('COMPANION_URL'); // URL for Companion (used by Dropbox, Google Drive, etc.)
+// export const COMPANION_AWS_ENDPOINT = getConfig('COMPANION_AWS_ENDPOINT'); // Removed
+export const USE_COMPANION = getConfig('USE_COMPANION') === 'true'; // Still relevant for providers like Dropbox/Google Drive
 // Export Provider configuration
 export const ENABLE_DROPBOX = getConfig('ENABLE_DROPBOX') === 'true';
 export const ENABLE_GOOGLE_DRIVE = getConfig('ENABLE_GOOGLE_DRIVE') === 'true';
@@ -139,11 +139,11 @@ if (typeof window !== 'undefined') {
     OVENPLAYER_SCRIPT_URL,
     UPLOAD_ENDPOINT_URL,
     NAMEFORUPLOADCOMPLETION,
-    S3_ENDPOINT,
+    S3_PUBLIC_ENDPOINT,
     S3_REGION,
     S3_BUCKET,
     COMPANION_URL,
-    COMPANION_AWS_ENDPOINT,
+    // COMPANION_AWS_ENDPOINT, // Removed
     USE_COMPANION,
     ENABLE_DROPBOX,
     ENABLE_GOOGLE_DRIVE,
@@ -165,11 +165,11 @@ export default {
   OVENPLAYER_SCRIPT_URL,
   UPLOAD_ENDPOINT_URL,
   NAMEFORUPLOADCOMPLETION,
-  S3_ENDPOINT,
+  S3_PUBLIC_ENDPOINT,
   S3_REGION,
   S3_BUCKET,
   COMPANION_URL,
-  COMPANION_AWS_ENDPOINT,
+  // COMPANION_AWS_ENDPOINT, // Removed
   USE_COMPANION,
   ENABLE_DROPBOX,
   ENABLE_GOOGLE_DRIVE,

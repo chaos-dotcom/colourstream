@@ -84,3 +84,12 @@ template_*_report.md
 missing_content_report.md
 template_comparison_report.md
 scripts/template_checker/reports/
+
+/templates
+.aider*
+
+/backend/dist
+/backend/dist/*
+
+# Temporary Files
+/tus-data

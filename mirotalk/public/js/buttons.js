@@ -7,6 +7,7 @@
  */
 let buttons = {
     main: {
+        showShareQr: false,
         showShareRoomBtn: false, // For guests
         showHideMeBtn: false,
         showAudioBtn: true,
