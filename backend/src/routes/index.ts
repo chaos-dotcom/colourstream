@@ -7,7 +7,9 @@ import omenRoutes from './omen';
 import mirotalkRoutes from './mirotalk';
 import omeWebhookRoutes from './omeWebhook';
 import uploadRoutes from './upload';
-import tusdHooksRoutes from './tusdHooksRoutes';
+// Removed import for tusHookRoutes as it's handled by script hooks now
+// import tusHookRoutes from './tusHookRoutes';
+
 
 const router = express.Router();
 
@@ -18,7 +20,8 @@ router.use('/obs', obsRoutes);
 router.use('/omen', omenRoutes);
 router.use('/mirotalk', mirotalkRoutes);
 router.use('/ome-webhook', omeWebhookRoutes);
-router.use('/upload', uploadRoutes);
-router.use('/tusd-hooks', tusdHooksRoutes);
+router.use('/upload', uploadRoutes); // General upload routes (e.g., S3 STS)
+// Removed route mounting for tusHookRoutes
+// router.use('/upload', tusHookRoutes);
 
-export default router; 
+export default router;

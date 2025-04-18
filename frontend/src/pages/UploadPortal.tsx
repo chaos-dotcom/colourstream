@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useLocation, useSearchParams } from 'react-router-dom';
-import { 
-  Box, 
-  Typography, 
-  Paper, 
+import {
+  Box,
+  Typography,
+  Paper,
   Container,
   Card,
   CardContent,
@@ -17,25 +17,28 @@ import {
 import { styled } from '@mui/material/styles';
 import { Dashboard } from '@uppy/react';
 import Uppy from '@uppy/core';
-import AwsS3 from '@uppy/aws-s3';
-import AwsS3Multipart from '@uppy/aws-s3-multipart';
+// Import both Tus and AwsS3 plugins
+import Tus from '@uppy/tus'; 
+import AwsS3 from '@uppy/aws-s3'; // Re-add AwsS3
 import Dropbox from '@uppy/dropbox';
 import GoogleDrivePicker from '@uppy/google-drive-picker';
 import type { UppyFile } from '@uppy/core';
-import type { AwsS3UploadParameters } from '@uppy/aws-s3';
+// Re-add AwsS3 specific types
+import type { AwsS3Part } from '@uppy/aws-s3'; // Use type from aws-s3
+// Base Uppy types (Meta, Body) removed as direct import caused issues
+import { v4 as uuidv4 } from 'uuid'; 
 import '@uppy/core/dist/style.min.css';
 import '@uppy/dashboard/dist/style.min.css';
 import { getUploadLink } from '../services/uploadService';
 import { ApiResponse } from '../types';
-import { 
-  UPLOAD_ENDPOINT_URL, 
-  API_URL, 
+import {
+  UPLOAD_ENDPOINT_URL,
+  API_URL,
   NAMEFORUPLOADCOMPLETION,
-  S3_ENDPOINT,
+  S3_PUBLIC_ENDPOINT,
   S3_REGION,
   S3_BUCKET,
   COMPANION_URL,
-  COMPANION_AWS_ENDPOINT,
   USE_COMPANION,
   ENABLE_DROPBOX,
   ENABLE_GOOGLE_DRIVE,
@@ -65,19 +68,26 @@ const StyledDashboard = styled(Box)(({ theme }) => ({
 }));
 
 // Safe Dashboard wrapper to handle potential errors
-const SafeDashboard: React.FC<any> = (props) => {
+// Define proper props type for SafeDashboard
+interface SafeDashboardProps {
+  uppy: Uppy<CustomFileMeta, Record<string, never>>;
+  [key: string]: any; // For other Dashboard props
+}
+
+const SafeDashboard: React.FC<SafeDashboardProps> = (props) => {
   // Save a reference to the uppy instance
   const uppyRef = React.useRef(props.uppy);
-  
+
   // Add safety monkey patches to prevent fileIDs undefined errors
   React.useEffect(() => {
     if (uppyRef.current) {
       // Store the original upload method
       const originalUpload = uppyRef.current.upload;
-      
+
       // Replace with a safer version
       uppyRef.current.upload = function() {
         try {
+          // @ts-ignore
           return originalUpload.apply(this, arguments);
         } catch (error) {
           console.error('Error in Uppy upload method:', error);
@@ -89,6 +99,7 @@ const SafeDashboard: React.FC<any> = (props) => {
       const originalGetFiles = uppyRef.current.getFiles;
       uppyRef.current.getFiles = function() {
         try {
+          // @ts-ignore
           return originalGetFiles.apply(this, arguments);
         } catch (error) {
           console.error('Error in Uppy getFiles method:', error);
@@ -97,7 +108,7 @@ const SafeDashboard: React.FC<any> = (props) => {
       };
     }
   }, []);
-  
+
   // Render the Dashboard component with the original props
   try {
     return <Dashboard {...props} />;
@@ -120,8 +131,8 @@ const accentColors = [
   '#28a197', // Turquoise
 ];
 
-// Rainbow flag component
-const RainbowFlag = () => (
+// Rainbow flag component - Ensure it's a valid React Functional Component
+const RainbowFlag: React.FC = () => (
   <span role="img" aria-label="Rainbow flag" style={{ fontSize: '32px', marginRight: '8px' }}>
     🏳️‍🌈
   </span>
@@ -134,23 +145,49 @@ const StyledAppBar = styled(AppBar)(() => ({
 
 // Interface for API response data
 interface UploadLinkResponse {
-  clientName: string;
+  clientCode: string; // Use clientCode
   projectName: string;
   expiresAt: string;
 }
+
+// Interface for the expected response from the completeMultipartUpload backend endpoint
+interface S3CompleteResponse {
+  location: string;
+}
+
+// Interface for custom Uppy file metadata
+interface CustomFileMeta {
+  clientCode?: string;
+  project?: string;
+  token?: string;
+  key?: string; // The generated S3 key we add
+  // Add index signature to satisfy Uppy's Meta constraint
+  [key: string]: any;
+}
+
+// Define the upload method choice here ('tus' or 's3')
+const UPLOAD_METHOD_CHOICE: 'tus' | 's3' = 'tus'; // <-- SET YOUR CHOICE HERE ('tus' or 's3')
 
 // Main upload portal for clients (standalone page not requiring authentication)
 const UploadPortal: React.FC = () => {
   const { token } = useParams<{ token: string }>();
   const location = useLocation();
-  const [searchParams] = useSearchParams();
+  // Removed useSearchParams as it's no longer needed for method choice
+  // const [searchParams] = useSearchParams();
+  // --- Move state declarations outside useEffect ---
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [projectInfo, setProjectInfo] = useState<UploadLinkResponse | null>(null);
-  const [uppy, setUppy] = useState<any>(null);
+  const [uppy, setUppy] = useState<Uppy<CustomFileMeta, Record<string, never>> | null>(null); // Use correct Uppy generic type
   const [accentColor, setAccentColor] = useState('#1d70b8');
-  const useS3 = searchParams.get('S3') === 'true';
-  
+  // --- End moved state declarations ---
+  // Removed check for 'tusd' query parameter
+  // const useTusd = searchParams.get('tusd') === 'true';
+  const lastProgressUpdateRef = React.useRef<number>(0); // Timestamp of the last update sent
+  const lastPercentageUpdateRef = React.useRef<number>(0); // Last percentage milestone reported
+  const MIN_PROGRESS_UPDATE_INTERVAL = 3000; // Minimum ms between updates (e.g., 3 seconds)
+  const PERCENTAGE_UPDATE_THRESHOLD = 5; // Send update every X percent increase (e.g., 5%)
+
   useEffect(() => {
     // Select a random accent color on component mount
     const randomColor = accentColors[Math.floor(Math.random() * accentColors.length)];
@@ -163,24 +200,29 @@ const UploadPortal: React.FC = () => {
         setLoading(false);
         return;
       }
-      
+
       try {
         const response = await getUploadLink(token);
         if (response.status === 'success') {
           // The API returns data in this format directly
-          // We need to cast it to any to avoid TypeScript errors
-          const data = response.data as any;
-          
-          setProjectInfo({
-            clientName: data.clientName,
-            projectName: data.projectName,
+          // We need to extract the fields we need from the response
+          const data = response.data;
+          console.log('[UploadPortal] Raw API response data:', JSON.stringify(data, null, 2)); // Log the raw data
+
+          // Create our UploadLinkResponse from the API data
+          const uploadLinkResponse: UploadLinkResponse = {
+            clientCode: data.project?.client?.code || 'default', // Logged below
+            projectName: data.project?.name || 'default', // Logged below
             expiresAt: data.expiresAt
-          });
-          
-          // Initialize Uppy with the token in metadata
-          const uppyInstance = new Uppy({
+          };
+          console.log('[UploadPortal] Constructed uploadLinkResponse:', JSON.stringify(uploadLinkResponse, null, 2)); // Log the constructed object
+
+          setProjectInfo(uploadLinkResponse);
+
+          // Initialize Uppy with the token in metadata and correct generic types
+          const uppyInstance = new Uppy<CustomFileMeta, Record<string, never>>({ // Ensure generics match state type
             id: 'clientUploader',
-            autoProceed: true,
+            autoProceed: true, // Require user to click upload button
             allowMultipleUploadBatches: true,
             debug: true, // Enable debug for troubleshooting
             restrictions: {
@@ -188,10 +230,10 @@ const UploadPortal: React.FC = () => {
               maxNumberOfFiles: 1000,
               // Allow all file types - this service is for all files
             },
+            // Set global metadata using clientCode
             meta: {
-              // Set global metadata that will apply to all files
-              client: data.clientName,
-              project: data.projectName,
+              clientCode: uploadLinkResponse.clientCode, // Store clientCode
+              project: uploadLinkResponse.projectName,
               token: token
             },
             locale: {
@@ -208,116 +250,164 @@ const UploadPortal: React.FC = () => {
             }
           });
 
-          // Choose upload method based on configuration
-          if (USE_COMPANION) {
-            console.log('Using AwsS3Multipart with Companion for large file uploads');
-            console.log('Companion URL configured as:', COMPANION_URL);
-            
-            // Use the AWS S3 Multipart plugin with Companion for chunked uploads
-            // @ts-expect-error - Uppy plugins have complex typings that are difficult to match exactly
-            uppyInstance.use(AwsS3Multipart, {
-              endpoint: COMPANION_URL,
-              headers: {
-                'x-upload-token': token
+          // --- Configure upload plugin based on the UPLOAD_METHOD_CHOICE constant ---
+          if (UPLOAD_METHOD_CHOICE === 'tus') {
+            console.log('Configuring Uppy with Tus plugin (based on constant)');
+            // --- Configure Tus plugin ---
+            // Use the public URL configured in Traefik (ensure HTTPS) - Pointing to default /files/ path
+            const tusdEndpoint = 'https://tusd.colourstream.johnrogerscolour.co.uk:1080/files/'; // Re-add /files/ path
+
+            uppyInstance.use(Tus, {
+              endpoint: tusdEndpoint,
+              //retryDelays: [0, 1000, 3000, 5000],
+              // chunkSize: 64 * 1024 * 1024,/; // Removed: Not needed for Tus, handled internally and they suggest not to set it in docs 
+              // resume: true, // Resume is enabled by default, remove explicit option
+              // autoRetry: true, // Removed: Not a valid Tus option, retry is handled by retryDelays
+              // Re-enable onBeforeRequest to send metadata
+              onBeforeRequest: (req) => {
+                // @ts-ignore - req.file exists but might not be in base HttpRequest type
+                const fileId = req.file?.id;
+                if (fileId && uppyInstance) {
+                  const file = uppyInstance.getFile(fileId);
+                  if (file) {
+                     // Ensure metadata values are strings before encoding
+                     const clientCode = file.meta.clientCode || '';
+                     const project = file.meta.project || '';
+                     const tokenMeta = file.meta.token || '';
+                     // Ensure file.name is also treated as a string, providing an empty fallback
+                     // Use the standard 'Upload-Metadata' header name
+                     req.setHeader('Upload-Metadata', `filename ${btoa(encodeURIComponent(file.name || ''))},filetype ${btoa(encodeURIComponent(file.type || 'application/octet-stream'))},clientCode ${btoa(encodeURIComponent(clientCode))},project ${btoa(encodeURIComponent(project))},token ${btoa(encodeURIComponent(tokenMeta))}`);
+                  }
+                }
               },
-              // Ensure all S3 requests go through Companion instead of directly to MinIO
-              companionAllowedHosts: /.*/,  // Force all uploads through Companion
-              // Note: Companion is configured with COMPANION_AWS_FORCE_PATH_STYLE=false
-              // The companionUrl value needs the exact URL format that the companion server expects
-              companionUrl: COMPANION_URL, // Explicitly set this to match the endpoint
-              limit: 6, // Number of concurrent uploads
-              retryDelays: [0, 1000, 3000, 5000, 10000], // Retry delays for failed chunks
-              // For very large files, use large chunks to speed up upload
-              // This is larger than the default 5MB chunks
-              chunkSize: 96 * 1024 * 1024, // 50MB chunks
-              // Log progress for debugging
-              getChunkSize(file: any) {
-                // For smaller files, use smaller chunks
-                if (file.size && file.size < 100 * 1024 * 1024) {
-                  return 10 * 1024 * 1024; // 10MB chunks for files smaller than 100MB
-                }
-                // For medium files
-                if (file.size && file.size < 1024 * 1024 * 1024) {
-                  return 25 * 1024 * 1024; // 25MB chunks for files smaller than 1GB
-                }
-                // For very large files (like your 600GB files)
-                return 50 * 1024 * 1024; // 50MB chunks for very large files
-              }
             });
-            
-            // Add Dropbox support if enabled
-            if (ENABLE_DROPBOX) {
-              console.log('Enabling Dropbox integration');
-              uppyInstance.use(Dropbox, {
-                companionUrl: COMPANION_URL,
-              });
-            }
-            
-            // Add Google Drive support if enabled
-            if (ENABLE_GOOGLE_DRIVE) {
-              console.log('Enabling Google Drive Picker integration');
-              uppyInstance.use(GoogleDrivePicker, {
-                companionUrl: COMPANION_URL,
-                clientId: GOOGLE_DRIVE_CLIENT_ID,
-                apiKey: GOOGLE_DRIVE_API_KEY,
-                appId: GOOGLE_DRIVE_APP_ID
-              });
-            }
-            
-            // Log all events for multipart uploads to help debug
-            uppyInstance.on('upload-success', (file, response) => {
+          } else { // Default to S3 if not 'tus'
+             console.log('Configuring Uppy with AwsS3 plugin (based on constant)');
+             // --- Configure AwsS3 plugin for direct uploads using temporary credentials ---
+             // @ts-ignore - Ignore TS errors for AwsS3 options when using getTemporarySecurityCredentials without Companion.
+             // We assume Uppy handles the multipart calls internally in this mode.
+             uppyInstance.use(AwsS3, {
+               // Force multipart for files > 5MB (S3 minimum part size)
+               shouldUseMultipart: (file) => (file.size ?? 0) > 5 * 1024 * 1024,
+               // Adjust concurrency based on network/backend capacity
+               limit: 20, // Keep the increased limit for S3
+               // Use a larger chunk size for S3
+               getChunkSize: (file) => {
+                 return 64 * 1024 * 1024;
+               },
+               // --- Use Temporary Credentials for Signing (Backend Endpoint Required) ---
+               getTemporarySecurityCredentials: async (options) => {
+                 console.log('[AwsS3] Requesting temporary credentials...');
+                 try {
+                   const currentToken = token; 
+                   if (!currentToken) {
+                     throw new Error('Upload token is not available for fetching credentials.');
+                   }
+                   const response = await fetch(`${API_URL}/upload/s3/sts-token`, {
+                     method: 'GET', 
+                     headers: { 'Authorization': `Bearer ${currentToken}` },
+                     signal: options?.signal, 
+                   });
+                   if (!response.ok) {
+                     const errorText = await response.text();
+                     console.error('[AwsS3] Failed to fetch temporary credentials:', response.status, errorText);
+                     throw new Error(`Failed to fetch temporary credentials: ${response.status} ${errorText}`);
+                   }
+                   const data = await response.json();
+                   console.log('[AwsS3] Received temporary credentials response:', data);
+                   if (!data || !data.data || !data.data.credentials || !data.data.bucket || !data.data.region) {
+                      console.error('[AwsS3] Invalid temporary credentials structure received from backend:', data);
+                      throw new Error('Invalid temporary credentials structure received from backend.');
+                   }
+                   return data.data;
+                 } catch (error) {
+                   console.error('[AwsS3] Error in getTemporarySecurityCredentials:', error);
+                   throw error;
+                 }
+               },
+               // Removed dummy multipart handlers as we are using @ts-ignore above
+             });
+          }
+          // --- Configure Companion-based providers (Dropbox, Google Drive) ---
+          // These might still be useful if you want cloud sources, but they upload via Companion.
+          // Companion would need to be configured to upload to the correct target (Tusd or S3/MinIO).
+          // which would then likely need to upload to Tusd or S3 itself.
+          // Consider if these are still needed with the Tus approach.
+          // These still require Companion
+          console.log('Configuring Dropbox/Google Drive.');
+          // Add Dropbox support if enabled
+          if (ENABLE_DROPBOX) {
+            console.log('Enabling Dropbox integration');
+            uppyInstance.use(Dropbox, {
+              companionUrl: COMPANION_URL,
+            });
+          }
+
+          // Add Google Drive support if enabled
+          if (ENABLE_GOOGLE_DRIVE) {
+            console.log('Enabling Google Drive Picker integration');
+            uppyInstance.use(GoogleDrivePicker, {
+              companionUrl: COMPANION_URL,
+              clientId: GOOGLE_DRIVE_CLIENT_ID,
+              apiKey: GOOGLE_DRIVE_API_KEY,
+              appId: GOOGLE_DRIVE_APP_ID
+            });
+          }
+          
+          // --- Event listeners ---
+          // Log all events for uploads to help debug
+          uppyInstance.on('upload-success', (file, response) => {
               if (!file) {
-                console.error('No file information available in upload-success event');
+                console.error('[upload-success] No file information available.');
                 return;
               }
-              
-              console.log('Multipart upload succeeded:', file.name);
-              console.log('Response details:', response);
-              
-              // Extract key information for callback
-              let key;
-              if (file.name) {
-                // Construct the key using the client/project structure with the clean filename 
-                key = `${file.meta?.client ? String(file.meta.client).replace(/\s+/g, '_') : 'default'}/${
-                  file.meta?.project ? String(file.meta.project).replace(/\s+/g, '_') : 'default'
-                }/${file.name}`;
-              } else if (response.uploadURL) {
-                // If we have a URL but no filename, extract the key from the URL
-                key = response.uploadURL.split('?')[0].split('/').slice(3).join('/');
+
+              if (UPLOAD_METHOD_CHOICE === 'tus') {
+                // Tus response structure
+                console.log(`[upload-success] Tus Upload succeeded: ${file.name}`);
+                console.log('[upload-success] Tus Response details:', response);
+                const uploadURL = response?.uploadURL;
+                console.log(`[upload-success] Tus Upload URL: ${uploadURL}`);
+                // TODO: Potentially notify backend that Tus upload is complete
               } else {
-                // Fallback for when we can't determine the key
-                key = `unknown/${Date.now()}.bin`;
+                // AwsS3 response structure (using temporary credentials, Uppy handles completion)
+                // The 'response' object here might be limited after direct S3 upload.
+                // Uppy's internal state knows the upload is complete.
+                // We might not get a specific 'location' back in this exact event handler
+                // when using getTemporarySecurityCredentials, as Uppy manages the final S3 CompleteMultipartUpload call.
+                console.log(`[upload-success] S3 Upload succeeded: ${file.name}`);
+                console.log('[upload-success] S3 Response details (may be limited):', response);
+                // The final location is implicitly known based on the generated key (file.meta.key)
+                // which would have been determined during the credential fetching or upload process.
+                // If you need the exact final URL confirmed, you might need another mechanism
+                // or rely on the key generation logic.
+                const finalLocation = `${S3_PUBLIC_ENDPOINT}/${S3_BUCKET}/${file.meta.key || file.name}`; // Best guess
+                console.log(`[upload-success] S3 Final Location (estimated): ${finalLocation}`);
               }
-                
-              // Notify backend about the successful S3 multipart upload
-              fetch(`${API_URL}/upload/s3-callback/${token}`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  key: key,
-                  size: file.size || 0,
-                  filename: file.name || 'unknown',
-                  mimeType: file.type || 'application/octet-stream',
-                  hash: 's3-multipart-' + file.id
-                })
-              })
-              .then(response => response.json())
-              .then(data => {
-                console.log('Backend notified of S3 multipart upload:', data);
-              })
-              .catch(error => {
-                console.error('Error notifying backend about S3 multipart upload:', error);
-              });
             });
             
-            // Enhanced error handling for multipart uploads
+            // Log overall progress (bytes uploaded / total)
+            uppyInstance.on('progress', (progress) => {
+              // This logs the percentage completion of the entire batch
+              console.log('[Uppy Progress]', `Total batch progress: ${progress}%`);
+            });
+
+            // Log restriction failures
+            uppyInstance.on('restriction-failed', (file, error) => {
+              console.error('[Uppy Restriction Failed]', `File: ${file?.name}, Error: ${error.message}`);
+              setError(`File restriction error for ${file?.name}: ${error.message}`);
+            });
+
+            // Enhanced error handling for AwsS3 with backend signing
             uppyInstance.on('upload-error', (file, error, response) => {
               console.error('MULTIPART UPLOAD ERROR:');
               console.error('File:', file?.name, file?.size, file?.type);
               console.error('Error message:', error?.message);
-              
+              // Log part number if available in the error object (Uppy might add this)
+              if ((error as any)?.partNumber) {
+                console.error('Failed part number:', (error as any).partNumber);
+              }
+
               if (response) {
                 console.error('Response status:', response.status);
                 try {
@@ -326,70 +416,68 @@ const UploadPortal: React.FC = () => {
                   console.error('Could not stringify response');
                 }
               }
-              
+
               setError(`Error uploading ${file?.name || 'unknown file'}: ${error?.message || 'Unknown error'}`);
             });
-            
-            // --- Telegram Progress Reporting ---
-            // Store last reported percentage for throttling
-            const lastReportedPercent: { [key: string]: number } = {};
-            const PERCENTAGE_THROTTLE_THRESHOLD = 2; // Send update every 2% increase
 
+            // Add specific logging for chunk uploads to debug performance
             uppyInstance.on('upload-progress', (file, progress) => {
-              // Ensure we have necessary data and avoid division by zero
-              if (!file || !file.id || !file.name || progress.bytesTotal === null || progress.bytesUploaded === null || progress.bytesTotal === 0) {
-                // console.log(`Progress for ${file?.name || 'unknown file'}: insufficient data`);
-                return;
+              if (!file || !file.name || progress.bytesTotal === null || progress.bytesUploaded === null) {
+                 console.log(`Progress for ${file?.name || 'unknown file'}: bytes information unavailable`);
+                 return; // Exit if essential progress info is missing
               }
 
-              const currentPercent = (progress.bytesUploaded / progress.bytesTotal * 100);
-              const lastPercent = lastReportedPercent[file.id] || 0;
+              // Calculate current percentage
+              const currentPercent = Math.round((progress.bytesUploaded / progress.bytesTotal) * 100);
 
-              // Throttle updates based on percentage increase
-              // Also send update if it's the first one (lastPercent === 0 and current > 0) or if it reaches 100%
-              const shouldUpdate = (currentPercent >= lastPercent + PERCENTAGE_THROTTLE_THRESHOLD) || (lastPercent === 0 && currentPercent > 0) || (currentPercent === 100 && lastPercent < 100);
+              // Throttle progress updates based on time AND percentage change
+              const now = Date.now();
+              const timeSinceLastUpdate = now - lastProgressUpdateRef.current;
+              const percentageIncrease = currentPercent - lastPercentageUpdateRef.current;
 
-              if (!shouldUpdate) {
-                return;
-              }
+              // Send update if minimum time passed AND (significant percentage increase OR upload is complete)
+              // Also ensure we send the very first update (percentageIncrease will be >= threshold initially)
+              // And ensure we don't send updates for 0% unless it's the very first one.
+              const shouldSendUpdate = timeSinceLastUpdate >= MIN_PROGRESS_UPDATE_INTERVAL &&
+                                       (percentageIncrease >= PERCENTAGE_UPDATE_THRESHOLD || currentPercent === 100) &&
+                                       (currentPercent > 0 || lastPercentageUpdateRef.current === 0); // Allow first 0% update
 
-              // Update last reported percentage *before* sending async request
-              // This prevents rapid retries if the backend call fails immediately
-              lastReportedPercent[file.id] = currentPercent;
-
-              console.log(`Progress for ${file.name}: ${currentPercent.toFixed(2)}% (${progress.bytesUploaded}/${progress.bytesTotal}) - Sending update.`);
-
-              // Send progress update to backend
-              fetch(`${API_URL}/upload/progress/${token}`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  fileId: file.id,
-                  fileName: file.name,
-                  bytesUploaded: progress.bytesUploaded,
-                  bytesTotal: progress.bytesTotal,
-                  percentage: currentPercent, // Send the calculated percentage
-                  clientName: file.meta?.client || 'Unknown Client',
-                  projectName: file.meta?.project || 'Unknown Project',
-                })
-              })
-              .then(response => {
-                if (!response.ok) {
-                  console.warn(`Failed to send progress update for ${file.name}: ${response.status}`);
-                  // If sending failed, reset the last reported percent to allow retry on next significant progress event
-                  lastReportedPercent[file.id] = lastPercent;
+              if (shouldSendUpdate) {
+                lastProgressUpdateRef.current = now; // Update time timestamp
+                // Only update the percentage ref if it's not 100% to allow the final 100% message through
+                if (currentPercent < 100) {
+                    lastPercentageUpdateRef.current = currentPercent; // Update percentage timestamp
                 }
-              })
-              .catch(error => {
-                console.error(`Error sending progress update for ${file.name}:`, error);
-                 // If sending failed, reset the last reported percent to allow retry on next significant progress event
-                lastReportedPercent[file.id] = lastPercent;
-              });
+
+
+                console.log(`Sending progress update for ${file.name} at ${currentPercent}%`);
+
+                // Send progress update to backend
+                fetch(`${API_URL}/upload/progress/${token}`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    uploadId: file.id, // Use Uppy's file ID
+                    bytesUploaded: progress.bytesUploaded,
+                    bytesTotal: progress.bytesTotal,
+                    filename: file.name,
+                    clientName: file.meta?.clientCode, // Use clientCode here too if needed by backend
+                    projectName: file.meta?.project,
+                  }),
+                })
+                .then(response => {
+                  if (!response.ok) {
+                    console.warn(`Backend progress update failed for ${file.name}: ${response.status}`);
+                  }
+                })
+                .catch(error => {
+                  console.error(`Error sending progress update for ${file.name}:`, error);
+                });
+              }
             });
-            // --- End Telegram Progress Reporting ---
-            
+
             // Add error logging for debugging upload issues
             uppyInstance.on('error', (error: any) => {
               console.error('Uppy error:', error);
@@ -399,17 +487,14 @@ const UploadPortal: React.FC = () => {
                 console.error('Error status:', error.status);
               }
             });
-            
-            // Log upload starts without depending on fileIDs
-            uppyInstance.on('upload', (data: any) => {
-              console.log('Upload process started');
-              console.log('Upload data object:', JSON.stringify({
-                // Safely extract only the properties we're interested in
-                fileCount: data && typeof data === 'object' ? Object.keys(data).length : 'unknown',
-                dataType: typeof data
-              }));
-              
-              // Try to get file information without using fileIDs
+
+            // Log when the upload process begins
+            // Correct signature: (uploadID: string, files: UppyFile[]) => void
+            uppyInstance.on('upload', (uploadID: string, files: UppyFile<CustomFileMeta, Record<string, never>>[]) => {
+              console.log('Upload process started. Batch ID:', uploadID);
+              console.log(`Files in this batch (${files.length}):`, files.map(f => f.name));
+
+              // Log current files managed by Uppy instance (redundant with above, but kept for consistency)
               try {
                 const files = uppyInstance.getFiles();
                 if (files && files.length > 0) {
@@ -424,310 +509,31 @@ const UploadPortal: React.FC = () => {
                 console.log('Could not get files from Uppy:', err);
               }
             });
-          } else if (useS3) {
-            // Fall back to regular S3 if Companion is not enabled
-            console.log('Using AwsS3 for direct uploads (Companion disabled)');
-            console.log('S3 endpoint configured as:', S3_ENDPOINT);
-            
-            uppyInstance.use(AwsS3, {
-              shouldUseMultipart: false, // Explicitly disable multipart uploads
-              limit: 1, // Process one file at a time to avoid issues
-              // TypeScript doesn't recognize forcePathStyle directly
-              // We'll handle URL style through the S3 configuration in the backend
-              getUploadParameters: async (file) => {
-                // Log original filename for debugging
-                console.log('Original filename before S3 upload:', file.name);
-                
-                // Ensure we have valid strings for file names
-                const fileName = typeof file.name === 'string' ? file.name : 'unnamed-file';
-                const clientName = file.meta?.client ? String(file.meta.client).replace(/\s+/g, '_') : 'default';
-                const projectName = file.meta?.project ? String(file.meta.project).replace(/\s+/g, '_') : 'default';
-                
-                // Set the file meta to include the original name without any modification
-                // This prevents Uppy from adding a UUID prefix
-                file.meta = {
-                  ...file.meta,
-                  key: `${clientName}/${projectName}/${fileName}`,
-                  // This prevents the AWS S3 plugin from adding random identifiers to the filename
-                  name: fileName
-                };
-                
-                // Generate a simple URL for debugging
-                const requestUrl = `${API_URL}/upload/s3-params/${token}?filename=${encodeURIComponent(fileName)}`;
-                console.log('Requesting S3 URL from:', requestUrl);
-                
-                // Simple fetch to get presigned URL
-                const response = await fetch(requestUrl);
-                
-                if (!response.ok) {
-                  console.error('S3 params request failed:', response.status, response.statusText);
-                  throw new Error(`S3 params request failed: ${response.status} ${response.statusText}`);
-                }
-                
-                const data = await response.json();
-                
-                if (data.status !== 'success' || !data.url) {
-                  console.error('Invalid S3 response:', data);
-                  throw new Error('Invalid S3 response from server');
-                }
-                
-                console.log('S3 presigned URL:', data.url);
-                console.log('S3 key from backend:', data.key);
-                
-                // Return the complete upload parameters including Content-Type
-                return {
-                  method: 'PUT',
-                  url: data.url,
-                  fields: {}, // Empty for PUT operations
-                  headers: {
-                    'Content-Type': file.type || 'application/octet-stream',
-                    // Add cache control to prevent caching issues
-                    'Cache-Control': 'no-cache'
-                  },
-                  // Add the key from the backend to override the default Uppy UUID generation
-                  key: data.key
-                };
-              }
-            });
-            
-            // Add event handler for successful uploads to record in the database
-            uppyInstance.on('upload-success', (file, response) => {
-              // Check that file exists before proceeding
-              if (!file || !file.name) {
-                console.error('Missing file data in upload-success event');
-                return;
-              }
-              
-              // Enhanced logging for debugging 
-              console.log('Upload successful to S3 - Original file name:', file.name);
-              console.log('File metadata:', file.meta);
-              console.log('Upload response details:', {
-                status: response.status,
-                body: response.body,
-                uploadURL: response.uploadURL
-              });
-              
-              // Extract the key from the upload response or construct it
-              // Important: We need to extract just the original filename without any UUID prefix
-              let key;
-              if (response.uploadURL) {
-                // When we get a URL back, extract just the key path from it (after the bucket)
-                const urlPath = response.uploadURL.split('?')[0].split('/').slice(3).join('/');
-                console.log('Extracted URL path from S3 response:', urlPath);
-                // Use the path from the response
-                key = urlPath;
-              } else {
-                // Construct the key using the client/project structure with the clean filename
-                // Strip any UUID patterns from the filename (standard UUID format)
-                const cleanFileName = file.name.replace(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-)/gi, '');
-                console.log('Clean filename (after UUID removal):', cleanFileName);
-                
-                key = `${file.meta.client ? file.meta.client.replace(/\s+/g, '_') : 'default'}/${
-                      file.meta.project ? file.meta.project.replace(/\s+/g, '_') : 'default'
-                    }/${cleanFileName}`;
-                console.log('Generated key from filename:', key);
-              }
-              
-              // Notify the backend about the successful S3 upload
-              fetch(`${API_URL}/upload/s3-callback/${token}`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  key: key,
-                  size: file.size || 0,
-                  filename: file.name, // Use the original filename
-                  mimeType: file.type || 'application/octet-stream',
-                  hash: 's3-' + file.id
-                })
-              })
-              .then(response => response.json())
-              .then(data => {
-                console.log('Backend notified of S3 upload:', data);
-              })
-              .catch(error => {
-                console.error('Error notifying backend about S3 upload:', error);
-              });
+
+          // Set up general error handling (catches broader Uppy errors)
+          uppyInstance.on('error', (error) => {
+            // Log the error but avoid setting the main error state if upload-error handles specifics
+            console.error('[Uppy General Error]', error); 
           });
 
-          // --- Progress Reporting for Direct S3 ---
-          // Store last reported percentage for throttling
-          const lastReportedPercentDirectS3: { [key: string]: number } = {};
-          const PERCENTAGE_THROTTLE_THRESHOLD_DIRECT_S3 = 2; // Send update every 2% increase
-
-          uppyInstance.on('upload-progress', (file, progress) => {
-            // Ensure we have necessary data and avoid division by zero
-            if (!file || !file.id || !file.name || progress.bytesTotal === null || progress.bytesUploaded === null || progress.bytesTotal === 0) {
-              return;
-            }
-
-            const currentPercent = (progress.bytesUploaded / progress.bytesTotal * 100);
-            const lastPercent = lastReportedPercentDirectS3[file.id] || 0;
-
-            // Throttle updates
-            const shouldUpdate = (currentPercent >= lastPercent + PERCENTAGE_THROTTLE_THRESHOLD_DIRECT_S3) || (lastPercent === 0 && currentPercent > 0) || (currentPercent === 100 && lastPercent < 100);
-
-            if (!shouldUpdate) {
-              return;
-            }
-
-            // Update last reported percentage
-            lastReportedPercentDirectS3[file.id] = currentPercent;
-
-            console.log(`Direct S3 Progress for ${file.name}: ${currentPercent.toFixed(2)}% - Sending update.`);
-
-            // Send progress update to backend
-            fetch(`${API_URL}/upload/progress/${token}`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                fileId: file.id,
-                fileName: file.name,
-                bytesUploaded: progress.bytesUploaded,
-                bytesTotal: progress.bytesTotal,
-                percentage: currentPercent,
-                clientName: file.meta?.client || 'Unknown Client',
-                projectName: file.meta?.project || 'Unknown Project',
-              })
-            })
-            .then(response => {
-              if (!response.ok) {
-                console.warn(`Failed to send direct S3 progress update for ${file.name}: ${response.status}`);
-                lastReportedPercentDirectS3[file.id] = lastPercent; // Allow retry
-              }
-            })
-            .catch(error => {
-              console.error(`Error sending direct S3 progress update for ${file.name}:`, error);
-              lastReportedPercentDirectS3[file.id] = lastPercent; // Allow retry
-            });
-          });
-          // --- End Progress Reporting for Direct S3 ---
-            
-            // Add specific listener for S3 multipart errors to get more detailed information
-            uppyInstance.on('upload-error', (file, error, response) => {
-              console.error('UPLOAD ERROR DETAILS:');
-              console.error('File:', file?.name, file?.size, file?.type);
-              console.error('Error message:', error?.message);
-              
-              // Try to extract the request details
-              if (response) {
-                console.error('Response status:', response.status);
-                
-                // Log all response properties safely using a try/catch to avoid TypeScript errors
-                try {
-                  console.error('Response details:', JSON.stringify(response, null, 2));
-                } catch (e) {
-                  console.error('Could not stringify response');
-                }
-                
-                // Log response body if available
-                if (response.body) {
-                  console.error('Response body:', 
-                    typeof response.body === 'string' 
-                      ? response.body 
-                      : JSON.stringify(response.body, null, 2)
-                  );
-                }
-              }
-              
-              // Log MinIO specific diagnostic info
-              if (error.message === 'Non 2xx' && response) {
-                console.error('MinIO S3 error details:', {
-                  status: response.status
-                });
-
-                // MinIO specific suggestion
-                if (response.status === 403) {
-                  setError(`Error uploading ${file?.name}: ${error.message} - This may be a MinIO permissions issue. Check the bucket policy and ACL settings.`);
-                } else if (response.status === 404) {
-                  setError(`Error uploading ${file?.name}: ${error.message} - The specified bucket or object key may not exist in MinIO.`);
-                } else if (response.status === 400) {
-                  setError(`Error uploading ${file?.name}: ${error.message} - Request format may be incorrect for MinIO.`);
-                } else {
-                  setError(`Error uploading ${file?.name}: ${error.message}`);
-                }
-              } else {
-                setError(`Error uploading ${file?.name}: ${error.message}`);
-              }
-            });
-
-          // --- Progress Reporting for XHR ---
-          // Store last reported percentage for throttling
-          const lastReportedPercentXHR: { [key: string]: number } = {};
-          const PERCENTAGE_THROTTLE_THRESHOLD_XHR = 2; // Send update every 2% increase
-
-          uppyInstance.on('upload-progress', (file, progress) => {
-            // Ensure we have necessary data and avoid division by zero
-            if (!file || !file.id || !file.name || progress.bytesTotal === null || progress.bytesUploaded === null || progress.bytesTotal === 0) {
-              return;
-            }
-
-            const currentPercent = (progress.bytesUploaded / progress.bytesTotal * 100);
-            const lastPercent = lastReportedPercentXHR[file.id] || 0;
-
-            // Throttle updates
-            const shouldUpdate = (currentPercent >= lastPercent + PERCENTAGE_THROTTLE_THRESHOLD_XHR) || (lastPercent === 0 && currentPercent > 0) || (currentPercent === 100 && lastPercent < 100);
-
-            if (!shouldUpdate) {
-              return;
-            }
-
-            // Update last reported percentage
-            lastReportedPercentXHR[file.id] = currentPercent;
-
-            console.log(`XHR Progress for ${file.name}: ${currentPercent.toFixed(2)}% - Sending update.`);
-
-            // Send progress update to backend
-            fetch(`${API_URL}/upload/progress/${token}`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                fileId: file.id,
-                fileName: file.name,
-                bytesUploaded: progress.bytesUploaded,
-                bytesTotal: progress.bytesTotal,
-                percentage: currentPercent,
-                clientName: file.meta?.client || 'Unknown Client',
-                projectName: file.meta?.project || 'Unknown Project',
-              })
-            })
-            .then(response => {
-              if (!response.ok) {
-                console.warn(`Failed to send XHR progress update for ${file.name}: ${response.status}`);
-                lastReportedPercentXHR[file.id] = lastPercent; // Allow retry
-              }
-            })
-            .catch(error => {
-              console.error(`Error sending XHR progress update for ${file.name}:`, error);
-              lastReportedPercentXHR[file.id] = lastPercent; // Allow retry
-            });
-          });
-          // --- End Progress Reporting for XHR ---
-          }
-          
-          // Set up error handling
-          uppyInstance.on('error', (error: Error) => {
-            console.error('Uppy error:', error);
-            setError(`Upload error: ${error.message}`);
-          });
-          
-          uppyInstance.on('upload-error', (file: any, error: Error, response: any) => {
+          // This is a duplicate handler for 'upload-error' - ideally consolidate with the one above
+          // Fixing signature to match Uppy's expected type
+          uppyInstance.on('upload-error', (file: UppyFile<CustomFileMeta, Record<string, never>> | undefined, error: Error, response?: Record<string, any>) => {
             if (file) {
-              console.error('File error:', file, error);
-              console.error('Upload error response:', response);
+              console.error('File error:', file.name, error); // Log filename safely
+              if (response) {
+                console.error('Upload error response:', response);
+              } else {
+                console.error('Upload error response: undefined (Error might have occurred before response was received or response object was not attached to error)');
+              }
               // Try to extract more meaningful error details
               let errorMessage = error.message;
               if (response && response.status) {
                 errorMessage = `HTTP ${response.status}: ${errorMessage}`;
                 if (response.body) {
                   try {
-                    const errorBody = typeof response.body === 'string' 
-                      ? JSON.parse(response.body) 
+                    const errorBody = typeof response.body === 'string'
+                      ? JSON.parse(response.body)
                       : response.body;
                     errorMessage += ` - ${errorBody.message || JSON.stringify(errorBody)}`;
                   } catch (e) {
@@ -759,16 +565,16 @@ const UploadPortal: React.FC = () => {
               setError(`Error uploading ${file.name}: ${errorMessage}`);
             }
           });
-          
+
           // Add file validation to block .turbosort files
-          uppyInstance.on('file-added', (file) => {
+          uppyInstance.on('file-added', (file: UppyFile<CustomFileMeta, Record<string, never>>) => {
             const fileName = file.name || '';
             if (fileName === '.turbosort' || fileName.toLowerCase().endsWith('.turbosort')) {
               setError('Files with .turbosort extension are not allowed');
               uppyInstance.removeFile(file.id);
             }
           });
-          
+
           setUppy(uppyInstance);
         }
       } catch (error) {
@@ -780,14 +586,17 @@ const UploadPortal: React.FC = () => {
     };
 
     validateToken();
-    
+
     // Clean up Uppy instance on unmount
     return () => {
+      // Add null check and use correct close method signature
       if (uppy) {
-        uppy.close();
+        // Cast to 'any' as a workaround for persistent TS error
+        (uppy as any).close({ reason: 'unmount' });
       }
     };
-  }, [token, useS3]);
+  // Removed useS3 dependency as it's not used anymore
+  }, [token]);
 
   const renderHeader = () => (
     <StyledAppBar position="static">
@@ -873,9 +682,9 @@ const UploadPortal: React.FC = () => {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       {renderHeader()}
-      
+
       <Container maxWidth="lg" sx={{ py: 6, flexGrow: 1 }}>
-        <Typography variant="h3" component="h1" gutterBottom sx={{ 
+        <Typography variant="h3" component="h1" gutterBottom sx={{
           color: '#0b0c0c',
           fontFamily: '"GDS Transport", Arial, sans-serif',
           fontWeight: 700,
@@ -884,43 +693,48 @@ const UploadPortal: React.FC = () => {
           Upload Files
         </Typography>
 
-        <Paper elevation={3} sx={{ 
-          p: 4, 
+        <Paper elevation={3} sx={{
+          p: 4,
           mb: 4,
           borderRadius: '0',
           border: '1px solid #b1b4b6'
         }}>
-          <Typography variant="body1" sx={{ 
-            marginBottom: '30px', 
+          <Typography variant="body1" sx={{
+            marginBottom: '30px',
             fontSize: '19px',
             color: '#0b0c0c'
           }}>
-            Upload large video files with high-speed direct upload. {useS3 && '(Using S3 storage for native filenames)'}
+            {UPLOAD_METHOD_CHOICE === 'tus'
+              ? 'Upload large video files with highly resumable upload.'
+              : 'Upload large video files with direct high-speed upload.'
+            }
           </Typography>
-          
+
           <StyledDashboard>
-            <SafeDashboard 
+            <SafeDashboard
               uppy={uppy}
               showProgressDetails
               showRemoveButtonAfterComplete
               proudlyDisplayPoweredByUppy={false}
               height={400}
               width="100%"
-              doneButtonHandler={() => {
-                uppy.cancelAll();
-              }}
+              // Removed doneButtonHandler to use default behavior
             />
           </StyledDashboard>
         </Paper>
       </Container>
-      
+
       <Box sx={{ marginTop: 'auto', borderTop: '1px solid #b1b4b6', py: 4, bgcolor: '#f3f2f1' }}>
         <Container>
           <Typography variant="body2" color="text.secondary">
             <strong>© {new Date().getFullYear()} ColourStream</strong>
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Powered by <Link href="https://github.com/transloadit/uppy" target="_blank" rel="noopener noreferrer" underline="none" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>Uppy</Link> and <Link href="https://min.io/" target="_blank" rel="noopener noreferrer" underline="none" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>MinIO</Link>
+            Powered by <Link href="https://github.com/transloadit/uppy" target="_blank" rel="noopener noreferrer" underline="none" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>Uppy</Link>
+            {UPLOAD_METHOD_CHOICE === 'tus'
+              ? <> and <Link href="https://tus.io/" target="_blank" rel="noopener noreferrer" underline="none" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>Tus</Link></>
+              : <> and <Link href="https://min.io/" target="_blank" rel="noopener noreferrer" underline="none" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>MinIO</Link></>
+            }
           </Typography>
         </Container>
       </Box>
@@ -928,4 +742,7 @@ const UploadPortal: React.FC = () => {
   );
 };
 
-export default UploadPortal; 
+// Removed duplicated code block from line 720 to 863
+// Removed second default export at line 1024
+
+export default UploadPortal; // Add the default export back

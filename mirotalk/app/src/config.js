@@ -144,7 +144,7 @@ module.exports = {
             showShareVideoAudioBtn: false,
             showPrivateMessageBtn: false,
             showZoomInOutBtn: false,
-            showVideoFocusBtn: false,
+            showVideoFocusBtn: true,
         },
         local: {
             showVideoPipBtn: false,

@@ -1,6 +1,27 @@
 import { Request, Response } from 'express';
 import { logger } from '../utils/logger';
 import { uploadTracker } from '../services/uploads/uploadTracker';
+import { getTelegramBot } from '../services/telegram/telegramBot';
+// Removed unused axios import
+
+/**
+ * Format bytes to human-readable format
+ */
+function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  
+  return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${units[i]}`;
+}
+
+/**
+ * Calculate progress percentage
+ */
+function calculateProgress(current: number, total: number): number {
+  return total > 0 ? Math.round((current / total) * 100) : 0;
+}
 
 /**
  * Controller for handling tusd webhook events
@@ -72,6 +93,15 @@ export class TusdHooksController {
         progress: `${Math.round((offset / size) * 100)}%` 
       });
       
+      // Check if this upload has been terminated
+      // If it has, we should not process any more receive hooks
+      const uploadInfo = uploadTracker.getUpload(uploadId);
+      if (uploadInfo?.terminated) {
+        logger.info(`Ignoring post-receive hook for terminated upload ${uploadId}`);
+        res.status(200).json({ message: 'Upload already terminated, hook ignored' });
+        return;
+      }
+      
       // Update the upload progress
       uploadTracker.trackUpload({
         id: uploadId,
@@ -117,11 +147,66 @@ export class TusdHooksController {
     try {
       const hookData = req.body;
       const uploadId = hookData.Upload?.ID;
+      const size = hookData.Upload?.Size || 0;
+      const offset = hookData.Upload?.Offset || 0;
+      const metadata = hookData.Upload?.MetaData || {};
       
-      logger.info('tusd post-terminate hook received', { uploadId });
-      
-      // You can handle upload termination here
-      // For example, clean up any associated resources
+      logger.info(`[handlePostTerminate] Received hook for uploadId: ${uploadId}`, { size, offset, metadata });
+
+      // Get the upload info *only* to check if we need to mark it terminated later.
+      // Do not rely on it for sending the notification itself.
+      const uploadInfo = uploadTracker.getUpload(uploadId);
+      logger.info(`[handlePostTerminate] Checked tracker for ${uploadId}. Found: ${!!uploadInfo}`);
+
+      // Get the telegram bot service
+      const telegramBot = getTelegramBot();
+      logger.info(`[handlePostTerminate] Got TelegramBot instance for ${uploadId}: ${!!telegramBot}`);
+
+      // If we have a telegram bot instance, notify about the termination
+      if (telegramBot) {
+        logger.info(`[handlePostTerminate] Attempting to send termination notification for ${uploadId}`);
+
+        // Create the termination message using ONLY data from the hook
+        // This avoids issues if the tracker state changes concurrently
+        const terminatedMessage = `<b>❌ Upload Terminated</b>\n` +
+          `<b>File:</b> ${metadata?.filename || 'Unknown File'}\n` +
+          `<b>Size:</b> ${formatFileSize(size || 0)}\n` +
+          `<b>Progress:</b> Cancelled at ${calculateProgress(offset || 0, size || 0)}% (${formatFileSize(offset || 0)} / ${formatFileSize(size || 0)})\n` +
+          `<b>Client:</b> ${metadata?.clientName || metadata?.client || 'Unknown Client'}\n` +
+          `<b>Project:</b> ${metadata?.projectName || metadata?.project || 'Unknown Project'}\n` +
+          `<b>Terminated at:</b> ${new Date().toLocaleString()}`;
+
+        logger.info(`[handlePostTerminate] Constructed termination message for ${uploadId}`);
+        console.log(`[TELEGRAM-DEBUG] [handlePostTerminate] Calling telegramBot.sendTerminationMessage for upload ${uploadId}`);
+
+        // Send the termination message using the dedicated method in TelegramBot
+        // This method handles sending a *new* message and cleaning up the old message ID.
+        telegramBot.sendTerminationMessage(uploadId, terminatedMessage)
+          .then(success => {
+            if (success) {
+              // Log success from the controller side as well
+              logger.info(`[handlePostTerminate] Successfully processed termination notification via TelegramBot for upload ${uploadId}`);
+            } else {
+              // Log failure from the controller side as well
+              logger.error(`[handlePostTerminate] Failed to send termination notification via TelegramBot for upload ${uploadId}`);
+            }
+          })
+          .catch(err => {
+            // Catch potential errors from the promise itself, though sendTerminationMessage handles internal errors
+            logger.error(`[handlePostTerminate] Error calling sendTerminationMessage for upload ${uploadId}:`, err);
+            console.error(`[TELEGRAM-DEBUG] [handlePostTerminate] Error calling sendTerminationMessage for ${uploadId}:`, err);
+          });
+      } else {
+         // Log if the bot instance wasn't available
+         logger.warn(`[handlePostTerminate] Telegram bot instance not available, cannot send termination notification for upload ${uploadId}`);
+      }
+
+      // Mark the upload as terminated in the tracker *if it was found initially*.
+      // This should happen regardless of whether the Telegram notification succeeded.
+      // This will allow us to ignore subsequent post-receive hooks
+      if (uploadInfo) {
+        uploadTracker.markAsTerminated(uploadId);
+      }
       
       res.status(200).json({ message: 'Post-terminate hook processed' });
     } catch (error) {

@@ -246,7 +246,6 @@ process_all_templates() {
   process_template "$TEMPLATES_DIR/backend/.env.template" "backend/.env"
   process_template "$TEMPLATES_DIR/frontend/.env.template" "frontend/.env"
   process_template "$TEMPLATES_DIR/mirotalk/.env.template" "mirotalk/.env"
-  process_template "$TEMPLATES_DIR/companion/.env.template" ".env.companion"
   
   # Check if turnserver.conf.template exists before processing
   if [ -f "$TEMPLATES_DIR/coturn/turnserver.conf.template" ]; then

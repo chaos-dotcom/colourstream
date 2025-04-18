@@ -22,11 +22,11 @@ import {
 import { ContentCopy } from '@mui/icons-material';
 import Cookies from 'js-cookie';
 import { validateRoomAccess, RoomConfig, generateMirotalkToken, TokenGenerationRequest } from '../utils/api';
-import { 
-  OVENPLAYER_SCRIPT_URL, 
-  WEBRTC_WS_HOST, 
-  WEBRTC_WS_PORT, 
-  WEBRTC_WS_PROTOCOL, 
+import {
+  OVENPLAYER_SCRIPT_URL,
+  WEBRTC_WS_HOST,
+  WEBRTC_WS_PORT,
+  WEBRTC_WS_PROTOCOL,
   WEBRTC_APP_PATH,
   VIDEO_URL,
   API_URL
@@ -40,12 +40,12 @@ export interface RoomViewProps {
 const RoomView: React.FC<RoomViewProps> = ({ isPasswordProtected = false, isPresenter: propIsPresenter = false }) => {
   const { roomId } = useParams<{ roomId: string }>();
   const location = useLocation();
-  
+
   // Check for presenter status in query parameters (using a more secure parameter name)
   const queryParams = new URLSearchParams(location.search);
   const accessType = queryParams.get('access');
   const isPresenter = propIsPresenter || accessType === 'p';
-  
+
   const [userName, setUserName] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [isNameSubmitted, setIsNameSubmitted] = useState<boolean>(false);
@@ -54,17 +54,12 @@ const RoomView: React.FC<RoomViewProps> = ({ isPasswordProtected = false, isPres
   const [roomConfig, setRoomConfig] = useState<RoomConfig | null>(null);
   const [isPlayerReady, setIsPlayerReady] = useState<boolean>(false);
   const [playerError, setPlayerError] = useState<string>('');
-  
-  const [tokenDialogOpen, setTokenDialogOpen] = useState<boolean>(false);
-  const [tokenName, setTokenName] = useState<string>('');
-  const [tokenExpiry, setTokenExpiry] = useState<string>('1d');
-  const [generatedUrl, setGeneratedUrl] = useState<string>('');
-  const [isGeneratingToken, setIsGeneratingToken] = useState<boolean>(false);
-  const [successMessage, setSuccessMessage] = useState<string>('');
-  
-  const scriptRef = useRef<HTMLScriptElement | null>(null);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const playerRef = useRef<any>(null);
+
+  // Removed state variables for token generation dialog
+
+  const scriptRef = useRef<HTMLScriptElement | null>(null); // For OvenPlayer script
+  const iframeRef = useRef<HTMLIFrameElement>(null); // Ref for the Mirotalk iframe
+  const playerRef = useRef<any>(null); // For OvenPlayer instance
 
   useEffect(() => {
     const savedName = Cookies.get('userName');
@@ -88,18 +83,28 @@ const RoomView: React.FC<RoomViewProps> = ({ isPasswordProtected = false, isPres
     setLoading(true);
 
     try {
-      if (roomId && isPasswordProtected) {
-        const config = await validateRoomAccess(roomId, pass, isPresenter);
-        setRoomConfig(config);
+      // Fetch room config only if password protected or explicitly needed
+      let config: RoomConfig | null = null;
+      if (roomId) {
+         if (isPasswordProtected) {
+            config = await validateRoomAccess(roomId, pass, isPresenter);
+         } else {
+             config = await validateRoomAccess(roomId, '', isPresenter); // Pass empty string for password if not protected
+         }
+         setRoomConfig(config);
       }
 
       if (name.trim()) {
         Cookies.set('userName', name.trim(), { expires: 31 });
         setIsNameSubmitted(true);
+      } else {
+         if (config) {
+            setIsNameSubmitted(true);
+         }
       }
     } catch (error: any) {
       console.error('Room access error:', error);
-      setError(error.message || 'Failed to join room. Please check your password and try again.');
+      setError(error.message || 'Failed to join room. Please check credentials or room details.');
       setIsNameSubmitted(false);
     } finally {
       setLoading(false);
@@ -111,38 +116,33 @@ const RoomView: React.FC<RoomViewProps> = ({ isPasswordProtected = false, isPres
     await handleAutoSubmit(userName, password);
   };
 
-  // Initialize OvenPlayer
+  // Initialize OvenPlayer Script & Instance
   useEffect(() => {
     if (!scriptRef.current && isNameSubmitted && roomConfig) {
       const script = document.createElement('script');
       script.src = OVENPLAYER_SCRIPT_URL;
       script.async = true;
-      
+
       script.onload = async () => {
         const player = (window as any).OvenPlayer;
         if (player && player.create) {
-          // Log stream key for debugging (will be removed in production)
           console.log('Stream key length:', roomConfig.streamKey?.length);
-          
-          // Construct the WebRTC URL with the stream key
+
           const wsHost = WEBRTC_WS_HOST;
           const wsPort = WEBRTC_WS_PORT;
           const wsProtocol = WEBRTC_WS_PROTOCOL;
           const appPath = WEBRTC_APP_PATH;
-          
-          // Format: wss://host:port/app/streamKey
+
           const streamUrl = roomConfig.streamKey
             ? `${wsProtocol}://${wsHost}:${wsPort}/${appPath}/${roomConfig.streamKey}`
             : `${wsProtocol}://${wsHost}:${wsPort}/${appPath}/stream`;
-            
+
           console.log('Using stream URL:', streamUrl);
-          
-          // Simple WebRTC streaming configuration
+
           playerRef.current = player.create('player_id', {
             autoStart: true,
             mute: true,
             webrtcConfig: {
-              // Standard STUN server configuration
               iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' }
               ],
@@ -156,23 +156,19 @@ const RoomView: React.FC<RoomViewProps> = ({ isPasswordProtected = false, isPres
               }
             ]
           });
-          
+
           playerRef.current.on('ready', () => {
             setIsPlayerReady(true);
             console.log('OvenPlayer ready - attempting to connect to stream');
           });
-          
-          // Add event listeners for troubleshooting
+
           playerRef.current.on('stateChanged', (state: any) => {
             console.log('Player state changed:', state);
-            
-            // If the player reaches the playing state, clear any error messages
             if (state && state.newstate === 'playing') {
               setPlayerError('');
             }
           });
-          
-          // Basic error handling
+
           playerRef.current.on('error', (error: any) => {
             console.error('OvenPlayer error:', error);
             setPlayerError(`Connection error: ${error.message || 'Failed to connect to stream'}`);
@@ -187,74 +183,52 @@ const RoomView: React.FC<RoomViewProps> = ({ isPasswordProtected = false, isPres
       document.head.appendChild(script);
     }
 
+    // Cleanup OvenPlayer Script & Instance
     return () => {
       if (scriptRef.current) {
         if (playerRef.current) {
           playerRef.current.remove();
           playerRef.current = null;
+          console.log('OvenPlayer instance removed.');
         }
-        document.head.removeChild(scriptRef.current);
+        if (scriptRef.current.parentNode === document.head) {
+           document.head.removeChild(scriptRef.current);
+        }
         scriptRef.current = null;
       }
     };
   }, [isNameSubmitted, roomConfig]);
 
-  // Initialize MiroTalk iframe after player is ready
+
+  // Initialize MiroTalk iframe by setting src (Original approach)
   useEffect(() => {
+    // Set iframe src only when authenticated, player is ready, iframe ref exists, and config is loaded
     if (isNameSubmitted && isPlayerReady && iframeRef.current && roomConfig) {
       const timestamp = new Date().getTime();
-      const baseUrl = VIDEO_URL;
+      const baseUrl = VIDEO_URL; // e.g., https://video.domain.com/join
       const queryParams = new URLSearchParams({
         room: roomConfig.mirotalkRoomId,
-        name: userName,
-        audio: '1',
-        video: '1',
-        screen: isPresenter ? '1' : '0',
-        hide: '0',
-        notify: '0',
-        token: roomConfig.mirotalkToken,
-        _: timestamp.toString(),
-        fresh: '1',
-        presenter: isPresenter ? '1' : '0'
+        name: userName || 'Guest', // Use Guest if username is empty
+        audio: '1', // Enable audio
+        video: '1', // Enable video
+        screen: isPresenter ? '1' : '0', // Enable screen share for presenter
+        hide: '0', // Don't hide self view
+        notify: '0', // Disable notifications
+        token: roomConfig.mirotalkToken, // Use the automatically fetched token
+        _: timestamp.toString(), // Cache buster
+        // Add any other necessary params from Mirotalk docs if needed
       });
-      iframeRef.current.src = `${baseUrl}?${queryParams.toString()}`;
+
+      const iframeSrc = `${baseUrl}?${queryParams.toString()}`;
+      console.log('Setting Mirotalk iframe src:', iframeSrc);
+      iframeRef.current.src = iframeSrc;
     }
+  // Dependencies: Re-run if auth status, player readiness, username, config, or presenter status changes
   }, [isNameSubmitted, isPlayerReady, userName, roomConfig, isPresenter]);
 
-  const handleCloseTokenDialog = () => {
-    setTokenDialogOpen(false);
-    setGeneratedUrl('');
-  };
+  // Removed handler functions for token generation dialog
 
-  const handleGenerateToken = async (isPresenterToken: boolean) => {
-    if (!roomConfig || !roomId) return;
-    
-    try {
-      setIsGeneratingToken(true);
-      setError('');
-      
-      const request: TokenGenerationRequest = {
-        roomId: roomConfig.mirotalkRoomId,
-        name: tokenName || 'Guest',
-        isPresenter: isPresenterToken,
-        expireTime: tokenExpiry
-      };
-      
-      const response = await generateMirotalkToken(request);
-      setGeneratedUrl(response.data.url);
-      setSuccessMessage(`${isPresenterToken ? 'Presenter' : 'Guest'} link generated successfully`);
-    } catch (error: any) {
-      setError(error.response?.data?.message || `Failed to generate ${isPresenterToken ? 'presenter' : 'guest'} link`);
-    } finally {
-      setIsGeneratingToken(false);
-    }
-  };
-
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setSuccessMessage('Link copied to clipboard');
-  };
-
+  // --- Login Form ---
   if (!isNameSubmitted) {
     return (
       <Container component="main" maxWidth="xs">
@@ -290,17 +264,20 @@ const RoomView: React.FC<RoomViewProps> = ({ isPasswordProtected = false, isPres
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  error={!!error}
-                  helperText={error}
+                  error={!!error && !loading}
+                  helperText={!loading ? error : ''}
                   disabled={loading}
                 />
+              )}
+              {error && !isPasswordProtected && !loading && (
+                 <Typography color="error" sx={{ mt: 1, textAlign: 'center' }}>{error}</Typography>
               )}
               <Button
                 type="submit"
                 fullWidth
                 variant="contained"
                 sx={{ mt: 3, mb: 2 }}
-                disabled={loading}
+                disabled={loading || !userName.trim()}
               >
                 {loading ? <CircularProgress size={24} /> : 'Join Stream'}
               </Button>
@@ -311,6 +288,7 @@ const RoomView: React.FC<RoomViewProps> = ({ isPasswordProtected = false, isPres
     );
   }
 
+  // --- Main Room View ---
   return (
     <Box
       sx={{
@@ -324,6 +302,7 @@ const RoomView: React.FC<RoomViewProps> = ({ isPasswordProtected = false, isPres
         overflow: 'hidden',
       }}
     >
+      {/* OvenPlayer Container */}
       <div
         id="player_id"
         style={{
@@ -331,6 +310,7 @@ const RoomView: React.FC<RoomViewProps> = ({ isPasswordProtected = false, isPres
           minHeight: 0,
           width: '100%',
           position: 'relative',
+          backgroundColor: '#000',
         }}
       >
         {playerError && (
@@ -340,112 +320,42 @@ const RoomView: React.FC<RoomViewProps> = ({ isPasswordProtected = false, isPres
               top: '50%',
               left: '50%',
               transform: 'translate(-50%, -50%)',
-              bgcolor: 'rgba(0, 0, 0, 0.7)',
+              bgcolor: 'rgba(0, 0, 0, 0.8)',
               color: 'white',
               p: 2,
               borderRadius: 1,
               textAlign: 'center',
               maxWidth: '80%',
+              zIndex: 10
             }}
           >
             <Typography variant="body1">{playerError}</Typography>
           </Box>
         )}
+        {/* Player initializes here */}
       </div>
-      {isPlayerReady && (
-        <iframe
-          ref={iframeRef}
-          title="Mirotalk Call"
-          allow="camera; microphone; display-capture; fullscreen; clipboard-read; clipboard-write; web-share; autoplay"
-          style={{
-            width: '100%',
-            height: '30vh',
-            border: 'none',
-            overflow: 'hidden',
-            display: 'block',
-          }}
-        />
-      )}
 
-      {/* Token Generation Dialog */}
-      <Dialog open={tokenDialogOpen} onClose={handleCloseTokenDialog} maxWidth="md" fullWidth>
-        <DialogTitle>Generate Token Links for {roomId}</DialogTitle>
-        <DialogContent>
-          {error && (
-            <Typography color="error" sx={{ mt: 2 }}>
-              {error}
-            </Typography>
-          )}
-          {successMessage && (
-            <Typography color="success.main" sx={{ mt: 2 }}>
-              {successMessage}
-            </Typography>
-          )}
-          <Box sx={{ mt: 2 }}>
-            <TextField
-              label="Participant Name"
-              fullWidth
-              value={tokenName}
-              onChange={(e) => setTokenName(e.target.value)}
-              margin="normal"
-              placeholder="Enter participant name (optional)"
-            />
-            
-            <FormControl fullWidth margin="normal">
-              <InputLabel>Token Expiry</InputLabel>
-              <Select
-                value={tokenExpiry}
-                onChange={(e) => setTokenExpiry(e.target.value)}
-                label="Token Expiry"
-              >
-                <MenuItem value="1h">1 Hour</MenuItem>
-                <MenuItem value="6h">6 Hours</MenuItem>
-                <MenuItem value="12h">12 Hours</MenuItem>
-                <MenuItem value="1d">1 Day</MenuItem>
-                <MenuItem value="7d">7 Days</MenuItem>
-              </Select>
-            </FormControl>
-            
-            {generatedUrl && (
-              <Box sx={{ mt: 2, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                <TextField
-                  fullWidth
-                  value={generatedUrl}
-                  label="Generated Link"
-                  InputProps={{
-                    readOnly: true,
-                  }}
-                />
-                <Tooltip title="Copy link">
-                  <IconButton onClick={() => handleCopy(generatedUrl)}>
-                    <ContentCopy />
-                  </IconButton>
-                </Tooltip>
-              </Box>
-            )}
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button 
-            onClick={() => handleGenerateToken(true)} 
-            variant="contained" 
-            color="primary"
-            disabled={isGeneratingToken}
-          >
-            Generate Presenter Link
-          </Button>
-          <Button 
-            onClick={() => handleGenerateToken(false)} 
-            variant="contained"
-            disabled={isGeneratingToken}
-          >
-            Generate Guest Link
-          </Button>
-          <Button onClick={handleCloseTokenDialog}>Close</Button>
-        </DialogActions>
-      </Dialog>
+      {/* Mirotalk Iframe Container - Renders only after name submission */}
+      {/* We now render the iframe directly */}
+      {isNameSubmitted && (
+         <iframe
+           ref={iframeRef}
+           title="Mirotalk Call"
+           allow="camera; microphone; display-capture; fullscreen; clipboard-read; clipboard-write; web-share; autoplay"
+           style={{
+             width: '100%',
+             height: '30vh', // Fixed height for the Mirotalk section
+             border: 'none',
+             overflow: 'hidden',
+             display: 'block',
+             backgroundColor: '#f0f0f0' // Background while loading
+           }}
+           // src is set dynamically by the useEffect hook
+         />
+      )}
+      {/* Removed Token Generation Dialog */}
     </Box>
   );
 };
 
-export default RoomView; 
+export default RoomView;

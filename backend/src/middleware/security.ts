@@ -17,7 +17,12 @@ export const generalLimiter = rateLimit({
                req.path.includes('/assets') || 
                req.path.includes('/ws') ||
                req.path.startsWith('/api/rooms/validate') ||
-               req.path.startsWith('/api/obs/');
+               req.path.startsWith('/api/obs/') ||
+               req.path.startsWith('/api/upload/') || // Skip all /api/upload/ routes
+               req.path.startsWith('/files') ||
+               req.path.startsWith('/upload');
+
+
     }
 });
 
@@ -34,9 +39,11 @@ export const loginLimiter = rateLimit({
 export const ipBlocker = async (req: Request, res: Response, next: NextFunction) => {
     try {
         // Skip IP blocking for authentication and OBS routes
-        if (req.path.endsWith('/auth/login') || 
+        if (req.path.endsWith('/auth/login') ||
             req.path.startsWith('/api/obs/') ||
-            req.path.startsWith('/api/rooms/validate')) {
+            req.path.startsWith('/api/rooms/validate')  ||
+            req.path.startsWith('/api/upload/')) // Skip all /api/upload/ routes
+            {
             return next();
         }
 

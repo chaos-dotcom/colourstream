@@ -1,0 +1,92 @@
+#!/bin/sh
+# Tusd post-finish hook script
+
+# Exit immediately if a command exits with a non-zero status.
+set -e
+# Print each command before executing it (for debugging)
+set -x
+
+# This script now ONLY notifies the backend that Tusd has finished receiving bytes.
+# Actual file processing (moving, DB update, final notification) is handled
+# by a separate backend endpoint triggered by a different hook mechanism.
+# The logic for sanitizing paths, determining the final destination,
+# creating directories, and moving the file now resides within the backend controller.
+
+# --- Get Metadata ---
+# Tusd provides metadata via environment variables prefixed with TUS_META_
+# Keys are uppercased, and hyphens are replaced with underscores.
+UPLOAD_ID="$TUS_ID"
+# We will get TOKEN and ORIGINAL_FILENAME from the .info file
+
+# --- Validate Base Info ---
+# The following logic has been moved to the backend controller.
+if [ -z "$UPLOAD_ID" ]; then
+  echo "Error: TUS_ID environment variable is missing." >&2
+  exit 1 # Exit with error
+fi
+
+echo "Processing upload ID: $UPLOAD_ID" >&2
+
+# --- Notify Backend of Completion ---
+# This script now ONLY notifies the backend that Tusd has finished receiving bytes.
+# Actual file processing (moving, DB update, final notification) is handled
+# by a separate backend endpoint triggered by a different hook mechanism.
+
+echo "[post-finish] Notifying backend API of completion: $BACKEND_PROGRESS_API_URL" >&2
+
+# Construct JSON payload for completion
+JSON_PAYLOAD_FINISH=$(cat <<EOF
+{
+  "uploadId": "$UPLOAD_ID",
+  "status": "finished"
+}
+EOF
+)
+
+# Use wget to send POST request for completion status
+wget -qO- --post-data="$JSON_PAYLOAD_FINISH" --header="Content-Type: application/json" "$BACKEND_PROGRESS_API_URL" > /dev/null
+WGET_FINISH_EXIT_CODE=$?
+
+if [ $WGET_FINISH_EXIT_CODE -ne 0 ]; then
+    echo "[post-finish] Warning: Failed to notify backend API of completion (wget exit code: $WGET_FINISH_EXIT_CODE). URL: $BACKEND_PROGRESS_API_URL" >&2
+    # Log warning but continue
+else
+    echo "[post-finish] Backend notified of completion successfully." >&2
+fi
+
+echo "Using Token: $TOKEN" >&2
+echo "Original Filename: $ORIGINAL_FILENAME" >&2
+
+# --- Notify Backend of Completion ---
+# This script now ONLY notifies the backend that Tusd has finished receiving bytes.
+# Actual file processing (moving, DB update, final notification) is handled
+# by a separate backend endpoint triggered by a different hook mechanism.
+
+echo "[post-finish] Notifying backend API of completion: $BACKEND_PROGRESS_API_URL" >&2
+
+# Construct JSON payload for completion
+JSON_PAYLOAD_FINISH=$(cat <<EOF
+{
+  "uploadId": "$UPLOAD_ID",
+  "status": "finished"
+}
+EOF
+)
+
+# Use wget to send POST request for completion status
+wget -qO- --post-data="$JSON_PAYLOAD_FINISH" --header="Content-Type: application/json" "$BACKEND_PROGRESS_API_URL" > /dev/null
+WGET_FINISH_EXIT_CODE=$?
+
+if [ $WGET_FINISH_EXIT_CODE -ne 0 ]; then
+    echo "[post-finish] Warning: Failed to notify backend API of completion (wget exit code: $WGET_FINISH_EXIT_CODE). URL: $BACKEND_PROGRESS_API_URL" >&2
+    # Log warning but continue
+else
+    echo "[post-finish] Backend notified of completion successfully." >&2
+fi
+
+# Exit with 0 to indicate success to tusd
+
+echo "Hook script finished successfully for upload ID: $UPLOAD_ID" >&2
+
+# Exit with 0 to indicate success to tusd
+exit 0
