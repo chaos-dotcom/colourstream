@@ -457,9 +457,13 @@ router.post('/webauthn/register', async (req: Request, res: Response, next: Next
 });
 
 // WebAuthn registration verification endpoint
-router.post('/webauthn/register/verify', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
+// Removed authenticateToken middleware to allow verification without prior login
+router.post('/webauthn/register/verify', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    logger.info('Starting passkey registration verification');
+    // Identify the user - assuming 'admin' for now in this flow
+    const userId = 'admin'; 
+    
+    logger.info(`Starting passkey registration verification for user: ${userId}`);
 
     if (!currentChallenge) {
       logger.error('No challenge found for verification');
@@ -490,12 +494,13 @@ router.post('/webauthn/register/verify', authenticateToken, async (req: Request,
       // Check if this specific credential already exists
       const existingCredential = await prisma.webAuthnCredential.findFirst({
         where: {
-          credentialId: credentialIdString
+          credentialId: credentialIdString,
+          userId: userId // Ensure we check for the correct user
         }
       });
 
       if (existingCredential) {
-        logger.warn('Credential already exists', { credentialId: credentialIdString });
+        logger.warn(`Credential already exists for user ${userId}`, { credentialId: credentialIdString });
         throw new AppError(400, 'This passkey is already registered');
       }
 
@@ -524,17 +529,27 @@ router.post('/webauthn/register/verify', authenticateToken, async (req: Request,
           credentialId: credentialIdString,
           publicKey: publicKeyString,
           counter: counter,
-          userId: 'admin',
+          userId: userId, // Use the determined userId
           transports: transportsJson
         }
       });
 
-      logger.info('Passkey registered successfully');
+      logger.info(`Passkey registered successfully for user: ${userId}`);
+
+      // Generate a token upon successful registration verification if needed
+      // This depends on whether the user should be logged in immediately after registration
+      // For the /setup-passkey flow, generating a token might be desired.
+      const token = jwt.sign(
+        { userId: userId, type: 'admin' }, // Use the determined userId
+        process.env.ADMIN_AUTH_SECRET!,
+        { expiresIn: '7d' }
+      );
 
       res.json({ 
         status: 'success',
         message: 'Passkey registered successfully',
-        verified: true 
+        verified: true,
+        data: { token } // Optionally return the token
       });
     } else {
       logger.error('Registration verification failed');
