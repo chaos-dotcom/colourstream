@@ -441,7 +441,7 @@ services:
       - "traefik.http.routers.companion.tls.certresolver=myresolver"
       - "traefik.http.routers.companion.service=companion"
       - "traefik.http.services.companion.loadbalancer.server.port=3020"
-tusd:
+  tusd:
      image: tusproject/tusd:latest
      container_name: colourstream-tusd # Added container name for clarity
      restart: unless-stopped # Restart policy
