@@ -395,19 +395,25 @@ router.post('/oidc/token-exchange', async (req: Request, res: Response, next: Ne
 });
 
 // WebAuthn registration endpoint
-router.post('/webauthn/register', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
+// Removed authenticateToken middleware to allow registration initiation without prior login
+// (e.g., when redirected from login because no passkey exists)
+router.post('/webauthn/register', async (req: Request, res: Response, next: NextFunction) => {
     try {
-        logger.info('Starting passkey registration process', {
+        // Identify the user - assuming 'admin' for now in this flow
+        // In a multi-user system, you might need a different way to identify the user
+        // if they aren't authenticated yet.
+        const userId = 'admin'; 
+        
+        logger.info(`Starting passkey registration process for user: ${userId}`, {
             userAgent: req.headers['user-agent'],
             ip: req.ip
         });
 
-        // Only allow registration if no credential exists with the same name
         const existingCredentials = await prisma.webAuthnCredential.findMany({
-            where: { userId: 'admin' }
+            where: { userId: userId }
         });
 
-        logger.info('Checking existing passkeys', {
+        logger.info(`Checking existing passkeys for user: ${userId}`, {
             count: existingCredentials.length,
             lastUsed: existingCredentials[0]?.lastUsed || null
         });
@@ -415,8 +421,8 @@ router.post('/webauthn/register', authenticateToken, async (req: Request, res: R
         const options = await generateRegistrationOptions({
             rpName,
             rpID,
-            userID: 'admin',
-            userName: 'admin',
+            userID: userId, // Use the determined userId
+            userName: userId, // Use the determined userId
             attestationType: 'none',
             authenticatorSelection: {
                 residentKey: 'preferred',
