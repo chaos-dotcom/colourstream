@@ -746,8 +746,7 @@ router.post('/webauthn/authenticate/verify', async (req: Request, res: Response,
 });
 
 // First-time setup registration endpoint (no auth required)
-// Also aliased to /register-first due to potential frontend bug
-router.post(['/webauthn/first-time-setup', '/webauthn/register-first'], async (req: Request, res: Response, next: NextFunction) => {
+router.post('/webauthn/first-time-setup', async (req: Request, res: Response, next: NextFunction) => {
   try {
     logger.info('Starting first-time setup passkey registration process', {
       userAgent: req.headers['user-agent'],
