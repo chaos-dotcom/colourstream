@@ -601,6 +601,60 @@ export const handleOIDCCallback = async (): Promise<AuthResult> => {
   }
 };
 
+
+// Function to register the first passkey during initial setup
+export const registerFirstPasskey = async (): Promise<ApiResponse<AuthResponse>> => {
+  try {
+    // 1. Get registration options
+    const optionsResponse = await api.post('/auth/webauthn/register-first');
+    const registrationOptions = optionsResponse.data.data.options;
+
+    if (!registrationOptions) {
+      throw new Error('Failed to get registration options for first passkey.');
+    }
+
+    // 2. Start browser registration
+    let credential;
+    try {
+      credential = await startRegistration(registrationOptions);
+    } catch (registrationError: any) {
+      console.error('Browser passkey registration failed:', registrationError);
+      // Handle specific errors like cancellation
+      if (registrationError.name === 'NotAllowedError') {
+        throw new Error('Passkey registration cancelled by user.');
+      }
+      throw new Error('Failed to create passkey in browser.');
+    }
+
+    // 3. Verify credential with backend
+    const verificationResponse = await api.post('/auth/webauthn/register-first/verify', credential);
+
+    if (verificationResponse.data?.status === 'success' && verificationResponse.data?.data?.token) {
+      // Store token and mark as authenticated
+      const token = verificationResponse.data.data.token;
+      localStorage.setItem('adminToken', token);
+      localStorage.setItem('isAdminAuthenticated', 'true');
+      localStorage.setItem('authToken', token);
+      localStorage.setItem('authTimestamp', Date.now().toString());
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+
+      return {
+        status: 'success',
+        data: { token, verified: true } // Assuming AuthResponse structure
+      };
+    } else {
+      throw new Error(verificationResponse.data?.message || 'Failed to verify first passkey.');
+    }
+  } catch (error: any) {
+    console.error('Error registering first passkey:', error);
+    return {
+      status: 'error',
+      message: error.message || 'An unknown error occurred during first passkey registration.',
+      data: { token: '', verified: false } // Return appropriate error structure
+    };
+  }
+};
+
 // Helper function to get Authorization header
 export const getAuthHeaders = (): { [key: string]: string } => {
   const token = localStorage.getItem('adminToken');
