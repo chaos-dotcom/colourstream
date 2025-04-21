@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Typography, Container, Paper, CircularProgress, Alert } from '@mui/material';
-import { registerFirstPasskey } from '../utils/api';
+import { registerPasskey } from '../utils/api'; // Use the standard registration function
 import KeyIcon from '@mui/icons-material/Key';
 import { Button } from '@mui/material';
 import { PageHeading } from './GovUkComponents';
@@ -44,7 +44,7 @@ const PasskeySetupPage: React.FC = () => {
     setRegistering(true);
 
     try {
-      await registerFirstPasskey();
+      await registerPasskey(); // Call the correct API function
       setSuccess(true);
       // After successful registration, wait a moment and then proceed
       setTimeout(() => {
