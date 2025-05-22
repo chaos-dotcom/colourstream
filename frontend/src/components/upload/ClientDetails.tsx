@@ -172,26 +172,15 @@ const ClientDetails: React.FC = () => {
     }
   };
 
-  const handleProjectDelete = async (projectId: string) => {
-    try {
-      const response = await deleteProject(projectId);
-      if (response.status === 'success') {
-        // Refresh the projects list
-        const projectsResponse = await getClientProjects(clientId!);
-        if (projectsResponse.status === 'success') {
-          setProjects(projectsResponse.data);
-        }
-      }
-    } catch (err) {
-      setError('Failed to delete project');
-    }
-  };
+  // This function is not being used, removing it
 
   const handleDeleteClient = async () => {
     if (!clientId) return;
     
     try {
+      console.log('Attempting to delete client:', clientId);
       const response = await deleteClient(clientId);
+      console.log('Delete client response:', response);
       
       if (response.status === 'success') {
         // Navigate back to clients list on successful deletion
@@ -204,6 +193,7 @@ const ClientDetails: React.FC = () => {
         setDeleteDialogOpen(false);
       }
     } catch (err) {
+      console.error('Error deleting client:', err);
       setError('Failed to delete client');
       setDeleteDialogOpen(false);
     }
