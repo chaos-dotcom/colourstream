@@ -230,7 +230,7 @@ const ClientDetails: React.FC = () => {
         let errorMessage = response.message || 'Failed to delete project';
         
         // Check for foreign key constraint error
-        if (response.code === 'P2003' || 
+        if ((response as any).code === 'P2003' || 
             (response.message && response.message.includes('Foreign key constraint violated'))) {
           errorMessage = 'Cannot delete project because it has uploaded files in the database. Please contact an administrator to resolve this issue.';
         }
@@ -243,7 +243,7 @@ const ClientDetails: React.FC = () => {
       let errorMessage = 'Failed to delete project';
       
       // Check for Prisma error in the caught exception
-      if (err.code === 'P2003' || 
+      if ((err as any).code === 'P2003' || 
           (err.message && err.message.includes('Foreign key constraint violated'))) {
         errorMessage = 'Cannot delete project because it has uploaded files in the database. Please contact an administrator to resolve this issue.';
       }
