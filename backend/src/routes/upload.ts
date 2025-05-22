@@ -876,6 +876,9 @@ router.get('/projects/:projectId', authenticateToken, async (req: Request, res: 
     if (project.client && project.client.code) {
       // Replace spaces with underscores to match expected directory structure
       const projectNameWithUnderscores = project.name.replace(/ /g, '_');
+      // Ensure we're using the same naming convention as the file storage system
+      // Replace spaces with underscores to match the file paths
+      const projectNameWithUnderscores = project.name.replace(/ /g, '_');
       const tusdProjectPath = path.join(
         tusdOrganizedDir,
         project.client.code,
@@ -888,6 +891,7 @@ router.get('/projects/:projectId', authenticateToken, async (req: Request, res: 
     const tusdDataDir = process.env.TUSD_DATA_DIR || '/srv/tusd-data';
     // Create a project-specific subdirectory in the TUSD data directory
     // Replace spaces with underscores to match expected directory structure
+    // This MUST match exactly how files are stored (Marco_Grade not Marco Grade)
     const projectNameWithUnderscores = project.name.replace(/ /g, '_');
     const tusdProjectPath = path.join(tusdDataDir, project.client?.code || 'default', projectNameWithUnderscores);
     locations.push(tusdProjectPath);
@@ -1747,10 +1751,12 @@ router.post('/projects/:projectId/turbosort', authenticateToken, async (req: Req
     // 2. TUSD organized directory
     const tusdOrganizedDir = process.env.TUS_ORGANIZED_DIR || path.join(__dirname, '../../organized');
     if (project.client && project.client.code) {
+      // Replace spaces with underscores to match the file paths
+      const projectNameWithUnderscores = project.name.replace(/ /g, '_');
       const tusdProjectPath = path.join(
         tusdOrganizedDir,
         project.client.code,
-        project.name
+        projectNameWithUnderscores
       );
       locations.push(tusdProjectPath);
     }
@@ -1758,7 +1764,9 @@ router.post('/projects/:projectId/turbosort', authenticateToken, async (req: Req
     // 3. TUSD data directory (where uploads are initially stored)
     const tusdDataDir = process.env.TUSD_DATA_DIR || '/srv/tusd-data';
     // Create a project-specific subdirectory in the TUSD data directory
-    const tusdProjectPath = path.join(tusdDataDir, project.client?.code || 'default', project.name);
+    // Replace spaces with underscores to match expected directory structure
+    const projectNameWithUnderscores = project.name.replace(/ /g, '_');
+    const tusdProjectPath = path.join(tusdDataDir, project.client?.code || 'default', projectNameWithUnderscores);
     locations.push(tusdProjectPath);
     
     // Log all locations for debugging
