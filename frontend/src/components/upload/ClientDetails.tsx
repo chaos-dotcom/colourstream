@@ -214,14 +214,27 @@ const ClientDetails: React.FC = () => {
         console.error('Failed to delete project:', response.message);
         let errorMessage = response.message || 'Failed to delete project';
         
-        // We no longer need to check for foreign key constraint errors since we're keeping files
+        // Check for foreign key constraint error
+        if (response.code === 'P2003' || 
+            (response.message && response.message.includes('Foreign key constraint violated'))) {
+          errorMessage = 'Cannot delete project because it has uploaded files in the database. Please contact an administrator to resolve this issue.';
+        }
+        
         setError(errorMessage);
-        setTimeout(() => setError(null), 5000);
+        setTimeout(() => setError(null), 8000);
       }
     } catch (err: any) {
       console.error('Error deleting project:', err);
-      setError('Failed to delete project');
-      setTimeout(() => setError(null), 5000);
+      let errorMessage = 'Failed to delete project';
+      
+      // Check for Prisma error in the caught exception
+      if (err.code === 'P2003' || 
+          (err.message && err.message.includes('Foreign key constraint violated'))) {
+        errorMessage = 'Cannot delete project because it has uploaded files in the database. Please contact an administrator to resolve this issue.';
+      }
+      
+      setError(errorMessage);
+      setTimeout(() => setError(null), 8000);
     }
   };
 
@@ -395,7 +408,7 @@ const ClientDetails: React.FC = () => {
                           onClick={(e) => {
                             e.stopPropagation(); // Prevent row click from triggering
                             // Show confirmation dialog before deleting
-                            if (window.confirm('Are you sure you want to delete this project? The project metadata will be removed, but any uploaded files will remain intact.')) {
+                            if (window.confirm('Are you sure you want to delete this project? The project metadata will be removed, but any uploaded files will remain intact.\n\nNote: If there are files in the database associated with this project, the deletion may fail.')) {
                               handleDeleteProject(project.id);
                             }
                           }}
