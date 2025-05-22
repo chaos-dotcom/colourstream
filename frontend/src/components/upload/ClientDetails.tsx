@@ -212,13 +212,27 @@ const ClientDetails: React.FC = () => {
         setTimeout(() => setSuccessMessage(null), 3000);
       } else {
         console.error('Failed to delete project:', response.message);
-        setError(response.message || 'Failed to delete project');
-        setTimeout(() => setError(null), 3000);
+        let errorMessage = response.message || 'Failed to delete project';
+        
+        // Check for foreign key constraint error
+        if (response.code === 'P2003' && response.meta?.field_name?.includes('UploadedFile_projectId_fkey')) {
+          errorMessage = 'Cannot delete project because it has uploaded files. Please delete all files first.';
+        }
+        
+        setError(errorMessage);
+        setTimeout(() => setError(null), 5000);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error deleting project:', err);
-      setError('Failed to delete project');
-      setTimeout(() => setError(null), 3000);
+      let errorMessage = 'Failed to delete project';
+      
+      // Check for Prisma error in the caught exception
+      if (err.code === 'P2003' && err.meta?.field_name?.includes('UploadedFile_projectId_fkey')) {
+        errorMessage = 'Cannot delete project because it has uploaded files. Please delete all files first.';
+      }
+      
+      setError(errorMessage);
+      setTimeout(() => setError(null), 5000);
     }
   };
 
