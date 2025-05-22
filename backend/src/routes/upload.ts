@@ -882,7 +882,9 @@ router.get('/projects/:projectId', authenticateToken, async (req: Request, res: 
     
     // 3. TUSD data directory (where uploads are initially stored)
     const tusdDataDir = process.env.TUSD_DATA_DIR || '/srv/tusd-data';
-    locations.push(tusdDataDir);
+    // Create a project-specific subdirectory in the TUSD data directory
+    const tusdProjectPath = path.join(tusdDataDir, project.client?.code || 'default', project.name);
+    locations.push(tusdProjectPath);
     
     // Try to find .turbosort file in any of the locations
     for (const location of locations) {
@@ -1747,7 +1749,9 @@ router.post('/projects/:projectId/turbosort', authenticateToken, async (req: Req
     
     // 3. TUSD data directory (where uploads are initially stored)
     const tusdDataDir = process.env.TUSD_DATA_DIR || '/srv/tusd-data';
-    locations.push(tusdDataDir);
+    // Create a project-specific subdirectory in the TUSD data directory
+    const tusdProjectPath = path.join(tusdDataDir, project.client?.code || 'default', project.name);
+    locations.push(tusdProjectPath);
     
     // Log all locations for debugging
     logger.info(`Setting turbosort directory "${directory}" for project ${projectId} in locations:`, locations);
@@ -1855,7 +1859,9 @@ router.delete('/projects/:projectId/turbosort', authenticateToken, async (req: R
     
     // 3. TUSD data directory (where uploads are initially stored)
     const tusdDataDir = process.env.TUSD_DATA_DIR || '/srv/tusd-data';
-    locations.push(tusdDataDir);
+    // Create a project-specific subdirectory in the TUSD data directory
+    const tusdProjectPath = path.join(tusdDataDir, project.client?.code || 'default', project.name);
+    locations.push(tusdProjectPath);
     
     // Log all locations for debugging
     logger.info(`Deleting turbosort file for project ${projectId} from locations:`, locations);
