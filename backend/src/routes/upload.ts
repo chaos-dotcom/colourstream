@@ -187,6 +187,7 @@ const storage = multer.diskStorage({
       // If not available, we fall back to the local path
       const organizedDir = process.env.TUS_ORGANIZED_DIR || path.join(__dirname, '../../organized');
       
+      // Use the exact project name without any transformations to preserve underscores
       const uploadDir = path.join(organizedDir, 
         uploadLink.project.client.code || 'default',
         uploadLink.project.name
@@ -872,6 +873,7 @@ router.get('/projects/:projectId', authenticateToken, async (req: Request, res: 
     // 2. TUSD organized directory
     const tusdOrganizedDir = process.env.TUS_ORGANIZED_DIR || path.join(__dirname, '../../organized');
     if (project.client && project.client.code) {
+      // Use the exact project name without any transformations to preserve underscores
       const tusdProjectPath = path.join(
         tusdOrganizedDir,
         project.client.code,
@@ -883,6 +885,7 @@ router.get('/projects/:projectId', authenticateToken, async (req: Request, res: 
     // 3. TUSD data directory (where uploads are initially stored)
     const tusdDataDir = process.env.TUSD_DATA_DIR || '/srv/tusd-data';
     // Create a project-specific subdirectory in the TUSD data directory
+    // Use the exact project name without any transformations to preserve underscores
     const tusdProjectPath = path.join(tusdDataDir, project.client?.code || 'default', project.name);
     locations.push(tusdProjectPath);
     
@@ -908,6 +911,7 @@ router.get('/projects/:projectId', authenticateToken, async (req: Request, res: 
     if (turbosortContent === null && project.client && project.client.code) {
       try {
         // Generate S3 key based on client and project name
+        // Use the exact project name without any transformations to preserve underscores
         const s3Key = s3Service.generateKey(
           project.client.code,
           project.name,
