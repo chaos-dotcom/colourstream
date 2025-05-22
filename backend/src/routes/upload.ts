@@ -860,46 +860,83 @@ router.get('/projects/:projectId', authenticateToken, async (req: Request, res: 
     // Note: The turbosort directory is stored in a .turbosort file in the project directory,
     // not in the database. This allows for easier integration with external file-based tools.
     let turbosortContent = null;
-    try {
-      // Construct the path to the project directory
-      const projectPath = path.join(process.env.UPLOAD_DIR || 'uploads', projectId);
-      const turbosortPath = path.join(projectPath, '.turbosort');
-      
-      // Check if the file exists locally
-      if (fs.existsSync(turbosortPath)) { // Use standard fs for sync check
-        // Read the content of the .turbosort file
-        turbosortContent = fs.readFileSync(turbosortPath, 'utf8').trim(); // Use standard fs for sync read
-      }
-      // If not found locally and we have client info, try to get from S3
-      else if (project.client && project.client.code) {
-        try {
-          // Generate S3 key based on client and project name
-          const s3Key = s3Service.generateKey(
-            project.client.code,
-            project.name,
-            '.turbosort'
-          );
-
-          // Try to get the file from S3
-          const s3Object = await s3Service.getFileContent(s3Key);
-          if (s3Object) {
-            turbosortContent = s3Object.toString('utf8').trim();
-            
-            // Cache the S3 content locally for future use
-            if (!fs.existsSync(projectPath)) { // Use standard fs for sync check
-              fs.mkdirSync(projectPath, { recursive: true }); // Use standard fs for sync creation
-            }
-            fs.writeFileSync(turbosortPath, turbosortContent); // Use standard fs for sync write
-            console.log(`Cached turbosort file from S3 to local path: ${turbosortPath}`);
-          }
-        } catch (s3Error) {
-          console.error('Failed to get turbosort file from S3:', s3Error);
-          // Don't fail the request if we can't get the file from S3
+    
+    // Define all possible locations where .turbosort file might exist
+    const locations = [];
+    
+    // 1. Standard upload directory (legacy)
+    const uploadDir = process.env.UPLOAD_DIR || 'uploads';
+    const projectUploadPath = path.join(uploadDir, projectId);
+    locations.push(projectUploadPath);
+    
+    // 2. TUSD organized directory
+    const tusdOrganizedDir = process.env.TUS_ORGANIZED_DIR || path.join(__dirname, '../../organized');
+    if (project.client && project.client.code) {
+      const tusdProjectPath = path.join(
+        tusdOrganizedDir,
+        project.client.code,
+        project.name
+      );
+      locations.push(tusdProjectPath);
+    }
+    
+    // 3. TUSD data directory (where uploads are initially stored)
+    const tusdDataDir = process.env.TUSD_DATA_DIR || '/srv/tusd-data';
+    locations.push(tusdDataDir);
+    
+    // Try to find .turbosort file in any of the locations
+    for (const location of locations) {
+      try {
+        const turbosortPath = path.join(location, '.turbosort');
+        
+        // Check if the file exists
+        if (fs.existsSync(turbosortPath)) {
+          // Read the content of the .turbosort file
+          turbosortContent = fs.readFileSync(turbosortPath, 'utf8').trim();
+          logger.info(`Found .turbosort file at: ${turbosortPath} with content: ${turbosortContent}`);
+          break; // Stop searching once found
         }
+      } catch (fsError) {
+        logger.error(`Error checking/reading .turbosort file at ${location}:`, fsError);
+        // Continue to next location
       }
-    } catch (err) {
-      console.error('Error reading .turbosort file:', err);
-      // Don't fail the request if we can't read the file
+    }
+    
+    // If not found in any local location and we have client info, try to get from S3
+    if (turbosortContent === null && project.client && project.client.code) {
+      try {
+        // Generate S3 key based on client and project name
+        const s3Key = s3Service.generateKey(
+          project.client.code,
+          project.name,
+          '.turbosort'
+        );
+
+        // Try to get the file from S3
+        const s3Object = await s3Service.getFileContent(s3Key);
+        if (s3Object) {
+          turbosortContent = s3Object.toString('utf8').trim();
+          logger.info(`Retrieved .turbosort file from S3 with content: ${turbosortContent}`);
+          
+          // Cache the S3 content locally in all locations
+          for (const location of locations) {
+            try {
+              if (!fs.existsSync(location)) {
+                fs.mkdirSync(location, { recursive: true });
+              }
+              const turbosortPath = path.join(location, '.turbosort');
+              fs.writeFileSync(turbosortPath, turbosortContent);
+              logger.info(`Cached turbosort file from S3 to local path: ${turbosortPath}`);
+            } catch (fsError) {
+              logger.error(`Failed to cache turbosort file to ${location}:`, fsError);
+              // Continue to next location
+            }
+          }
+        }
+      } catch (s3Error) {
+        logger.error('Failed to get turbosort file from S3:', s3Error);
+        // Don't fail the request if we can't get the file from S3
+      }
     }
 
     // Add the turbosort content to the response
@@ -1689,17 +1726,50 @@ router.post('/projects/:projectId/turbosort', authenticateToken, async (req: Req
       });
     }
 
-    // Construct the path to the project directory
-    const projectPath = path.join(process.env.UPLOAD_DIR || 'uploads', projectId);
+    // Get all possible storage locations to ensure the .turbosort file is accessible everywhere
+    const locations = [];
     
-    // Create the project directory if it doesn't exist
-    if (!fs.existsSync(projectPath)) { // Use standard fs for sync check
-      fs.mkdirSync(projectPath, { recursive: true }); // Use standard fs for sync creation
+    // 1. Standard upload directory (legacy)
+    const uploadDir = process.env.UPLOAD_DIR || 'uploads';
+    const projectUploadPath = path.join(uploadDir, projectId);
+    locations.push(projectUploadPath);
+    
+    // 2. TUSD organized directory
+    const tusdOrganizedDir = process.env.TUS_ORGANIZED_DIR || path.join(__dirname, '../../organized');
+    if (project.client && project.client.code) {
+      const tusdProjectPath = path.join(
+        tusdOrganizedDir,
+        project.client.code,
+        project.name
+      );
+      locations.push(tusdProjectPath);
     }
-
-    // Write the directory name to the .turbosort file
-    const turbosortPath = path.join(projectPath, '.turbosort');
-    fs.writeFileSync(turbosortPath, directory); // Use standard fs for sync write
+    
+    // 3. TUSD data directory (where uploads are initially stored)
+    const tusdDataDir = process.env.TUSD_DATA_DIR || '/srv/tusd-data';
+    locations.push(tusdDataDir);
+    
+    // Log all locations for debugging
+    logger.info(`Setting turbosort directory "${directory}" for project ${projectId} in locations:`, locations);
+    
+    // Create directories and write .turbosort file to all locations
+    for (const location of locations) {
+      try {
+        // Create the directory if it doesn't exist
+        if (!fs.existsSync(location)) {
+          logger.info(`Creating directory: ${location}`);
+          fs.mkdirSync(location, { recursive: true });
+        }
+        
+        // Write the .turbosort file
+        const turbosortPath = path.join(location, '.turbosort');
+        logger.info(`Writing .turbosort file to: ${turbosortPath}`);
+        fs.writeFileSync(turbosortPath, directory);
+      } catch (fsError) {
+        logger.error(`Failed to write .turbosort file to ${location}:`, fsError);
+        // Continue to next location, don't fail the entire request
+      }
+    }
 
     // Also save the .turbosort file to S3 if project has a client
     if (project.client && project.client.code) {
@@ -1723,10 +1793,10 @@ router.post('/projects/:projectId/turbosort', authenticateToken, async (req: Req
           }
         );
 
-        console.log(`Turbosort file uploaded to S3 at key: ${s3Key}`);
+        logger.info(`Turbosort file uploaded to S3 at key: ${s3Key}`);
       } catch (s3Error) {
-        console.error('Failed to upload turbosort file to S3:', s3Error);
-        // Don't fail the request if S3 upload fails, we still have the local file
+        logger.error('Failed to upload turbosort file to S3:', s3Error);
+        // Don't fail the request if S3 upload fails, we still have the local files
       }
     }
 
@@ -1736,7 +1806,7 @@ router.post('/projects/:projectId/turbosort', authenticateToken, async (req: Req
       data: { directory }
     });
   } catch (error) {
-    console.error('Failed to set turbosort directory:', error);
+    logger.error('Failed to set turbosort directory:', error);
     res.status(500).json({
       status: 'error',
       message: 'Failed to set turbosort directory'
@@ -1764,13 +1834,46 @@ router.delete('/projects/:projectId/turbosort', authenticateToken, async (req: R
       });
     }
 
-    // Construct the path to the .turbosort file
-    const projectPath = path.join(process.env.UPLOAD_DIR || 'uploads', projectId);
-    const turbosortPath = path.join(projectPath, '.turbosort');
-
-    // Check if the file exists before attempting to delete
-    if (fs.existsSync(turbosortPath)) { // Use standard fs for sync check
-      fs.unlinkSync(turbosortPath); // Use standard fs for sync unlink
+    // Get all possible storage locations to ensure the .turbosort file is deleted everywhere
+    const locations = [];
+    
+    // 1. Standard upload directory (legacy)
+    const uploadDir = process.env.UPLOAD_DIR || 'uploads';
+    const projectUploadPath = path.join(uploadDir, projectId);
+    locations.push(projectUploadPath);
+    
+    // 2. TUSD organized directory
+    const tusdOrganizedDir = process.env.TUS_ORGANIZED_DIR || path.join(__dirname, '../../organized');
+    if (project.client && project.client.code) {
+      const tusdProjectPath = path.join(
+        tusdOrganizedDir,
+        project.client.code,
+        project.name
+      );
+      locations.push(tusdProjectPath);
+    }
+    
+    // 3. TUSD data directory (where uploads are initially stored)
+    const tusdDataDir = process.env.TUSD_DATA_DIR || '/srv/tusd-data';
+    locations.push(tusdDataDir);
+    
+    // Log all locations for debugging
+    logger.info(`Deleting turbosort file for project ${projectId} from locations:`, locations);
+    
+    // Delete .turbosort file from all locations
+    for (const location of locations) {
+      try {
+        const turbosortPath = path.join(location, '.turbosort');
+        
+        // Check if the file exists before attempting to delete
+        if (fs.existsSync(turbosortPath)) {
+          logger.info(`Deleting .turbosort file from: ${turbosortPath}`);
+          fs.unlinkSync(turbosortPath);
+        }
+      } catch (fsError) {
+        logger.error(`Failed to delete .turbosort file from ${location}:`, fsError);
+        // Continue to next location, don't fail the entire request
+      }
     }
 
     // Also delete from S3 if project has a client
@@ -1785,9 +1888,9 @@ router.delete('/projects/:projectId/turbosort', authenticateToken, async (req: R
 
         // Delete the .turbosort file from S3
         await s3Service.deleteFile(s3Key);
-        console.log(`Turbosort file deleted from S3 at key: ${s3Key}`);
+        logger.info(`Turbosort file deleted from S3 at key: ${s3Key}`);
       } catch (s3Error) {
-        console.error('Failed to delete turbosort file from S3:', s3Error);
+        logger.error('Failed to delete turbosort file from S3:', s3Error);
         // Don't fail the request if S3 deletion fails
       }
     }
@@ -1797,7 +1900,7 @@ router.delete('/projects/:projectId/turbosort', authenticateToken, async (req: R
       message: 'Turbosort file deleted successfully'
     });
   } catch (error) {
-    console.error('Failed to delete turbosort file:', error);
+    logger.error('Failed to delete turbosort file:', error);
     res.status(500).json({
       status: 'error',
       message: 'Failed to delete turbosort file'
