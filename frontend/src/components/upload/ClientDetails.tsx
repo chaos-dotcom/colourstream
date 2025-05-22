@@ -186,7 +186,7 @@ const ClientDetails: React.FC = () => {
         // Navigate back to clients list on successful deletion
         setSuccessMessage('Client deleted successfully');
         setTimeout(() => {
-          navigate('/admin/upload');
+          navigate('/upload');
         }, 1500);
       } else {
         let errorMessage = response.message || 'Failed to delete client';
