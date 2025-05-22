@@ -752,20 +752,30 @@ router.delete('/projects/:projectId', authenticateToken, async (req: Request, re
       });
     }
 
-    // Delete all files from S3
-    for (const file of project.files) {
-      if (file.storage === 's3' && file.path) {
-        try {
-          await s3Service.deleteFile(file.path);
-          console.log(`Deleted file from S3: ${file.path}`);
-        } catch (s3Error) {
-          console.error(`Failed to delete file from S3: ${file.path}`, s3Error);
-          // Continue with deletion even if S3 deletion fails
+    // First, delete all files from the database
+    if (project.files.length > 0) {
+      // Delete all files from S3 first
+      for (const file of project.files) {
+        if (file.storage === 's3' && file.path) {
+          try {
+            await s3Service.deleteFile(file.path);
+            console.log(`Deleted file from S3: ${file.path}`);
+          } catch (s3Error) {
+            console.error(`Failed to delete file from S3: ${file.path}`, s3Error);
+            // Continue with deletion even if S3 deletion fails
+          }
         }
       }
+      
+      // Delete all files from the database
+      await prisma.uploadedFile.deleteMany({
+        where: { projectId }
+      });
+      
+      console.log(`Deleted all files for project ${projectId} from database`);
     }
 
-    // Delete the project (cascading delete will handle upload links)
+    // Now delete the project (cascading delete will handle upload links)
     await prisma.project.delete({
       where: { id: projectId }
     });
@@ -934,22 +944,46 @@ router.delete('/clients/:clientId', authenticateToken, async (req: Request, res:
       });
     }
 
-    // Delete all files from S3 for each project
+    // First, delete all files from S3 and database for each project
     for (const project of client.projects) {
-      for (const file of project.files) {
-        if (file.storage === 's3' && file.path) {
-          try {
-            await s3Service.deleteFile(file.path);
-            console.log(`Deleted file from S3: ${file.path}`);
-          } catch (s3Error) {
-            console.error(`Failed to delete file from S3: ${file.path}`, s3Error);
-            // Continue with deletion even if S3 deletion fails
+      if (project.files.length > 0) {
+        // Delete files from S3
+        for (const file of project.files) {
+          if (file.storage === 's3' && file.path) {
+            try {
+              await s3Service.deleteFile(file.path);
+              console.log(`Deleted file from S3: ${file.path}`);
+            } catch (s3Error) {
+              console.error(`Failed to delete file from S3: ${file.path}`, s3Error);
+              // Continue with deletion even if S3 deletion fails
+            }
           }
         }
+        
+        // Delete files from database
+        await prisma.uploadedFile.deleteMany({
+          where: { projectId: project.id }
+        });
+        
+        console.log(`Deleted all files for project ${project.id} from database`);
       }
+      
+      // Delete upload links for this project
+      await prisma.uploadLink.deleteMany({
+        where: { projectId: project.id }
+      });
+      
+      console.log(`Deleted all upload links for project ${project.id}`);
     }
     
-    // Delete the client (cascading delete will handle projects and upload links)
+    // Delete all projects for this client
+    await prisma.project.deleteMany({
+      where: { clientId }
+    });
+    
+    console.log(`Deleted all projects for client ${clientId}`);
+    
+    // Finally, delete the client
     await prisma.client.delete({
       where: { id: clientId }
     });
