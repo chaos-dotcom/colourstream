@@ -1863,10 +1863,12 @@ router.delete('/projects/:projectId/turbosort', authenticateToken, async (req: R
     // 2. TUSD organized directory
     const tusdOrganizedDir = process.env.TUS_ORGANIZED_DIR || path.join(__dirname, '../../organized');
     if (project.client && project.client.code) {
+      // Replace spaces with underscores to match expected directory structure
+      const projectNameWithUnderscores = project.name.replace(/ /g, '_');
       const tusdProjectPath = path.join(
         tusdOrganizedDir,
         project.client.code,
-        project.name
+        projectNameWithUnderscores
       );
       locations.push(tusdProjectPath);
     }
@@ -1874,13 +1876,15 @@ router.delete('/projects/:projectId/turbosort', authenticateToken, async (req: R
     // 3. TUSD data directory (where uploads are initially stored)
     const tusdDataDir = process.env.TUSD_DATA_DIR || '/srv/tusd-data';
     // Create a project-specific subdirectory in the TUSD data directory
-    const tusdProjectPath = path.join(tusdDataDir, project.client?.code || 'default', project.name);
+    // Replace spaces with underscores to match expected directory structure
+    const projectNameWithUnderscores = project.name.replace(/ /g, '_');
+    const tusdProjectPath = path.join(tusdDataDir, project.client?.code || 'default', projectNameWithUnderscores);
     locations.push(tusdProjectPath);
     
     // Log all locations for debugging
     logger.info(`Deleting turbosort file for project ${projectId} from locations:`, locations);
     
-    // Delete .turbosort file from all locations
+    // Delete ONLY the .turbosort file from all locations, not any other files
     for (const location of locations) {
       try {
         const turbosortPath = path.join(location, '.turbosort');
@@ -1900,13 +1904,15 @@ router.delete('/projects/:projectId/turbosort', authenticateToken, async (req: R
     if (project.client && project.client.code) {
       try {
         // Generate S3 key based on client and project name
+        // Replace spaces with underscores to match expected directory structure
+        const projectNameWithUnderscores = project.name.replace(/ /g, '_');
         const s3Key = s3Service.generateKey(
           project.client.code,
-          project.name,
+          projectNameWithUnderscores,
           '.turbosort'
         );
 
-        // Delete the .turbosort file from S3
+        // Delete ONLY the .turbosort file from S3
         await s3Service.deleteFile(s3Key);
         logger.info(`Turbosort file deleted from S3 at key: ${s3Key}`);
       } catch (s3Error) {
