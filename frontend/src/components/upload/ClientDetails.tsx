@@ -208,30 +208,19 @@ const ClientDetails: React.FC = () => {
       if (response.status === 'success') {
         // Remove project from state
         setProjects(projects.filter(project => project.id !== projectId));
-        setSuccessMessage('Project deleted successfully');
+        setSuccessMessage('Project deleted successfully. Any uploaded files remain intact.');
         setTimeout(() => setSuccessMessage(null), 3000);
       } else {
         console.error('Failed to delete project:', response.message);
         let errorMessage = response.message || 'Failed to delete project';
         
-        // Check for foreign key constraint error
-        if (response.code === 'P2003' && response.meta?.field_name?.includes('UploadedFile_projectId_fkey')) {
-          errorMessage = 'Cannot delete project because it has uploaded files. Please delete all files first.';
-        }
-        
+        // We no longer need to check for foreign key constraint errors since we're keeping files
         setError(errorMessage);
         setTimeout(() => setError(null), 5000);
       }
     } catch (err: any) {
       console.error('Error deleting project:', err);
-      let errorMessage = 'Failed to delete project';
-      
-      // Check for Prisma error in the caught exception
-      if (err.code === 'P2003' && err.meta?.field_name?.includes('UploadedFile_projectId_fkey')) {
-        errorMessage = 'Cannot delete project because it has uploaded files. Please delete all files first.';
-      }
-      
-      setError(errorMessage);
+      setError('Failed to delete project');
       setTimeout(() => setError(null), 5000);
     }
   };
@@ -405,7 +394,10 @@ const ClientDetails: React.FC = () => {
                           startIcon={<DeleteIcon />}
                           onClick={(e) => {
                             e.stopPropagation(); // Prevent row click from triggering
-                            handleDeleteProject(project.id);
+                            // Show confirmation dialog before deleting
+                            if (window.confirm('Are you sure you want to delete this project? The project metadata will be removed, but any uploaded files will remain intact.')) {
+                              handleDeleteProject(project.id);
+                            }
                           }}
                           className="delete-button"
                           sx={{ 
