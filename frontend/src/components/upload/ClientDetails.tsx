@@ -189,12 +189,27 @@ const ClientDetails: React.FC = () => {
           navigate('/admin/upload');
         }, 1500);
       } else {
-        setError(response.message || 'Failed to delete client');
+        let errorMessage = response.message || 'Failed to delete client';
+        
+        // Check for specific error messages
+        if (response.message && response.message.includes('Foreign key constraint violated')) {
+          errorMessage = 'Cannot delete client because it has projects with uploaded files. Please delete all projects and their files first.';
+        }
+        
+        setError(errorMessage);
         setDeleteDialogOpen(false);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error deleting client:', err);
-      setError('Failed to delete client');
+      
+      let errorMessage = 'Failed to delete client';
+      
+      // Check for server error (500)
+      if (err.response && err.response.status === 500) {
+        errorMessage = 'Cannot delete client because it has projects with uploaded files. Please delete all projects and their files first.';
+      }
+      
+      setError(errorMessage);
       setDeleteDialogOpen(false);
     }
   };
@@ -540,6 +555,9 @@ const ClientDetails: React.FC = () => {
           <Box sx={{ backgroundColor: '#f8f8f8', p: 2, mb: 2 }}>
             <Typography variant="body2" sx={{ mb: 1 }}>
               This will also delete all projects and upload links associated with this client.
+            </Typography>
+            <Typography variant="body2" sx={{ mb: 1 }}>
+              <strong>Note:</strong> You must first delete all projects that have uploaded files before you can delete this client.
             </Typography>
           </Box>
           <Typography variant="body2" color="error">
