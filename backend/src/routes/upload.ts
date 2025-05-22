@@ -875,9 +875,7 @@ router.get('/projects/:projectId', authenticateToken, async (req: Request, res: 
     const tusdOrganizedDir = process.env.TUS_ORGANIZED_DIR || path.join(__dirname, '../../organized');
     if (project.client && project.client.code) {
       // Replace spaces with underscores to match expected directory structure
-      const projectNameWithUnderscores = project.name.replace(/ /g, '_');
-      // Ensure we're using the same naming convention as the file storage system
-      // Replace spaces with underscores to match the file paths
+      // This MUST match exactly how files are stored (Marco_Grade not Marco Grade)
       const projectNameWithUnderscores = project.name.replace(/ /g, '_');
       const tusdProjectPath = path.join(
         tusdOrganizedDir,
