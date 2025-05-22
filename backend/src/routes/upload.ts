@@ -187,10 +187,11 @@ const storage = multer.diskStorage({
       // If not available, we fall back to the local path
       const organizedDir = process.env.TUS_ORGANIZED_DIR || path.join(__dirname, '../../organized');
       
-      // Use the exact project name without any transformations to preserve underscores
+      // Replace spaces with underscores to match expected directory structure
+      const projectNameWithUnderscores = uploadLink.project.name.replace(/ /g, '_');
       const uploadDir = path.join(organizedDir, 
         uploadLink.project.client.code || 'default',
-        uploadLink.project.name
+        projectNameWithUnderscores
       );
 
       if (!fs.existsSync(uploadDir)) { // Use standard fs for sync check
@@ -873,11 +874,12 @@ router.get('/projects/:projectId', authenticateToken, async (req: Request, res: 
     // 2. TUSD organized directory
     const tusdOrganizedDir = process.env.TUS_ORGANIZED_DIR || path.join(__dirname, '../../organized');
     if (project.client && project.client.code) {
-      // Use the exact project name without any transformations to preserve underscores
+      // Replace spaces with underscores to match expected directory structure
+      const projectNameWithUnderscores = project.name.replace(/ /g, '_');
       const tusdProjectPath = path.join(
         tusdOrganizedDir,
         project.client.code,
-        project.name
+        projectNameWithUnderscores
       );
       locations.push(tusdProjectPath);
     }
@@ -885,8 +887,9 @@ router.get('/projects/:projectId', authenticateToken, async (req: Request, res: 
     // 3. TUSD data directory (where uploads are initially stored)
     const tusdDataDir = process.env.TUSD_DATA_DIR || '/srv/tusd-data';
     // Create a project-specific subdirectory in the TUSD data directory
-    // Use the exact project name without any transformations to preserve underscores
-    const tusdProjectPath = path.join(tusdDataDir, project.client?.code || 'default', project.name);
+    // Replace spaces with underscores to match expected directory structure
+    const projectNameWithUnderscores = project.name.replace(/ /g, '_');
+    const tusdProjectPath = path.join(tusdDataDir, project.client?.code || 'default', projectNameWithUnderscores);
     locations.push(tusdProjectPath);
     
     // Try to find .turbosort file in any of the locations
@@ -911,10 +914,11 @@ router.get('/projects/:projectId', authenticateToken, async (req: Request, res: 
     if (turbosortContent === null && project.client && project.client.code) {
       try {
         // Generate S3 key based on client and project name
-        // Use the exact project name without any transformations to preserve underscores
+        // Replace spaces with underscores to match expected directory structure
+        const projectNameWithUnderscores = project.name.replace(/ /g, '_');
         const s3Key = s3Service.generateKey(
           project.client.code,
-          project.name,
+          projectNameWithUnderscores,
           '.turbosort'
         );
 
