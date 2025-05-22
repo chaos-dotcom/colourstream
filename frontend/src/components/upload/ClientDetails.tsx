@@ -201,7 +201,9 @@ const ClientDetails: React.FC = () => {
 
   const handleDeleteProject = async (projectId: string) => {
     try {
+      console.log('Attempting to delete project:', projectId);
       const response = await deleteProject(projectId);
+      console.log('Delete project response:', response);
       
       if (response.status === 'success') {
         // Remove project from state
@@ -209,10 +211,14 @@ const ClientDetails: React.FC = () => {
         setSuccessMessage('Project deleted successfully');
         setTimeout(() => setSuccessMessage(null), 3000);
       } else {
+        console.error('Failed to delete project:', response.message);
         setError(response.message || 'Failed to delete project');
+        setTimeout(() => setError(null), 3000);
       }
     } catch (err) {
+      console.error('Error deleting project:', err);
       setError('Failed to delete project');
+      setTimeout(() => setError(null), 3000);
     }
   };
 
@@ -258,6 +264,12 @@ const ClientDetails: React.FC = () => {
       {successMessage && (
         <Alert severity="success" sx={{ mb: 3, borderRadius: 0 }} onClose={() => setSuccessMessage(null)}>
           {successMessage}
+        </Alert>
+      )}
+      
+      {error && (
+        <Alert severity="error" sx={{ mb: 3, borderRadius: 0 }} onClose={() => setError(null)}>
+          {error}
         </Alert>
       )}
       
