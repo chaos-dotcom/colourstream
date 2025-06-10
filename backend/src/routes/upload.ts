@@ -598,7 +598,7 @@ router.post('/upload/:token', upload.array('files'), async (req: Request, res: R
           token: token,
           clientName: uploadLink.project.client.name,
           projectName: uploadLink.project.name,
-          storage: useS3 ? 's3' : 'local'
+          storage: 'local'
         },
         createdAt: new Date(),
       });
@@ -663,7 +663,7 @@ router.post('/upload/:token', upload.array('files'), async (req: Request, res: R
             clientName: uploadLink.project.client.name,
             projectName: uploadLink.project.name,
             error: error instanceof Error ? error.message : 'Unknown error',
-            storage: useS3 ? 's3' : 'local'
+            storage: 'local'
           },
           createdAt: new Date(),
           isComplete: true
