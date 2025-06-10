@@ -856,44 +856,6 @@ router.get('/projects/:projectId', authenticateToken, async (req: Request, res: 
       }
     }
     
-    // If not found in any local location and we have client info, try to get from S3
-    if (turbosortContent === null && project.client && project.client.code) {
-      try {
-        // Generate S3 key based on client and project name
-        // Replace spaces with underscores to match expected directory structure
-        const projectNameWithUnderscores = project.name.replace(/ /g, '_');
-        const s3Key = s3Service.generateKey(
-          project.client.code,
-          projectNameWithUnderscores,
-          '.turbosort'
-        );
-
-        // Try to get the file from S3
-        const s3Object = await s3Service.getFileContent(s3Key);
-        if (s3Object) {
-          turbosortContent = s3Object.toString('utf8').trim();
-          logger.info(`Retrieved .turbosort file from S3 with content: ${turbosortContent}`);
-          
-          // Cache the S3 content locally in all locations
-          for (const location of locations) {
-            try {
-              if (!fs.existsSync(location)) {
-                fs.mkdirSync(location, { recursive: true });
-              }
-              const turbosortPath = path.join(location, '.turbosort');
-              fs.writeFileSync(turbosortPath, turbosortContent);
-              logger.info(`Cached turbosort file from S3 to local path: ${turbosortPath}`);
-            } catch (fsError) {
-              logger.error(`Failed to cache turbosort file to ${location}:`, fsError);
-              // Continue to next location
-            }
-          }
-        }
-      } catch (s3Error) {
-        logger.error('Failed to get turbosort file from S3:', s3Error);
-        // Don't fail the request if we can't get the file from S3
-      }
-    }
 
     // Add the turbosort content to the response
     res.json({
@@ -1393,34 +1355,6 @@ router.post('/projects/:projectId/turbosort', authenticateToken, async (req: Req
       }
     }
 
-    // Also save the .turbosort file to S3 if project has a client
-    if (project.client && project.client.code) {
-      try {
-        // Generate S3 key based on client and project name
-        const s3Key = s3Service.generateKey(
-          project.client.code,
-          project.name,
-          '.turbosort'
-        );
-
-        // Upload the .turbosort file to S3
-        await s3Service.uploadFile(
-          Buffer.from(directory),
-          s3Key,
-          'text/plain',
-          {
-            clientName: project.client.name,
-            projectName: project.name,
-            turbosortDirectory: 'true'
-          }
-        );
-
-        logger.info(`Turbosort file uploaded to S3 at key: ${s3Key}`);
-      } catch (s3Error) {
-        logger.error('Failed to upload turbosort file to S3:', s3Error);
-        // Don't fail the request if S3 upload fails, we still have the local files
-      }
-    }
 
     res.json({
       status: 'success',
@@ -1504,26 +1438,6 @@ router.delete('/projects/:projectId/turbosort', authenticateToken, async (req: R
       }
     }
 
-    // Also delete from S3 if project has a client
-    if (project.client && project.client.code) {
-      try {
-        // Generate S3 key based on client and project name
-        // Replace spaces with underscores to match expected directory structure
-        const projectNameWithUnderscores = project.name.replace(/ /g, '_');
-        const s3Key = s3Service.generateKey(
-          project.client.code,
-          projectNameWithUnderscores,
-          '.turbosort'
-        );
-
-        // Delete ONLY the .turbosort file from S3
-        await s3Service.deleteFile(s3Key);
-        logger.info(`Turbosort file deleted from S3 at key: ${s3Key}`);
-      } catch (s3Error) {
-        logger.error('Failed to delete turbosort file from S3:', s3Error);
-        // Don't fail the request if S3 deletion fails
-      }
-    }
 
     res.json({
       status: 'success',
