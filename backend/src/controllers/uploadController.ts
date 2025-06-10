@@ -214,25 +214,6 @@ export const handleProcessFinishedUpload = async (req: Request, res: Response): 
       // Construct URL if applicable (depends on how files are served)
       // finalUrl = `http://your-file-server/${finalPath}`; // Example
 
-    } else if (storageType === 's3store') {
-      logger.info(`[ProcessFinished:${uploadId}] Processing s3store upload.`);
-      if (!token) {
-          throw new Error(`Token is missing, cannot process S3 upload for ${uploadId}.`);
-      }
-      const s3Processed = await s3FileProcessor.processFile(uploadId, token);
-
-      if (!s3Processed) {
-        throw new Error(`S3 file processing failed for upload ${uploadId}.`);
-      }
-
-      const updatedFile = await prisma.uploadedFile.findUnique({ where: { id: uploadId } });
-      if (!updatedFile || !updatedFile.path) {
-          throw new Error(`Failed to retrieve updated file details from DB after S3 processing for ${uploadId}.`);
-      }
-      finalPath = updatedFile.path; // Assign finalPath
-      finalUrl = updatedFile.url; // Assign finalUrl
-      finalStorageType = 's3'; // Ensure DB reflects S3 storage
-
     } else {
       throw new Error(`Unsupported storage type '${storageType}' for upload ${uploadId}.`);
     }
