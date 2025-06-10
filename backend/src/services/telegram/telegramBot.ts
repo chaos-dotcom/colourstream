@@ -387,7 +387,11 @@ export class TelegramBot {
     uploadSpeed?: number;
     storage?: string;
     terminated?: boolean;
-  }): Promise<boolean> {
+  }, hookType?: string): Promise<boolean> {
+    // For termination hooks, always send notification regardless of progress
+    if (hookType === 'post-terminate') {
+      this.lastReportedProgress.set(uploadInfo.id, -Infinity);
+    }
     const { id, size, offset, metadata, isComplete, uploadSpeed, createdAt, terminated } = uploadInfo;
 
     logger.info(`[sendUploadNotification] Received data for ID ${id}: size=${size}, offset=${offset}, filename=${metadata?.filename}, client=${metadata?.clientName}, project=${metadata?.projectName}, isComplete=${isComplete}, speed=${uploadSpeed}, terminated=${terminated}`);
