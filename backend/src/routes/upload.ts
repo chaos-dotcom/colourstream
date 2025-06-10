@@ -533,7 +533,6 @@ router.post('/upload/:token', upload.array('files'), async (req: Request, res: R
   try {
     const { token } = req.params;
     const files = multerReq.files;
-    const useS3 = req.query.S3 === 'true';
 
     const uploadLink = await prisma.uploadLink.findUnique({
       where: { token },
