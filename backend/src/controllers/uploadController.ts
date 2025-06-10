@@ -6,7 +6,6 @@ import { PrismaClient, Project, Client } from '@prisma/client'; // Add Project, 
 import xxhash from 'xxhash-wasm';
 import { logger } from '../utils/logger'; // Correct path
 import { getTelegramBot } from '../services/telegram/telegramBot';
-import { s3FileProcessor } from '../services/s3/s3FileProcessor'; // Needed for S3 processing
 import { uploadTracker } from '../services/uploads/uploadTracker'; // Import uploadTracker
 
 // Initialize Prisma Client
