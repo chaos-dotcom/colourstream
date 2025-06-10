@@ -391,6 +391,7 @@ export class TelegramBot {
     // For termination hooks, always send notification regardless of progress
     if (hookType === 'post-terminate') {
       this.lastReportedProgress.set(uploadInfo.id, -Infinity);
+      uploadInfo.terminated = true;
     }
     const { id, size, offset, metadata, isComplete, uploadSpeed, createdAt, terminated } = uploadInfo;
 
