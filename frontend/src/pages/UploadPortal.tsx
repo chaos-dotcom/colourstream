@@ -180,6 +180,7 @@ const UploadPortal: React.FC = () => {
   const [projectInfo, setProjectInfo] = useState<UploadLinkResponse | null>(null);
   const [uppy, setUppy] = useState<Uppy<CustomFileMeta, Record<string, never>> | null>(null); // Use correct Uppy generic type
   const [accentColor, setAccentColor] = useState('#1d70b8');
+  const [pageIsVisible, setPageIsVisible] = useState(true); // Track if page is visible
   // --- End moved state declarations ---
   // Removed check for 'tusd' query parameter
   // const useTusd = searchParams.get('tusd') === 'true';
@@ -598,6 +599,19 @@ const UploadPortal: React.FC = () => {
   // Removed useS3 dependency as it's not used anymore
   }, [token]);
 
+  // Add visibility change listener to detect background tabs
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setPageIsVisible(document.visibilityState === 'visible');
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
   const renderHeader = () => (
     <StyledAppBar position="static">
       <Box sx={{ height: '6px', width: '100%', bgcolor: '#ff00ff', display: 'flex' }}>
@@ -682,6 +696,19 @@ const UploadPortal: React.FC = () => {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       {renderHeader()}
+
+      {/* Warning banner when tab is in background */}
+      {!pageIsVisible && (
+        <Alert severity="warning" sx={{ 
+          borderRadius: 0, 
+          textAlign: 'center',
+          position: 'sticky',
+          top: 0,
+          zIndex: 1000
+        }}>
+          Uploads may pause/slow when this tab is in background. Keep this tab active for best performance.
+        </Alert>
+      )}
 
       <Container maxWidth="lg" sx={{ py: 6, flexGrow: 1 }}>
         <Typography variant="h3" component="h1" gutterBottom sx={{
