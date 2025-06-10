@@ -8,11 +8,8 @@ import { v4 as uuidv4 } from 'uuid';
 import xxhash from 'xxhash-wasm';
 import { authenticateToken } from '../middleware/auth';
 import { uploadTracker } from '../services/uploads/uploadTracker';
-import { s3Service } from '../services/s3/s3Service';
-import { s3FileProcessor } from '../services/s3/s3FileProcessor'; // Corrected casing
 import { logger } from '../utils/logger';
 import { getTelegramBot } from '../services/telegram/telegramBot';
-import { CompletedPart } from '@aws-sdk/client-s3';
 // Import the controller function for the finished upload hook
 import { handleProcessFinishedUpload } from '../controllers/uploadController';
 
