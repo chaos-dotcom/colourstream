@@ -17,6 +17,7 @@ export class TelegramBot {
   private baseUrl: string;
   private messageIdCache: Map<string, number>; // In-memory cache for message IDs
   private uploadInfoCache: Map<string, any> = new Map<string, any>(); // Cache for upload information
+  private lastReportedProgress: Map<string, number> = new Map<string, number>(); // Cache for last reported progress percentage
 
   constructor(config: TelegramConfig) {
     this.botToken = config.botToken;
@@ -128,9 +129,10 @@ export class TelegramBot {
   public async cleanupUploadMessage(uploadId: string): Promise<boolean> {
     console.log(`[TELEGRAM-DEBUG] Cleaning up message ID for upload ${uploadId}`);
     try {
-      // Remove from the in-memory cache first
+      // Remove from the in-memory caches first
       this.messageIdCache.delete(uploadId);
-      this.uploadInfoCache.delete(uploadId); // Also clear related upload info cache
+      this.uploadInfoCache.delete(uploadId);
+      this.lastReportedProgress.delete(uploadId); // Also clear last reported progress
 
       // Check if our model exists yet (after migration) to avoid runtime errors
       // @ts-ignore - We're checking this at runtime
@@ -414,6 +416,16 @@ export class TelegramBot {
     // Calculate progress percentage
     const progress = size > 0 ? Math.round((offset / size) * 100) : 0;
     
+    // Rate limit: only send every 5% change or for termination/completion
+    const lastReported = this.lastReportedProgress.get(id) ?? -Infinity;
+    const progressDiff = progress - lastReported;
+    const shouldSend = isTerminated || actuallyComplete || progress >= 100 || progressDiff >= 5;
+
+    if (!shouldSend) {
+      console.log(`[TELEGRAM-DEBUG] Skipping notification for upload ${id} at ${progress}% (last reported: ${lastReported}%, diff: ${progressDiff}%)`);
+      return true; // Skip notification but return success
+    }
+    
     // Format file size in human-readable format
     const formatFileSize = (bytes: number): string => {
       if (bytes < 1024) return `${bytes} B`;
@@ -556,6 +568,11 @@ export class TelegramBot {
 
     // Send message with upload ID for editing
     const success = await this.sendMessage(message, id);
+    
+    // Update last reported progress on successful send
+    if (success) {
+      this.lastReportedProgress.set(id, progress);
+    }
     
     // If upload is complete/terminated and the notification was sent/edited successfully,
     // schedule cleanup after a delay to ensure the completion message is visible
