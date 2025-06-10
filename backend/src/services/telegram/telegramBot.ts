@@ -466,6 +466,7 @@ export class TelegramBot {
     // Create message with upload details and fewer emojis
     let message = '';
     if (isTerminated) {
+      console.log(`[TELEGRAM-DEBUG] Preparing termination message for upload ${id}`);
       message = `<b>❌ Upload Terminated</b>\n`;
     } else if (actuallyComplete) {
       message = `<b>✅ Upload Completed!</b>\n`;
@@ -566,8 +567,19 @@ export class TelegramBot {
       console.log(`[TELEGRAM-DEBUG] Sending new message for upload ${id}`);
     }
 
+    // For termination, log the message we are about to send
+    if (isTerminated) {
+      console.log(`[TELEGRAM-DEBUG] Termination message for upload ${id}:`);
+      console.log(message);
+    }
+
     // Send message with upload ID for editing
     const success = await this.sendMessage(message, id);
+
+    // For termination, log the result
+    if (isTerminated) {
+      console.log(`[TELEGRAM-DEBUG] Termination message for upload ${id} sent with result: ${success}`);
+    }
     
     // Update last reported progress on successful send
     if (success) {
