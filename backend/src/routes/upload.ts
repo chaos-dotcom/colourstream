@@ -1246,8 +1246,43 @@ router.post('/hook-progress', async (req: Request, res: Response) => {
         // Prevent the default success response below.
         return;
 
-      // Removed the conflicting 'post-terminate' case from this handler.
-      // It is now correctly handled by TusdHooksController via tusdHooksRoutes.ts
+      case 'post-terminate':
+        logger.info(`[Hook Progress] Received 'post-terminate' hook for ${uploadId}. Sending termination notification.`);
+
+        // Get the last known details for the upload
+        let terminatingDetails = await getUploadDetails(uploadId);
+
+        if (!terminatingDetails) {
+          logger.warn(`[Hook Progress] Failed to get details for terminated upload ${uploadId}. Using defaults.`);
+          // Try to use cache or set defaults
+          terminatingDetails = tusdProgressCache.get(uploadId) || {
+            token: 'Unknown',
+            clientName: 'Unknown Client',
+            projectName: 'Unknown Project',
+            filename: 'Unknown Filename',
+            size: 0,
+            storage: 'local'
+          };
+        }
+
+        // Send termination notification
+        if (telegramBot) {
+          await telegramBot.sendUploadNotification({
+            id: uploadId,
+            size: terminatingDetails.size ?? 0,
+            offset: offset ? Number(offset) : 0, // Use the offset from the hook if available, else 0
+            metadata: {
+              filename: terminatingDetails.filename || 'Unknown Filename',
+              clientName: terminatingDetails.clientName || 'Unknown Client',
+              projectName: terminatingDetails.projectName || 'Unknown Project',
+              token: terminatingDetails.token || 'Unknown',
+            },
+            terminated: true
+          });
+        } else {
+          logger.warn(`[Hook Progress] Telegram bot not available, skipping termination notification for ${uploadId}`);
+        }
+        break;
 
       default:
         // Use hookType in the log message
