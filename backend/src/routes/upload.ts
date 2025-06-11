@@ -18,9 +18,6 @@ const prisma = new PrismaClient();
 
 // Removed the separate /process-finished route, as all hooks go to /hook-progress now.
 // router.post('/process-finished', handleProcessFinishedUpload);
-
-// Note: This is basic and will be lost on server restart.
-// Consider Redis or a database for production.
 interface TusdUploadInfo {
   token: string;
   clientName?: string;
@@ -1071,14 +1068,6 @@ router.get('/upload-links-all', authenticateToken, async (req: Request, res: Res
   }
 });
 
-
-// --- Redundant /tusd-hook endpoint removed ---
-
-
-
-
-
-
 // --- NEW: Tusd Hook Progress Handler ---
 // Endpoint called by Tusd HTTP hooks (post-create, post-receive, post-finish, post-terminate)
 router.post('/hook-progress', async (req: Request, res: Response) => {
@@ -1097,7 +1086,6 @@ router.post('/hook-progress', async (req: Request, res: Response) => {
 
   if (!telegramBot) {
     logger.error(`[Hook Progress:${uploadId}] Telegram bot not initialized.`);
-    // Don't fail the hook, just log
     // Don't fail the hook, just log
     // Allow processing to continue without Telegram if needed
   }
@@ -1230,17 +1218,6 @@ router.post('/hook-progress', async (req: Request, res: Response) => {
       case 'post-finish':
         // Upload is fully received by Tusd. Trigger final processing.
         logger.info(`[Hook Progress] Received 'post-finish' hook for ${uploadId}. Triggering final processing.`);
-        // Call the controller function, passing the correct uploadId extracted from the hook payload.
-        // The controller will read the .info file using this ID.
-        // We need to pass a modified request or just the ID. Let's pass req/res for now.
-        // The controller already expects to extract uploadId from req.body (which we set up for the 'finished' case previously).
-        // We need to ensure the controller *can* get the ID from the *actual* hook payload structure.
-        // Let's modify the call to pass the ID explicitly for clarity, and adjust the controller.
-        // handleProcessFinishedUpload(req, res); // Old call
-        // Instead of passing req/res, we'll just trigger the logic.
-        // The controller needs refactoring to accept just the ID and fetch info.
-        // For now, let's adapt the controller call slightly:
-        // Create a simplified body for the controller to parse temporarily
         req.body = { uploadId: uploadId }; // Overwrite req.body for the controller
         handleProcessFinishedUpload(req, res);
         // Prevent the default success response below.
@@ -1301,11 +1278,6 @@ router.post('/hook-progress', async (req: Request, res: Response) => {
   }
 });
 // --- End Tusd Hook Progress Handler ---
-
-
-// The duplicate /s3-callback endpoint below was removed as it was erroneous and redundant.
-// The correct /s3-callback endpoint is defined earlier in the file (around line 1180).
-
 // Set turbosort directory for a project
 // Note: The turbosort directory is stored in a .turbosort file in the project directory,
 // not in the database. This allows for easier integration with external file-based tools.
