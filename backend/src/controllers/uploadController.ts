@@ -160,8 +160,10 @@ export const handleProcessFinishedUpload = async (req: Request, res: Response): 
     const sanitizedProjectName = sanitizePathString(projectName);
     const sanitizedFilename = sanitizePathString(originalFilename); // Define sanitizedFilename
 
-    const sourceDataPath = infoPayload.Storage.Path;
-    const sourceInfoPath = infoPayload.Storage.InfoPath;
+    // ** FIX **: Reconstruct source paths using the backend's known TUSD_DATA_DIR
+    // This avoids path mismatches (e.g., /tusd_data vs /srv/tusd_data) between containers.
+    const sourceDataPath = path.join(tusdDataDir, infoPayload.ID);
+    const sourceInfoPath = path.join(tusdDataDir, `${infoPayload.ID}.info`);
     const storageType = infoPayload.Storage.Type;
 
     // Declare variables needed later
@@ -195,14 +197,18 @@ export const handleProcessFinishedUpload = async (req: Request, res: Response): 
       logger.info(`[ProcessFinished:${uploadId}] Ensuring metadata directory exists: ${finalMetadataDir}`);
       await fs.mkdir(finalMetadataDir, { recursive: true });
 
-      // Move Files (Data first, then Info)
-      logger.info(`[ProcessFinished:${uploadId}] Moving data file from ${sourceDataPath} to ${absoluteDestFilePath}`);
-      await fs.rename(sourceDataPath, absoluteDestFilePath);
-      logger.info(`[ProcessFinished:${uploadId}] Successfully moved data file.`);
+      // ** FIX **: Copy and then delete files for robustness across filesystems (e.g., Docker volumes)
+      logger.info(`[ProcessFinished:${uploadId}] Copying data file from ${sourceDataPath} to ${absoluteDestFilePath}`);
+      await fs.copyFile(sourceDataPath, absoluteDestFilePath);
+      logger.info(`[ProcessFinished:${uploadId}] Successfully copied data file. Deleting original.`);
+      await fs.unlink(sourceDataPath);
+      logger.info(`[ProcessFinished:${uploadId}] Successfully deleted original data file.`);
 
       logger.info(`[ProcessFinished:${uploadId}] Moving info file from ${sourceInfoPath} to ${absoluteDestInfoPath}`);
       try {
-        await fs.rename(sourceInfoPath, absoluteDestInfoPath);
+        // Also copy/delete the info file for consistency and robustness
+        await fs.copyFile(sourceInfoPath, absoluteDestInfoPath);
+        await fs.unlink(sourceInfoPath);
         logger.info(`[ProcessFinished:${uploadId}] Successfully moved info file.`);
       } catch (infoMoveError) {
         logger.warn(`[ProcessFinished:${uploadId}] Failed to move info file (non-critical):`, infoMoveError);
