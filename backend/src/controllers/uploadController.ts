@@ -174,16 +174,14 @@ export const handleProcessFinishedUpload = async (req: Request, res: Response): 
     if (storageType === 'filestore') {
       logger.info(`[ProcessFinished:${uploadId}] Processing filestore upload.`);
 
-      // Define Destination Paths (relative to tusdDataDir for consistency)
+      // Define Destination Paths
       const relativeDestDir = path.join(sanitizedClientCode, sanitizedProjectName);
-      const relativeDestMetadataDir = path.join(relativeDestDir, '.metadata');
-      const relativeDestFilePath = path.join(relativeDestDir, sanitizedFilename);
-      const relativeDestInfoPath = path.join(relativeDestMetadataDir, `${sanitizedFilename}.info`);
+      const finalDestDir = path.join(tusdDataDir, relativeDestDir); // The main destination folder
+      const finalMetadataDir = path.join(finalDestDir, '.metadata');
 
-      // Absolute paths for file operations
-      const absoluteDestMetadataDir = path.join(tusdDataDir, relativeDestMetadataDir);
-      absoluteDestFilePath = path.join(tusdDataDir, relativeDestFilePath); // Assign value here
-      const absoluteDestInfoPath = path.join(tusdDataDir, relativeDestInfoPath);
+      const relativeDestFilePath = path.join(relativeDestDir, sanitizedFilename);
+      absoluteDestFilePath = path.join(finalDestDir, sanitizedFilename);
+      const absoluteDestInfoPath = path.join(finalMetadataDir, `${sanitizedFilename}.info`);
 
       logger.info(`[ProcessFinished:${uploadId}] Calculated paths:`);
       logger.info(`  Source Data: ${sourceDataPath}`);
@@ -192,8 +190,10 @@ export const handleProcessFinishedUpload = async (req: Request, res: Response): 
       logger.info(`  Dest Info:   ${absoluteDestInfoPath}`);
 
       // Create Directories
-      logger.info(`[ProcessFinished:${uploadId}] Ensuring destination directories exist: ${absoluteDestMetadataDir}`);
-      await fs.mkdir(absoluteDestMetadataDir, { recursive: true });
+      logger.info(`[ProcessFinished:${uploadId}] Ensuring destination directory exists: ${finalDestDir}`);
+      await fs.mkdir(finalDestDir, { recursive: true });
+      logger.info(`[ProcessFinished:${uploadId}] Ensuring metadata directory exists: ${finalMetadataDir}`);
+      await fs.mkdir(finalMetadataDir, { recursive: true });
 
       // Move Files (Data first, then Info)
       logger.info(`[ProcessFinished:${uploadId}] Moving data file from ${sourceDataPath} to ${absoluteDestFilePath}`);
