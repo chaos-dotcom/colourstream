@@ -139,12 +139,24 @@ const RoomView: React.FC<RoomViewProps> = ({ isPasswordProtected = false, isPres
 
           console.log('Using stream URL:', streamUrl);
 
+          const videoUrlHostname = new URL(VIDEO_URL).hostname;
+          const stunTurnPort = 3478;
+
           playerRef.current = player.create('player_id', {
             autoStart: true,
             mute: true,
             webrtcConfig: {
               iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' }
+                {
+                  urls: [
+                    `stun:${videoUrlHostname}:${stunTurnPort}`,
+                    `turn:${videoUrlHostname}:${stunTurnPort}?transport=udp`,
+                    `turn:${videoUrlHostname}:${stunTurnPort}?transport=tcp`,
+                  ],
+                  // Add username and credential fields here if your TURN server requires authentication
+                  // username: "your_turn_username",
+                  // credential: "your_turn_password",
+                }
               ],
               debug: true
             },
