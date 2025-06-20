@@ -10,6 +10,9 @@ interface RuntimeConfig {
   OVENPLAYER_SCRIPT_URL: string;
   UPLOAD_ENDPOINT_URL: string;
   NAMEFORUPLOADCOMPLETION: string;
+  // TURN server credentials
+  TURN_SERVER_USERNAME?: string;
+  TURN_SERVER_CREDENTIAL?: string;
   // S3 configuration
   S3_PUBLIC_ENDPOINT: string;
   S3_REGION: string;
@@ -95,6 +98,10 @@ const getConfig = (key: keyof RuntimeConfig): string => {
       return envValue || '';
     case 'GOOGLE_DRIVE_APP_ID':
       return envValue || '';
+    case 'TURN_SERVER_USERNAME':
+      return envValue || '';
+    case 'TURN_SERVER_CREDENTIAL':
+      return envValue || '';
     default:
       return envValue || '';
   }
@@ -111,6 +118,9 @@ export const VIDEO_URL = getConfig('VIDEO_URL');
 export const OVENPLAYER_SCRIPT_URL = getConfig('OVENPLAYER_SCRIPT_URL');
 export const UPLOAD_ENDPOINT_URL = getConfig('UPLOAD_ENDPOINT_URL');
 export const NAMEFORUPLOADCOMPLETION = getConfig('NAMEFORUPLOADCOMPLETION');
+// Export TURN server credentials
+export const TURN_SERVER_USERNAME = getConfig('TURN_SERVER_USERNAME');
+export const TURN_SERVER_CREDENTIAL = getConfig('TURN_SERVER_CREDENTIAL');
 // Export S3 configuration
 export const S3_PUBLIC_ENDPOINT = getConfig('S3_PUBLIC_ENDPOINT');
 export const S3_REGION = getConfig('S3_REGION');
@@ -139,6 +149,8 @@ if (typeof window !== 'undefined') {
     OVENPLAYER_SCRIPT_URL,
     UPLOAD_ENDPOINT_URL,
     NAMEFORUPLOADCOMPLETION,
+    TURN_SERVER_USERNAME,
+    TURN_SERVER_CREDENTIAL,
     S3_PUBLIC_ENDPOINT,
     S3_REGION,
     S3_BUCKET,
@@ -165,6 +177,8 @@ export default {
   OVENPLAYER_SCRIPT_URL,
   UPLOAD_ENDPOINT_URL,
   NAMEFORUPLOADCOMPLETION,
+  TURN_SERVER_USERNAME,
+  TURN_SERVER_CREDENTIAL,
   S3_PUBLIC_ENDPOINT,
   S3_REGION,
   S3_BUCKET,

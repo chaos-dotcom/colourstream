@@ -29,7 +29,9 @@ import {
   WEBRTC_WS_PROTOCOL,
   WEBRTC_APP_PATH,
   VIDEO_URL,
-  API_URL
+  API_URL,
+  TURN_SERVER_USERNAME,
+  TURN_SERVER_CREDENTIAL,
 } from '../config';
 
 export interface RoomViewProps {
@@ -153,9 +155,8 @@ const RoomView: React.FC<RoomViewProps> = ({ isPasswordProtected = false, isPres
                     `turn:${videoUrlHostname}:${stunTurnPort}?transport=udp`,
                     `turn:${videoUrlHostname}:${stunTurnPort}?transport=tcp`,
                   ],
-                  // Add username and credential fields here if your TURN server requires authentication
-                  // username: "your_turn_username",
-                  // credential: "your_turn_password",
+                  username: TURN_SERVER_USERNAME,
+                  credential: TURN_SERVER_CREDENTIAL,
                 }
               ],
               debug: true
