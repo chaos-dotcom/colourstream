@@ -459,7 +459,7 @@ services:
        - "-disable-download=true" # Disable direct downloads, handled by backend
      networks: # Added network definition
        - network
-    labels:
+     labels:
       - "traefik.enable=false"
   coturn:
     image: coturn/coturn
