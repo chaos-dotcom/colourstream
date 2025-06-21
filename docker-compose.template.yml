@@ -183,7 +183,7 @@ services:
       - "traefik.http.middlewares.websocket-headers.headers.customrequestheaders.Upgrade=websocket"
 
   traefik:
-    image: traefik:v3.3.3
+    image: traefik:v3.4.1
     restart: always
     command:
       - "--api.dashboard=true"
@@ -231,12 +231,11 @@ services:
     ports:
       - "8081:8081/tcp" # OVT(Origin)1
       - "8082:8082/tcp" # OVT(Origin)2
-      - "9000:9000/tcp" # OVT(Origin)
+      - "9002:9000/tcp" # OVT(Origin)
       - "1935:1935/tcp" # RTMP Provider
       - "9999:9999" # SRT
       - "3333:3333" # WebRTC Signaling / LLHLS
       - "3334:3334" # TLS WebRTC Signaling / LLHLS
-      - "3478:3478/tcp" # WebRTC TURN
       - "10000-10004:10000-10004/udp" # WebRTC Candidate
     environment:
       # Use domain name instead of IP address for WebRTC ICE candidates
@@ -440,7 +439,6 @@ services:
      restart: unless-stopped # Restart policy
      volumes:
        - /Volumes/Backup3/tusd-data:/srv/tusd-data # Map a local directory for file storage
-       # - ./tusd-hooks:/etc/tusd/hooks # Removed script hook directory mount
        - ./certs/certs/tusd.colourstream.${DOMAIN}.crt:/etc/tusd/tusd.crt:ro # Mount the TLS certificate
        - ./certs/private/tusd.colourstream.${DOMAIN}.key:/etc/tusd/tusd.key:ro # Mount the TLS key
      entrypoint: /usr/local/bin/tusd # Explicitly set the entrypoint
@@ -458,9 +456,21 @@ services:
        # Specify which events trigger hooks (all sent to the same URL)
        - "-hooks-enabled-events=post-create,post-receive,post-finish,post-terminate"
        - "-enable-h2c" # This might conflict with TLS, review if needed
+       - "-disable-download=true" # Disable direct downloads, handled by backend
      networks: # Added network definition
        - network
-
+    labels:
+      - "traefik.enable=false"
+  coturn:
+    image: coturn/coturn
+    container_name: colourstream-coturn
+    network_mode: "host"
+    user: "root"
+    restart: unless-stopped
+    volumes:
+      - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+      - ./certs/certs/video.colourstream..${DOMAIN}.crt:/etc/turnserver.pem
+      - ./certs/private/video.colourstream..${DOMAIN}.key:/etc/turnserver.key
 volumes:
   postgres_data:
     name: colourstream_postgres_data
