@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useLocation, useSearchParams } from 'react-router-dom';
+import { useParams, useLocation, } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -17,13 +17,11 @@ import {
 import { styled } from '@mui/material/styles';
 import { Dashboard } from '@uppy/react';
 import Uppy from '@uppy/core';
-// Import both Tus and AwsS3 plugins
+// Import Tus plugins
 import Tus from '@uppy/tus'; 
-import AwsS3 from '@uppy/aws-s3'; // Re-add AwsS3
 import Dropbox from '@uppy/dropbox';
 import GoogleDrivePicker from '@uppy/google-drive-picker';
 import type { UppyFile } from '@uppy/core';
-
 import '@uppy/core/dist/style.min.css';
 import '@uppy/dashboard/dist/style.min.css';
 import { getUploadLink } from '../services/uploadService';
@@ -31,7 +29,6 @@ import {
   API_URL,
   NAMEFORUPLOADCOMPLETION,
   COMPANION_URL,
-  USE_COMPANION,
   ENABLE_DROPBOX,
   ENABLE_GOOGLE_DRIVE,
   GOOGLE_DRIVE_CLIENT_ID,
@@ -158,7 +155,7 @@ const UPLOAD_METHOD_CHOICE: 'tus' | 's3' = 'tus'; // <-- SET YOUR CHOICE HERE ('
 // Main upload portal for clients (standalone page not requiring authentication)
 const UploadPortal: React.FC = () => {
   const { token } = useParams<{ token: string }>();
-  const location = useLocation();
+  // const location = useLocation(); // commented out as it's not used - not sure if it should be used later
   // Removed useSearchParams as it's no longer needed for method choice
   // const [searchParams] = useSearchParams();
   // --- Move state declarations outside useEffect ---
