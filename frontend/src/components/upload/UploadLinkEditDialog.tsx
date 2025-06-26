@@ -6,7 +6,6 @@ import {
   DialogActions,
   Button,
   TextField,
-  FormControl,
   FormControlLabel,
   Checkbox,
   Box,

@@ -1,14 +1,14 @@
-import axios, { AxiosError, AxiosRequestConfig } from 'axios';
+import axios from 'axios';
 import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
 import type {
   ApiResponse,
   AuthResponse,
   PasskeyInfo,
   WebAuthnRegistrationResponse,
-  WebAuthnRegistrationOptions,
-  WebAuthnAuthenticationOptions,
+  // WebAuthnRegistrationOptions, // Removed as unused
+  // WebAuthnAuthenticationOptions, // Removed as unused
 } from '../types';
-import { API_URL, OIDC_AUTH_ENDPOINT } from '../config';
+import { API_URL } from '../config';
 
 // Create axios instance with retry capability
 export const api = axios.create({

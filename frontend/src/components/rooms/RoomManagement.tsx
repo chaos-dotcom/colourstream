@@ -3,11 +3,6 @@ import {
   Box,
   Typography,
   CircularProgress,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   IconButton,
   Tooltip,
   Dialog,
@@ -15,7 +10,6 @@ import {
   DialogContent,
   DialogTitle,
   TextField,
-  Alert,
   Snackbar
 } from '@mui/material';
 import {
@@ -23,9 +17,6 @@ import {
   VisibilityOff,
   ContentCopy,
   OpenInNew,
-  Delete,
-  PlayArrow,
-  Stop,
   Link as LinkIcon
 } from '@mui/icons-material';
 import { 

@@ -9,9 +9,7 @@ import {
   Container,
   Breadcrumbs,
   Link,
-  Paper,
 } from '@mui/material';
-import { styled } from '@mui/material/styles';
 import ClientList from './ClientList';
 import ProjectList from './ProjectList';
 import CreateClientForm from './CreateClientForm';

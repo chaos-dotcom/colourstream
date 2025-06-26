@@ -1,5 +1,12 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
+import React, { 
+  useEffect, 
+  useRef, 
+  useState 
+} from 'react';
+import { 
+  useParams, 
+  useLocation 
+} from 'react-router-dom';
 import {
   Box,
   Button,
@@ -8,20 +15,12 @@ import {
   Container,
   Paper,
   CircularProgress,
-  IconButton,
-  Tooltip,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
 } from '@mui/material';
-import { ContentCopy } from '@mui/icons-material';
 import Cookies from 'js-cookie';
-import { validateRoomAccess, RoomConfig, generateMirotalkToken, TokenGenerationRequest } from '../utils/api';
+import { 
+  validateRoomAccess, 
+  RoomConfig 
+} from '../utils/api';
 import {
   OVENPLAYER_SCRIPT_URL,
   WEBRTC_WS_HOST,
@@ -29,7 +28,6 @@ import {
   WEBRTC_WS_PROTOCOL,
   WEBRTC_APP_PATH,
   VIDEO_URL,
-  API_URL,
   TURN_SERVER_USERNAME,
   TURN_SERVER_CREDENTIAL,
 } from '../config';

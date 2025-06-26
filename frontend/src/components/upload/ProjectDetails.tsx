@@ -14,7 +14,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Chip,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -29,7 +28,6 @@ import OpenInNew from '@mui/icons-material/OpenInNew';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import { Project, UploadLink, UploadedFile } from '../../types/upload';
-import { ApiResponse } from '../../types';
 import { 
   getProject, 
   getProjectFiles, 
@@ -42,11 +40,6 @@ import {
 } from '../../services/uploadService';
 import CreateUploadLinkForm from './CreateUploadLinkForm';
 import { Link as RouterLink } from 'react-router-dom';
-
-// Define proper types
-interface UploadLinkWithSelection extends UploadLink {
-  selected?: boolean;
-}
 
 // GDS-inspired styles
 const gdsStyles = {
@@ -140,7 +133,6 @@ const ProjectDetails: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [showCreateLink, setShowCreateLink] = useState(false);
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
-  const [selectedUploadLink, setSelectedUploadLink] = useState<UploadLink | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [linkToDelete, setLinkToDelete] = useState<UploadLink | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);

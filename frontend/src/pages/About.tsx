@@ -1,10 +1,8 @@
 import React from 'react';
-import { Link as RouterLink } from 'react-router-dom';
 import GovUkLayout from '../components/GovUkLayout';
 import { 
   PageHeading, 
   SectionHeading, 
-  Panel
 } from '../components/GovUkComponents';
 
 const About: React.FC = () => {

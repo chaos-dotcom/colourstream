@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useLocation, useSearchParams } from 'react-router-dom';
+import { 
+  useParams, 
+} from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -17,29 +19,18 @@ import {
 import { styled } from '@mui/material/styles';
 import { Dashboard } from '@uppy/react';
 import Uppy from '@uppy/core';
-// Import both Tus and AwsS3 plugins
+// Import Tus plugins
 import Tus from '@uppy/tus'; 
-import AwsS3 from '@uppy/aws-s3'; // Re-add AwsS3
 import Dropbox from '@uppy/dropbox';
 import GoogleDrivePicker from '@uppy/google-drive-picker';
 import type { UppyFile } from '@uppy/core';
-// Re-add AwsS3 specific types
-import type { AwsS3Part } from '@uppy/aws-s3'; // Use type from aws-s3
-// Base Uppy types (Meta, Body) removed as direct import caused issues
-import { v4 as uuidv4 } from 'uuid'; 
 import '@uppy/core/dist/style.min.css';
 import '@uppy/dashboard/dist/style.min.css';
 import { getUploadLink } from '../services/uploadService';
-import { ApiResponse } from '../types';
 import {
-  UPLOAD_ENDPOINT_URL,
   API_URL,
   NAMEFORUPLOADCOMPLETION,
-  S3_PUBLIC_ENDPOINT,
-  S3_REGION,
-  S3_BUCKET,
   COMPANION_URL,
-  USE_COMPANION,
   ENABLE_DROPBOX,
   ENABLE_GOOGLE_DRIVE,
   GOOGLE_DRIVE_CLIENT_ID,
@@ -150,11 +141,6 @@ interface UploadLinkResponse {
   expiresAt: string;
 }
 
-// Interface for the expected response from the completeMultipartUpload backend endpoint
-interface S3CompleteResponse {
-  location: string;
-}
-
 // Interface for custom Uppy file metadata
 interface CustomFileMeta {
   clientCode?: string;
@@ -171,7 +157,6 @@ const UPLOAD_METHOD_CHOICE: 'tus' | 's3' = 'tus'; // <-- SET YOUR CHOICE HERE ('
 // Main upload portal for clients (standalone page not requiring authentication)
 const UploadPortal: React.FC = () => {
   const { token } = useParams<{ token: string }>();
-  const location = useLocation();
   // Removed useSearchParams as it's no longer needed for method choice
   // const [searchParams] = useSearchParams();
   // --- Move state declarations outside useEffect ---
@@ -282,52 +267,6 @@ const UploadPortal: React.FC = () => {
                 }
               },
             });
-          } else { // Default to S3 if not 'tus'
-             console.log('Configuring Uppy with AwsS3 plugin (based on constant)');
-             // --- Configure AwsS3 plugin for direct uploads using temporary credentials ---
-             // @ts-ignore - Ignore TS errors for AwsS3 options when using getTemporarySecurityCredentials without Companion.
-             // We assume Uppy handles the multipart calls internally in this mode.
-             uppyInstance.use(AwsS3, {
-               // Force multipart for files > 5MB (S3 minimum part size)
-               shouldUseMultipart: (file) => (file.size ?? 0) > 5 * 1024 * 1024,
-               // Adjust concurrency based on network/backend capacity
-               limit: 20, // Keep the increased limit for S3
-               // Use a larger chunk size for S3
-               getChunkSize: (file) => {
-                 return 64 * 1024 * 1024;
-               },
-               // --- Use Temporary Credentials for Signing (Backend Endpoint Required) ---
-               getTemporarySecurityCredentials: async (options) => {
-                 console.log('[AwsS3] Requesting temporary credentials...');
-                 try {
-                   const currentToken = token; 
-                   if (!currentToken) {
-                     throw new Error('Upload token is not available for fetching credentials.');
-                   }
-                   const response = await fetch(`${API_URL}/upload/s3/sts-token`, {
-                     method: 'GET', 
-                     headers: { 'Authorization': `Bearer ${currentToken}` },
-                     signal: options?.signal, 
-                   });
-                   if (!response.ok) {
-                     const errorText = await response.text();
-                     console.error('[AwsS3] Failed to fetch temporary credentials:', response.status, errorText);
-                     throw new Error(`Failed to fetch temporary credentials: ${response.status} ${errorText}`);
-                   }
-                   const data = await response.json();
-                   console.log('[AwsS3] Received temporary credentials response:', data);
-                   if (!data || !data.data || !data.data.credentials || !data.data.bucket || !data.data.region) {
-                      console.error('[AwsS3] Invalid temporary credentials structure received from backend:', data);
-                      throw new Error('Invalid temporary credentials structure received from backend.');
-                   }
-                   return data.data;
-                 } catch (error) {
-                   console.error('[AwsS3] Error in getTemporarySecurityCredentials:', error);
-                   throw error;
-                 }
-               },
-               // Removed dummy multipart handlers as we are using @ts-ignore above
-             });
           }
           // --- Configure Companion-based providers (Dropbox, Google Drive) ---
           // These might still be useful if you want cloud sources, but they upload via Companion.
@@ -370,21 +309,7 @@ const UploadPortal: React.FC = () => {
                 const uploadURL = response?.uploadURL;
                 console.log(`[upload-success] Tus Upload URL: ${uploadURL}`);
                 // TODO: Potentially notify backend that Tus upload is complete
-              } else {
-                // AwsS3 response structure (using temporary credentials, Uppy handles completion)
-                // The 'response' object here might be limited after direct S3 upload.
-                // Uppy's internal state knows the upload is complete.
-                // We might not get a specific 'location' back in this exact event handler
-                // when using getTemporarySecurityCredentials, as Uppy manages the final S3 CompleteMultipartUpload call.
-                console.log(`[upload-success] S3 Upload succeeded: ${file.name}`);
-                console.log('[upload-success] S3 Response details (may be limited):', response);
-                // The final location is implicitly known based on the generated key (file.meta.key)
-                // which would have been determined during the credential fetching or upload process.
-                // If you need the exact final URL confirmed, you might need another mechanism
-                // or rely on the key generation logic.
-                const finalLocation = `${S3_PUBLIC_ENDPOINT}/${S3_BUCKET}/${file.meta.key || file.name}`; // Best guess
-                console.log(`[upload-success] S3 Final Location (estimated): ${finalLocation}`);
-              }
+              } 
             });
             
             // Log overall progress (bytes uploaded / total)
@@ -398,29 +323,6 @@ const UploadPortal: React.FC = () => {
               console.error('[Uppy Restriction Failed]', `File: ${file?.name}, Error: ${error.message}`);
               setError(`File restriction error for ${file?.name}: ${error.message}`);
             });
-
-            // Enhanced error handling for AwsS3 with backend signing
-            uppyInstance.on('upload-error', (file, error, response) => {
-              console.error('MULTIPART UPLOAD ERROR:');
-              console.error('File:', file?.name, file?.size, file?.type);
-              console.error('Error message:', error?.message);
-              // Log part number if available in the error object (Uppy might add this)
-              if ((error as any)?.partNumber) {
-                console.error('Failed part number:', (error as any).partNumber);
-              }
-
-              if (response) {
-                console.error('Response status:', response.status);
-                try {
-                  console.error('Response details:', JSON.stringify(response, null, 2));
-                } catch (e) {
-                  console.error('Could not stringify response');
-                }
-              }
-
-              setError(`Error uploading ${file?.name || 'unknown file'}: ${error?.message || 'Unknown error'}`);
-            });
-
             // Add specific logging for chunk uploads to debug performance
             uppyInstance.on('upload-progress', (file, progress) => {
               if (!file || !file.name || progress.bytesTotal === null || progress.bytesUploaded === null) {
@@ -542,25 +444,6 @@ const UploadPortal: React.FC = () => {
                     // Add the raw body for debugging
                     errorMessage += ` - Raw body: ${typeof response.body === 'string' ? response.body : '[Object]'}`;
                   }
-                }
-              }
-              // Additional S3-specific error details
-              if (error.message === 'Non 2xx' && response) {
-                console.error('MinIO S3 error details:', {
-                  status: response.status,
-                  statusText: response.statusText,
-                  url: response.request?.url || 'Unknown URL',
-                  headers: response.headers,
-                  method: response.method || 'Unknown Method'
-                });
-
-                // MinIO specific suggestion
-                if (response.status === 403) {
-                  errorMessage += ' - This may be a MinIO permissions issue. Check the bucket policy and ACL settings.';
-                } else if (response.status === 404) {
-                  errorMessage += ' - The specified bucket or object key may not exist in MinIO.';
-                } else if (response.status === 400) {
-                  errorMessage += ' - Request format may be incorrect for MinIO.';
                 }
               }
               setError(`Error uploading ${file.name}: ${errorMessage}`);

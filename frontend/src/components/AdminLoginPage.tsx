@@ -8,9 +8,8 @@ import {
   CircularProgress,
   Divider,
 } from '@mui/material';
-import { authenticateWithPasskey, loginWithOIDC, handleOIDCCallback, getOIDCConfig } from '../utils/api';
-import { PageHeading, Button, WarningText, InsetText } from './GovUkComponents';
-import PasskeyLogin from './PasskeyLogin';
+import { authenticateWithPasskey, loginWithOIDC, getOIDCConfig } from '../utils/api';
+import { PageHeading, Button, InsetText } from './GovUkComponents';
 import axios from 'axios';
 
 const AdminLoginPage: React.FC = () => {
@@ -18,7 +17,6 @@ const AdminLoginPage: React.FC = () => {
   
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [passkeySupported, setPasskeySupported] = useState(true);
   const [oidcEnabled, setOidcEnabled] = useState(false);
   const [oidcProviderName, setOidcProviderName] = useState('Identity Provider');
   const [initializing, setInitializing] = useState(true);
@@ -105,27 +103,6 @@ const AdminLoginPage: React.FC = () => {
         setInitializing(false);
       });
       
-    // Check if browser supports passkeys
-    const checkPasskeySupport = async () => {
-      try {
-        // Check if PublicKeyCredential is available
-        if (window.PublicKeyCredential) {
-          // Check if conditional mediation (autofill) is supported
-          const conditionalSupported = await PublicKeyCredential.isConditionalMediationAvailable?.() || false;
-          console.log('Passkey conditional mediation supported:', conditionalSupported);
-          setPasskeySupported(true);
-        } else {
-          console.log('PublicKeyCredential API not available');
-          setPasskeySupported(false);
-        }
-      } catch (err) {
-        console.error('Error checking passkey support:', err);
-        setPasskeySupported(false);
-      }
-    };
-    
-    checkPasskeySupport();
-    
     // Check if this is an OIDC callback
     const isOidcCallback = location.pathname.includes('/auth/oidc/callback');
     console.log('Is OIDC callback:', isOidcCallback);

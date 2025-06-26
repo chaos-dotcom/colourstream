@@ -9,8 +9,6 @@ import {
   CreateUploadLinkRequest,
 } from '../types/upload';
 import { api } from '../utils/api';
-import { API_URL } from '../config';
-import axios from 'axios';
 
 // Client Management
 export const getClients = async (): Promise<ApiResponse<Client[]>> => {

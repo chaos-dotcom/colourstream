@@ -12,8 +12,8 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "strict": true,
-    "noUnusedLocals": false, // Disable unused locals warning- we put this in 
-    "noUnusedParameters": false, // we also put this in 
+    "noUnusedLocals": true, // Disable unused locals warning- we put this in 
+    "noUnusedParameters": true, // we also put this in 
     "noFallthroughCasesInSwitch": true,
     "allowJs": true,
     "esModuleInterop": true,
