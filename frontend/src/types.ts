@@ -1,8 +1,5 @@
 import type {
-  PublicKeyCredentialCreationOptionsJSON,
-  PublicKeyCredentialRequestOptionsJSON,
   RegistrationResponseJSON,
-  AuthenticationResponseJSON,
 } from '@simplewebauthn/types';
 
 export type WebAuthnRegistrationResponse = RegistrationResponseJSON;
@@ -23,25 +20,6 @@ export interface PasskeyInfo {
   credentialId: string;
   lastUsed: string;
   createdAt: string;
-}
-
-// OIDC related types
-interface OIDCConfig {
-  id?: string;
-  enabled: boolean;
-  providerName: string;
-  clientId: string;
-  clientSecret?: string;
-  discoveryUrl?: string;
-  authorizationUrl?: string;
-  tokenUrl?: string;
-  userInfoUrl?: string;
-  scope?: string;
-  redirectUri?: string;
-  logoutUrl?: string;
-  group?: string;
-  createdAt?: string;
-  updatedAt?: string;
 }
 
 // Interface for active upload data received via WebSocket
