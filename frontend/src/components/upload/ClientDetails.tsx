@@ -1,16 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link as RouterLink, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
   Paper,
-  Grid,
-  Card,
-  CardContent,
   Button,
   CircularProgress,
   Divider,
-  Stack,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -171,8 +167,6 @@ const ClientDetails: React.FC = () => {
       setError('Failed to refresh projects');
     }
   };
-
-  // This function is not being used, removing it
 
   const handleDeleteClient = async () => {
     if (!clientId) return;
