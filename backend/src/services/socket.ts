@@ -59,13 +59,6 @@ export const initializeSocketIO = (httpServer: http.Server): SocketIOServer => {
   return io;
 };
 
-const getIO = (): SocketIOServer | null => {
-  if (!io) {
-    logger.warn('Attempted to get Socket.IO instance before initialization.');
-  }
-  return io;
-};
-
 // Optional: Add cleanup logic if needed, though Socket.IO often handles this
 export const cleanupSocketIO = () => {
     if (io) {

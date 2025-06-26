@@ -1,12 +1,5 @@
 import { Room } from '@prisma/client';
 
-// Type for incoming request body
-type RoomCreateBody = {
-  name: string;
-  password: string;
-  expiryDays: number;
-};
-
 // Type for Prisma create operation
 export type RoomCreateInput = {
   id: string;
@@ -20,29 +13,3 @@ export type RoomCreateInput = {
   presenterLink?: string;
   mirotalkToken?: string;
 };
-
-type RoomResponse = Omit<Room, 'password'> & {
-  displayPassword: string;
-};
-
-// Using Prisma.RoomSelect to ensure type safety
-type RoomSelect = {
-  id?: boolean;
-  name?: boolean;
-  mirotalkRoomId?: boolean;
-  streamKey?: boolean;
-  password?: boolean;
-  displayPassword?: boolean;
-  expiryDate?: boolean;
-  link?: boolean;
-  presenterLink?: boolean;
-  mirotalkToken?: boolean;
-  createdAt?: boolean;
-};
-
-type RoomValidationResponse = {
-  mirotalkRoomId: string;
-  streamKey: string;
-  mirotalkToken?: string;
-  isPresenter?: boolean;
-}; 
