@@ -8,9 +8,8 @@ import {
   CircularProgress,
   Divider,
 } from '@mui/material';
-import { authenticateWithPasskey, loginWithOIDC, handleOIDCCallback, getOIDCConfig } from '../utils/api';
-import { PageHeading, Button, WarningText, InsetText } from './GovUkComponents';
-import PasskeyLogin from './PasskeyLogin';
+import { authenticateWithPasskey, loginWithOIDC, getOIDCConfig } from '../utils/api';
+import { PageHeading, Button, InsetText } from './GovUkComponents';
 import axios from 'axios';
 
 const AdminLoginPage: React.FC = () => {
@@ -18,7 +17,6 @@ const AdminLoginPage: React.FC = () => {
   
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [passkeySupported, setPasskeySupported] = useState(true);
   const [oidcEnabled, setOidcEnabled] = useState(false);
   const [oidcProviderName, setOidcProviderName] = useState('Identity Provider');
   const [initializing, setInitializing] = useState(true);
