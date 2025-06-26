@@ -10,7 +10,7 @@ import {
   CircularProgress,
 } from '@mui/material';
 import Cookies from 'js-cookie';
-import { validateRoomAccess, RoomConfig, generateMirotalkToken, TokenGenerationRequest } from '../utils/api';
+import { validateRoomAccess, RoomConfig } from '../utils/api';
 import {
   OVENPLAYER_SCRIPT_URL,
   WEBRTC_WS_HOST,
