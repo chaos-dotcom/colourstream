@@ -1,5 +1,12 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
+import React, { 
+  useEffect, 
+  useRef, 
+  useState 
+} from 'react';
+import { 
+  useParams, 
+  useLocation 
+} from 'react-router-dom';
 import {
   Box,
   Button,
@@ -10,7 +17,10 @@ import {
   CircularProgress,
 } from '@mui/material';
 import Cookies from 'js-cookie';
-import { validateRoomAccess, RoomConfig } from '../utils/api';
+import { 
+  validateRoomAccess, 
+  RoomConfig 
+} from '../utils/api';
 import {
   OVENPLAYER_SCRIPT_URL,
   WEBRTC_WS_HOST,
