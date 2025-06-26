@@ -12,7 +12,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "find-deadcode": "ts-prune",
-    "migrate:sqlite-to-postgres": "node scripts/migrate-sqlite-to-postgres.js"
+    "migrate:sqlite-to-postgres": "node scripts/migrate-sqlite-to-postgres.js",
+    "knip": "knip"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.525.0",
@@ -58,14 +59,15 @@
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.9",
     "@types/morgan": "^1.9.9",
-    "@types/node": "^20.11.16",
+    "@types/node": "^20.19.1",
     "@types/node-fetch": "^2.6.12",
     "@types/ws": "^8.5.14",
+    "knip": "^5.61.2",
     "nodemon": "^3.0.3",
     "prisma": "^6.4.1",
     "ts-node": "^10.9.2",
     "ts-prune": "^0.10.3",
-    "typescript": "^5.3.3"
+    "typescript": "^5.8.3"
   },
   "keywords": [],
   "author": "",
