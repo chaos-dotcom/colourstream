@@ -156,18 +156,6 @@ const ClientDetails: React.FC = () => {
     }
   }, [clientId]);
 
-  const handleProjectCreated = async () => {
-    setShowCreateProject(false);
-    try {
-      const response = await getClientProjects(clientId!);
-      if (response.status === 'success') {
-        setProjects(response.data);
-      }
-    } catch (err) {
-      setError('Failed to refresh projects');
-    }
-  };
-
   const handleDeleteClient = async () => {
     if (!clientId) return;
     
