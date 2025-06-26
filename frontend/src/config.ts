@@ -69,13 +69,6 @@ const getConfig = (key: keyof RuntimeConfig): string => {
       return envValue || 'https://upload.colourstream.johnrogerscolour.co.uk/';
     case 'NAMEFORUPLOADCOMPLETION':
       return envValue || 'John';
-    // S3 configuration defaults
-    case 'S3_PUBLIC_ENDPOINT':
-      return envValue || 'https://s3.colourstream.johnrogerscolour.co.uk';
-    case 'S3_REGION':
-      return envValue || 'us-east-1';
-    case 'S3_BUCKET':
-      return envValue || 'uploads';
     // Companion configuration defaults
     case 'COMPANION_URL':
       // Use VITE_COMPANION_URL from env if available, otherwise default based on current domain
@@ -117,10 +110,6 @@ export const NAMEFORUPLOADCOMPLETION = getConfig('NAMEFORUPLOADCOMPLETION');
 // Export TURN server credentials
 export const TURN_SERVER_USERNAME = getConfig('TURN_SERVER_USERNAME');
 export const TURN_SERVER_CREDENTIAL = getConfig('TURN_SERVER_CREDENTIAL');
-// Export S3 configuration
-export const S3_PUBLIC_ENDPOINT = getConfig('S3_PUBLIC_ENDPOINT');
-export const S3_REGION = getConfig('S3_REGION');
-export const S3_BUCKET = getConfig('S3_BUCKET');
 // Export Companion configuration
 export const COMPANION_URL = getConfig('COMPANION_URL'); // URL for Companion (used by Dropbox, Google Drive, etc.)
 // export const COMPANION_AWS_ENDPOINT = getConfig('COMPANION_AWS_ENDPOINT'); // Removed
@@ -147,9 +136,6 @@ if (typeof window !== 'undefined') {
     NAMEFORUPLOADCOMPLETION,
     TURN_SERVER_USERNAME,
     TURN_SERVER_CREDENTIAL,
-    S3_PUBLIC_ENDPOINT,
-    S3_REGION,
-    S3_BUCKET,
     COMPANION_URL,
     // COMPANION_AWS_ENDPOINT, // Removed
     USE_COMPANION,
@@ -175,9 +161,6 @@ export default {
   NAMEFORUPLOADCOMPLETION,
   TURN_SERVER_USERNAME,
   TURN_SERVER_CREDENTIAL,
-  S3_PUBLIC_ENDPOINT,
-  S3_REGION,
-  S3_BUCKET,
   COMPANION_URL,
   // COMPANION_AWS_ENDPOINT, // Removed
   USE_COMPANION,
