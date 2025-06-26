@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { 
   useParams, 
-  useLocation, 
 } from 'react-router-dom';
 import {
   Box,
@@ -158,7 +157,6 @@ const UPLOAD_METHOD_CHOICE: 'tus' | 's3' = 'tus'; // <-- SET YOUR CHOICE HERE ('
 // Main upload portal for clients (standalone page not requiring authentication)
 const UploadPortal: React.FC = () => {
   const { token } = useParams<{ token: string }>();
-  const location = useLocation();
   // Removed useSearchParams as it's no longer needed for method choice
   // const [searchParams] = useSearchParams();
   // --- Move state declarations outside useEffect ---
