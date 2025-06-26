@@ -12,8 +12,8 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "strict": true,
-    "noUnusedLocals": true, // Disable unused locals warning- we put this in 
-    "noUnusedParameters": true, // we also put this in 
+    "noUnusedLocals": true,
+    "noUnusedParameters": true, 
     "noFallthroughCasesInSwitch": true,
     "allowJs": true,
     "esModuleInterop": true,
@@ -27,6 +27,5 @@
   "include": ["src"],
   "references": [{ "path": "./tsconfig.node.json" }], // and we put this in 
   "rules": {
-    "@typescript-eslint/no-unused-vars": "warn" // we also put this in 
   }
 }
