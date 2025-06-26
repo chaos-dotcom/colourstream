@@ -63,9 +63,3 @@ export interface CreateUploadLinkRequest {
   usageLimit?: number;
   token?: string;
 }
-
-interface FileStats {
-  totalFiles: number;
-  totalSize: number;
-  lastUpload: string | null;
-} 

@@ -5,10 +5,7 @@ import type {
   AuthenticationResponseJSON,
 } from '@simplewebauthn/types';
 
-type WebAuthnRegistrationOptions = PublicKeyCredentialCreationOptionsJSON;
-type WebAuthnAuthenticationOptions = PublicKeyCredentialRequestOptionsJSON;
 export type WebAuthnRegistrationResponse = RegistrationResponseJSON;
-type WebAuthnAuthenticationResponse = AuthenticationResponseJSON;
 
 export interface ApiResponse<T> {
   status: 'success' | 'error';
@@ -45,12 +42,6 @@ interface OIDCConfig {
   group?: string;
   createdAt?: string;
   updatedAt?: string;
-}
-
-interface OIDCConfigResponse {
-  config: OIDCConfig | null;
-  isInitialized: boolean;
-  clientSecret?: string | null;
 }
 
 // Interface for active upload data received via WebSocket

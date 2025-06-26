@@ -143,20 +143,6 @@ interface AuthResult {
   error?: string;
 }
 
-const adminLogin = async (password: string): Promise<ApiResponse<AuthResponse>> => {
-  const response = await api.post('/auth/login', { password });
-  const result = response.data as ApiResponse<AuthResponse>;
-  const { token } = result.data;
-  localStorage.setItem('adminToken', token);
-  localStorage.setItem('isAdminAuthenticated', 'true');
-  return result;
-};
-
-const changePassword = async (currentPassword: string, newPassword: string): Promise<ApiResponse<void>> => {
-  const response = await api.post('/auth/change-password', { currentPassword, newPassword });
-  return response.data;
-};
-
 export const createRoom = async (roomData: CreateRoomData): Promise<ApiResponse<{ room: Room }>> => {
   console.log('Creating room with data:', {
     ...roomData,
@@ -226,27 +212,7 @@ export const stopOBSStream = async (): Promise<void> => {
   return response.data;
 };
 
-const checkSetupRequired = async (): Promise<ApiResponse<SetupStatus>> => {
-  try {
-    const response = await api.get('/auth/setup-required');
-    return response.data;
-  } catch (error) {
-    console.error('Error checking auth status:', error);
-    return {
-      status: 'error',
-      message: 'Failed to check setup status',
-      data: {
-        setupRequired: false,
-        hasPasskeys: false
-      }
-    };
-  }
-};
-
-const firstTimeSetup = async (): Promise<ApiResponse<AuthResponse>> => {
-  try {
-    // Step 1: Get registration options from the server
-    const response = await api.post('/auth/webauthn/first-time-setup');
+export const registerPasskey = async (): Promise<ApiResponse<WebAuthnRegistrationResponse>> => {
     if (!response.data) {
       throw new Error('No registration options received from server');
     }
@@ -309,10 +275,6 @@ const firstTimeSetup = async (): Promise<ApiResponse<AuthResponse>> => {
   } catch (error: any) {
     console.error('Passkey setup error:', error);
     throw new Error('Failed to set up passkey');
-  }
-};
-
-export const registerPasskey = async (): Promise<ApiResponse<WebAuthnRegistrationResponse>> => {
   try {
     // Step 1: Get registration options from the server
     const response = await api.post('/auth/webauthn/register');
@@ -550,26 +512,6 @@ export const loginWithOIDC = async (redirectUrl: string): Promise<void> => {
   }
 };
 
-const getOIDCUserProfile = async (): Promise<any> => {
-  try {
-    const response = await api.get('/auth/oidc/profile');
-    return response.data.data.profile;
-  } catch (error) {
-    console.error('Error fetching OIDC user profile:', error);
-    throw new Error('Failed to fetch OIDC user profile');
-  }
-};
-
-const getOIDCToken = async (): Promise<string> => {
-  try {
-    const response = await api.get('/auth/oidc/token');
-    return response.data.data.token;
-  } catch (error) {
-    console.error('Error fetching OIDC token:', error);
-    throw new Error('Failed to fetch OIDC token');
-  }
-};
-
 
 export const handleOIDCCallback = async (): Promise<AuthResult> => {
   try {
@@ -601,59 +543,6 @@ export const handleOIDCCallback = async (): Promise<AuthResult> => {
   }
 };
 
-
-// Function to register the first passkey during initial setup
-const registerFirstPasskey = async (): Promise<ApiResponse<AuthResponse>> => {
-  try {
-    // 1. Get registration options
-    const optionsResponse = await api.post('/auth/webauthn/register-first');
-    const registrationOptions = optionsResponse.data.data.options;
-
-    if (!registrationOptions) {
-      throw new Error('Failed to get registration options for first passkey.');
-    }
-
-    // 2. Start browser registration
-    let credential;
-    try {
-      credential = await startRegistration(registrationOptions);
-    } catch (registrationError: any) {
-      console.error('Browser passkey registration failed:', registrationError);
-      // Handle specific errors like cancellation
-      if (registrationError.name === 'NotAllowedError') {
-        throw new Error('Passkey registration cancelled by user.');
-      }
-      throw new Error('Failed to create passkey in browser.');
-    }
-
-    // 3. Verify credential with backend
-    const verificationResponse = await api.post('/auth/webauthn/register-first/verify', credential);
-
-    if (verificationResponse.data?.status === 'success' && verificationResponse.data?.data?.token) {
-      // Store token and mark as authenticated
-      const token = verificationResponse.data.data.token;
-      localStorage.setItem('adminToken', token);
-      localStorage.setItem('isAdminAuthenticated', 'true');
-      localStorage.setItem('authToken', token);
-      localStorage.setItem('authTimestamp', Date.now().toString());
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-
-      return {
-        status: 'success',
-        data: { token, verified: true } // Assuming AuthResponse structure
-      };
-    } else {
-      throw new Error(verificationResponse.data?.message || 'Failed to verify first passkey.');
-    }
-  } catch (error: any) {
-    console.error('Error registering first passkey:', error);
-    return {
-      status: 'error',
-      message: error.message || 'An unknown error occurred during first passkey registration.',
-      data: { token: '', verified: false } // Return appropriate error structure
-    };
-  }
-};
 
 // Helper function to get Authorization header
 export const getAuthHeaders = (): { [key: string]: string } => {
