@@ -422,32 +422,6 @@ export const generateMirotalkToken = async (
   return response.data as ApiResponse<TokenGenerationResponse>;
 };
 
-const getDefaultMiroTalkCredentials = async (): Promise<DefaultMiroTalkCredentials> => {
-  try {
-    const response = await fetch(`${API_URL}/mirotalk/default-credentials`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch default MiroTalk credentials');
-    }
-
-    const data = await response.json();
-    return data.data.defaultCredentials;
-  } catch (error) {
-    console.error('Error fetching default MiroTalk credentials:', error);
-    // Return default values if API call fails
-    return {
-      username: 'globalUsername',
-      password: 'globalPassword'
-    };
-  }
-};
-
 export const getOIDCConfig = async (): Promise<OIDCConfigResponse> => {
   try {
     console.log('Getting OIDC config from:', `${API_URL}/auth/oidc/config`);
