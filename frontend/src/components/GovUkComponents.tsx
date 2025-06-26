@@ -1,6 +1,5 @@
 import React, { ReactNode } from 'react';
-import { Typography, Box, Button as MuiButton, TextField as MuiTextField, Paper, Breadcrumbs, Link as MuiLink } from '@mui/material';
-import { Link as RouterLink } from 'react-router-dom';
+import { Typography, Box, Button as MuiButton, TextField as MuiTextField } from '@mui/material';
 
 // Page heading with optional caption
 interface PageHeadingProps {
@@ -183,86 +182,6 @@ export const Button: React.FC<ButtonProps> = ({
     >
       {children}
     </MuiButton>
-  );
-};
-
-// GOV.UK styled text field
-interface TextFieldProps {
-  id: string;
-  label: string;
-  value: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  error?: string;
-  type?: string;
-  fullWidth?: boolean;
-  required?: boolean;
-  hint?: string;
-}
-
-const TextField: React.FC<TextFieldProps> = ({
-  id,
-  label,
-  value,
-  onChange,
-  error,
-  type = 'text',
-  fullWidth = true,
-  required = false,
-  hint,
-}) => {
-  return (
-    <Box sx={{ mb: 3 }}>
-      <MuiTextField
-        id={id}
-        label={label}
-        value={value}
-        onChange={onChange}
-        error={!!error}
-        helperText={error || hint}
-        type={type}
-        fullWidth={fullWidth}
-        required={required}
-        FormHelperTextProps={{
-          sx: {
-            color: error ? '#d4351c' : '#505a5f',
-            fontWeight: error ? 700 : 400,
-            marginLeft: 0,
-            marginTop: 0.5,
-          },
-        }}
-        InputLabelProps={{
-          shrink: true,
-          sx: {
-            fontWeight: 700,
-            color: '#0b0c0c',
-            fontSize: '1.125rem',
-            transform: 'none',
-            position: 'relative',
-            marginBottom: 0.5,
-          },
-        }}
-        sx={{
-          '& .MuiInputBase-root': {
-            borderRadius: 0,
-            backgroundColor: '#ffffff',
-          },
-          '& .MuiOutlinedInput-root': {
-            '& fieldset': {
-              borderColor: error ? '#d4351c' : '#0b0c0c',
-              borderWidth: 2,
-            },
-            '&:hover fieldset': {
-              borderColor: error ? '#d4351c' : '#0b0c0c',
-            },
-            '&.Mui-focused fieldset': {
-              borderColor: '#0b0c0c',
-              borderWidth: 3,
-              boxShadow: '0 0 0 3px #ffdd00',
-            },
-          },
-        }}
-      />
-    </Box>
   );
 };
 
