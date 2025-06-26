@@ -460,7 +460,7 @@ export const generateMirotalkToken = async (
   return response.data as ApiResponse<TokenGenerationResponse>;
 };
 
-export const getDefaultMiroTalkCredentials = async (): Promise<DefaultMiroTalkCredentials> => {
+const getDefaultMiroTalkCredentials = async (): Promise<DefaultMiroTalkCredentials> => {
   try {
     const response = await fetch(`${API_URL}/mirotalk/default-credentials`, {
       method: 'GET',
