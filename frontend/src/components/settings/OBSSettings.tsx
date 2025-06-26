@@ -39,7 +39,7 @@ const defaultSettings: OBSSettingsType = {
 
 export const OBSSettings: React.FC = () => {
   const [settings, setSettings] = useState<OBSSettingsType>(defaultSettings);
-  const [error, setError] = useState<string | null>(null);
+  const [_error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connected' | 'connecting' | 'error'>('disconnected');
