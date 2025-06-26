@@ -98,14 +98,14 @@ const getConfig = (key: keyof RuntimeConfig): string => {
 
 // Export configuration values
 export const API_URL = getConfig('API_URL');
-export const OIDC_AUTH_ENDPOINT = getConfig('OIDC_AUTH_ENDPOINT');
+const OIDC_AUTH_ENDPOINT = getConfig('OIDC_AUTH_ENDPOINT');
 export const WEBRTC_WS_HOST = getConfig('WEBRTC_WS_HOST');
 export const WEBRTC_WS_PORT = getConfig('WEBRTC_WS_PORT');
 export const WEBRTC_WS_PROTOCOL = getConfig('WEBRTC_WS_PROTOCOL');
 export const WEBRTC_APP_PATH = getConfig('WEBRTC_APP_PATH');
 export const VIDEO_URL = getConfig('VIDEO_URL');
 export const OVENPLAYER_SCRIPT_URL = getConfig('OVENPLAYER_SCRIPT_URL');
-export const UPLOAD_ENDPOINT_URL = getConfig('UPLOAD_ENDPOINT_URL');
+const UPLOAD_ENDPOINT_URL = getConfig('UPLOAD_ENDPOINT_URL');
 export const NAMEFORUPLOADCOMPLETION = getConfig('NAMEFORUPLOADCOMPLETION');
 // Export TURN server credentials
 export const TURN_SERVER_USERNAME = getConfig('TURN_SERVER_USERNAME');
@@ -113,7 +113,7 @@ export const TURN_SERVER_CREDENTIAL = getConfig('TURN_SERVER_CREDENTIAL');
 // Export Companion configuration
 export const COMPANION_URL = getConfig('COMPANION_URL'); // URL for Companion (used by Dropbox, Google Drive, etc.)
 // export const COMPANION_AWS_ENDPOINT = getConfig('COMPANION_AWS_ENDPOINT'); // Removed
-export const USE_COMPANION = getConfig('USE_COMPANION') === 'true'; // Still relevant for providers like Dropbox/Google Drive
+const USE_COMPANION = getConfig('USE_COMPANION') === 'true'; // Still relevant for providers like Dropbox/Google Drive
 // Export Provider configuration
 export const ENABLE_DROPBOX = getConfig('ENABLE_DROPBOX') === 'true';
 export const ENABLE_GOOGLE_DRIVE = getConfig('ENABLE_GOOGLE_DRIVE') === 'true';
@@ -148,10 +148,11 @@ if (typeof window !== 'undefined') {
   });
 }
 
-export default {
-  API_URL,
-  OIDC_AUTH_ENDPOINT,
-  WEBRTC_WS_HOST,
+// Default export removed as it's unused
+// {
+//   API_URL,
+//   OIDC_AUTH_ENDPOINT,
+//   WEBRTC_WS_HOST,
   WEBRTC_WS_PORT,
   WEBRTC_WS_PROTOCOL,
   WEBRTC_APP_PATH,

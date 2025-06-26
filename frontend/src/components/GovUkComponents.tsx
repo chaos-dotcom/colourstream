@@ -199,7 +199,7 @@ interface TextFieldProps {
   hint?: string;
 }
 
-export const TextField: React.FC<TextFieldProps> = ({
+const TextField: React.FC<TextFieldProps> = ({
   id,
   label,
   value,
@@ -272,7 +272,7 @@ interface PanelProps {
   children: ReactNode;
 }
 
-export const Panel: React.FC<PanelProps> = ({ title, children }) => {
+const Panel: React.FC<PanelProps> = ({ title, children }) => {
   return (
     <Paper
       sx={{
@@ -372,7 +372,7 @@ interface BreadcrumbsProps {
   }[];
 }
 
-export const GovUkBreadcrumbs: React.FC<BreadcrumbsProps> = ({ items }) => {
+const GovUkBreadcrumbs: React.FC<BreadcrumbsProps> = ({ items }) => {
   return (
     <Breadcrumbs
       separator="›"
@@ -439,7 +439,7 @@ interface SummaryListProps {
   items: SummaryListItemProps[];
 }
 
-export const SummaryList: React.FC<SummaryListProps> = ({ items }) => {
+const SummaryList: React.FC<SummaryListProps> = ({ items }) => {
   return (
     <Box
       sx={{

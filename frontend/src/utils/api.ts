@@ -143,7 +143,7 @@ export interface AuthResult {
   error?: string;
 }
 
-export const adminLogin = async (password: string): Promise<ApiResponse<AuthResponse>> => {
+const adminLogin = async (password: string): Promise<ApiResponse<AuthResponse>> => {
   const response = await api.post('/auth/login', { password });
   const result = response.data as ApiResponse<AuthResponse>;
   const { token } = result.data;
@@ -152,7 +152,7 @@ export const adminLogin = async (password: string): Promise<ApiResponse<AuthResp
   return result;
 };
 
-export const changePassword = async (currentPassword: string, newPassword: string): Promise<ApiResponse<void>> => {
+const changePassword = async (currentPassword: string, newPassword: string): Promise<ApiResponse<void>> => {
   const response = await api.post('/auth/change-password', { currentPassword, newPassword });
   return response.data;
 };
@@ -226,7 +226,7 @@ export const stopOBSStream = async (): Promise<void> => {
   return response.data;
 };
 
-export const checkSetupRequired = async (): Promise<ApiResponse<SetupStatus>> => {
+const checkSetupRequired = async (): Promise<ApiResponse<SetupStatus>> => {
   try {
     const response = await api.get('/auth/setup-required');
     return response.data;
@@ -243,7 +243,7 @@ export const checkSetupRequired = async (): Promise<ApiResponse<SetupStatus>> =>
   }
 };
 
-export const firstTimeSetup = async (): Promise<ApiResponse<AuthResponse>> => {
+const firstTimeSetup = async (): Promise<ApiResponse<AuthResponse>> => {
   try {
     // Step 1: Get registration options from the server
     const response = await api.post('/auth/webauthn/first-time-setup');
@@ -550,7 +550,7 @@ export const loginWithOIDC = async (redirectUrl: string): Promise<void> => {
   }
 };
 
-export const getOIDCUserProfile = async (): Promise<any> => {
+const getOIDCUserProfile = async (): Promise<any> => {
   try {
     const response = await api.get('/auth/oidc/profile');
     return response.data.data.profile;
@@ -560,7 +560,7 @@ export const getOIDCUserProfile = async (): Promise<any> => {
   }
 };
 
-export const getOIDCToken = async (): Promise<string> => {
+const getOIDCToken = async (): Promise<string> => {
   try {
     const response = await api.get('/auth/oidc/token');
     return response.data.data.token;
@@ -603,7 +603,7 @@ export const handleOIDCCallback = async (): Promise<AuthResult> => {
 
 
 // Function to register the first passkey during initial setup
-export const registerFirstPasskey = async (): Promise<ApiResponse<AuthResponse>> => {
+const registerFirstPasskey = async (): Promise<ApiResponse<AuthResponse>> => {
   try {
     // 1. Get registration options
     const optionsResponse = await api.post('/auth/webauthn/register-first');
