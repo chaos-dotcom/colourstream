@@ -28,7 +28,7 @@ interface ApiResponse<T> {
     response: T;
 }
 
-export class OvenMediaEngineService {
+class OvenMediaEngineService {
     private baseURL: string;
     private accessToken: string;
 

@@ -28,7 +28,7 @@ declare global {
   }
 }
 
-export const verifyToken = async (token: string): Promise<JwtPayload> => {
+const verifyToken = async (token: string): Promise<JwtPayload> => {
   try {
     const decoded = jwt.verify(
       token,
@@ -40,7 +40,7 @@ export const verifyToken = async (token: string): Promise<JwtPayload> => {
   }
 };
 
-export function authenticateToken(req: Request, res: Response, next: NextFunction) {
+function authenticateToken(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -59,7 +59,7 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
   }
 }
 
-export function isAdmin(req: Request, res: Response, next: NextFunction) {
+function isAdmin(req: Request, res: Response, next: NextFunction) {
   if (!req.user || req.user.type !== 'admin') {
     logger.warn('Authorization failed: Admin access required', { user: req.user });
     return res.status(403).json({ status: 'error', message: 'Admin access required' });
@@ -67,7 +67,7 @@ export function isAdmin(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
-export function isOIDCAuthenticated(req: Request, res: Response, next: NextFunction) {
+function isOIDCAuthenticated(req: Request, res: Response, next: NextFunction) {
   if (!req.oidc || !req.oidc.isAuthenticated || !req.oidc.isAuthenticated()) {
     logger.warn('OIDC Authentication failed: User not authenticated');
     return res.status(401).json({ status: 'error', message: 'OIDC authentication required' });

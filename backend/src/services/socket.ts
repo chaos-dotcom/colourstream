@@ -59,7 +59,7 @@ export const initializeSocketIO = (httpServer: http.Server): SocketIOServer => {
   return io;
 };
 
-export const getIO = (): SocketIOServer | null => {
+const getIO = (): SocketIOServer | null => {
   if (!io) {
     logger.warn('Attempted to get Socket.IO instance before initialization.');
   }

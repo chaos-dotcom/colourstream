@@ -4,7 +4,7 @@ import { blockedIPService } from '../services/blockedIP';
 import { logger } from '../utils/logger';
 
 // Rate limiter for general requests - increased limits for production
-export const generalLimiter = rateLimit({
+const generalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 300, // Increased from 100 to 300 requests per windowMs
     message: 'Too many requests from this IP, please try again later',
@@ -63,7 +63,7 @@ export const ipBlocker = async (req: Request, res: Response, next: NextFunction)
 };
 
 // Middleware to track failed login attempts and block IPs if necessary
-export const trackLoginAttempts = async (req: Request, res: Response, next: NextFunction) => {
+const trackLoginAttempts = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const clientIP = req.ip || req.socket.remoteAddress || 'unknown';
         

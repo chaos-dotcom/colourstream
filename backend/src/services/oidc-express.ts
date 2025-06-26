@@ -29,7 +29,7 @@ let oidcConfig: ConfigParams = {
 /**
  * Initialize OIDC from environment variables
  */
-export async function initializeOIDCFromEnv(): Promise<boolean> {
+async function initializeOIDCFromEnv(): Promise<boolean> {
   try {
     // Check if environment variables are set
     if (
@@ -70,7 +70,7 @@ export async function initializeOIDCFromEnv(): Promise<boolean> {
 /**
  * Initialize OIDC from database configuration
  */
-export async function initializeOIDCFromDB(): Promise<boolean> {
+async function initializeOIDCFromDB(): Promise<boolean> {
   try {
     // Get config from database
     const config = await prisma.oIDCConfig.findUnique({
