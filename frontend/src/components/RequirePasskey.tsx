@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { Box, Typography, Container, Paper, CircularProgress, Alert, Button } from '@mui/material';
-import { getPasskeys, registerPasskey } from '../utils/api';
-import KeyIcon from '@mui/icons-material/Key';
+import { Box, Typography, Container, Paper, CircularProgress, Alert } from '@mui/material';
+import { getPasskeys } from '../utils/api';
 import { Button as GovUkButton } from './GovUkComponents';
 
 interface RequirePasskeyProps {
@@ -12,9 +11,6 @@ interface RequirePasskeyProps {
 const RequirePasskey: React.FC<RequirePasskeyProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [passkeyRegistered, setPasskeyRegistered] = useState(false);
-  const [registering, setRegistering] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
   const [passkeySupported, setPasskeySupported] = useState(true);
   
   const navigate = useNavigate();
@@ -55,32 +51,6 @@ const RequirePasskey: React.FC<RequirePasskeyProps> = ({ children }) => {
     checkPasskeySupport();
     checkPasskeyRegistration();
   }, []);
-
-  const handleRegisterPasskey = async () => {
-    setError(null);
-    setRegistering(true);
-
-    try {
-      await registerPasskey();
-      setSuccess(true);
-      // After successful registration, wait a moment and then proceed
-      setTimeout(() => {
-        setPasskeyRegistered(true);
-      }, 1500);
-    } catch (error: any) {
-      console.error('Error registering passkey:', error);
-      if (error.response?.status === 400 && error.response?.data?.message === 'Passkey already registered') {
-        setSuccess(true); // Already registered is considered success
-        setTimeout(() => {
-          setPasskeyRegistered(true);
-        }, 1500);
-      } else {
-        setError(error.response?.data?.message || 'Failed to register passkey');
-      }
-    } finally {
-      setRegistering(false);
-    }
-  };
 
   // If still loading, show loading spinner
   if (loading) {
