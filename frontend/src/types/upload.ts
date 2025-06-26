@@ -64,7 +64,7 @@ export interface CreateUploadLinkRequest {
   token?: string;
 }
 
-export interface FileStats {
+interface FileStats {
   totalFiles: number;
   totalSize: number;
   lastUpload: string | null;
