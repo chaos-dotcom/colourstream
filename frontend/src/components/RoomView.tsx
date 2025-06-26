@@ -8,18 +8,7 @@ import {
   Container,
   Paper,
   CircularProgress,
-  IconButton,
-  Tooltip,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
 } from '@mui/material';
-import { ContentCopy } from '@mui/icons-material';
 import Cookies from 'js-cookie';
 import { validateRoomAccess, RoomConfig, generateMirotalkToken, TokenGenerationRequest } from '../utils/api';
 import {
