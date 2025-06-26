@@ -1,5 +1,3 @@
-import { Room } from '@prisma/client';
-
 // Type for Prisma create operation
 export type RoomCreateInput = {
   id: string;

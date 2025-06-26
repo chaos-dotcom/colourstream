@@ -26,15 +26,6 @@ export const generalLimiter = rateLimit({
     }
 });
 
-// Stricter rate limiter for login attempts
-const loginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 10, // Increased from 5 to 10 login attempts per windowMs
-    message: 'Too many login attempts from this IP, please try again later',
-    standardHeaders: true,
-    legacyHeaders: false,
-});
-
 // Middleware to check if IP is blocked
 export const ipBlocker = async (req: Request, res: Response, next: NextFunction) => {
     try {
