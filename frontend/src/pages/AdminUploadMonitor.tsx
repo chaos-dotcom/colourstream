@@ -15,7 +15,7 @@ import ActiveUploadsDisplay from '../components/ActiveUploadsDisplay';
 
 const AdminUploadMonitor: React.FC = () => {
   const [activeUploads, setActiveUploads] = useState<ActiveUpload[]>([]);
-  const [socket, setSocket] = useState<Socket | null>(null); //query this 
+  const [_socket, setSocket] = useState<Socket | null>(null); //query this 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true); // Add loading state
   const navigate = useNavigate();
