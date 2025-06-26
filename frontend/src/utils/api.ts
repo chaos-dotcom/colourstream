@@ -2,7 +2,6 @@ import axios from 'axios';
 import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
 import type {
   ApiResponse,
-  AuthResponse,
   PasskeyInfo,
   WebAuthnRegistrationResponse,
   // WebAuthnRegistrationOptions, // Removed as unused
@@ -86,11 +85,6 @@ interface OBSSettings {
   protocol?: 'rtmp' | 'srt';
 }
 
-interface SetupStatus {
-  setupRequired: boolean;
-  hasPasskeys: boolean;
-}
-
 interface OBSConnectionStatus {
   status: 'disconnected' | 'connected' | 'connecting' | 'error';
   error?: string;
@@ -107,11 +101,6 @@ interface TokenGenerationResponse {
   url: string;
   token: string;
   expiresIn: number;
-}
-
-interface DefaultMiroTalkCredentials {
-  username: string;
-  password: string;
 }
 
 export interface OIDCConfig {
