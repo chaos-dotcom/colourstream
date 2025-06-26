@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 // Removed io, Socket imports
 import {
   Box,
@@ -20,23 +20,19 @@ import {
   Container,
   Snackbar,
   Typography,
-  Paper,
   Button,
 } from '@mui/material';
 // Only import icons that are actually used
 import { ContentCopy, OpenInNew } from '@mui/icons-material';
 import { OBSSettings } from './settings/OBSSettings';
 import OIDCSettings from './settings/OIDCSettings';
-import OBSControls from './settings/OBSControls';
-import {
-  InsetText,
-} from './GovUkComponents';
+// Removed OBSControls import
 import { 
   adminLogout, 
   generateMirotalkToken, 
   TokenGenerationRequest,
   stopOBSStream, // Removed duplicate and added comma
-  getAuthHeaders // Assuming this exists or create it to get auth token
+  // Removed getAuthHeaders import
 } from '../utils/api';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import RoomManagement from './rooms/RoomManagement';
@@ -89,7 +85,7 @@ const AdminDashboard: React.FC = () => {
   const [generatedUrl, setGeneratedUrl] = useState('');
   const [isGeneratingToken, setIsGeneratingToken] = useState(false);
   const [value, setValue] = useState(0);
-  const [stoppingStream, setStoppingStream] = useState(false);
+  // Removed stoppingStream state
   const navigate = useNavigate();
   // Removed activeUploads and socket state
 
@@ -118,19 +114,7 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleStopStream = async () => {
-    setStoppingStream(true);
-    setError(null);
-    try {
-      await stopOBSStream();
-      setSuccess('OBS stream stopped successfully');
-    } catch (error: any) {
-      console.error('Failed to stop OBS stream:', error);
-      setError(error.response?.data?.message || 'Failed to stop OBS stream. Make sure OBS is connected.');
-    } finally {
-      setStoppingStream(false);
-    }
-  };
+  // Removed handleStopStream function
 
   const handleCloseTokenDialog = () => {
     setTokenDialogOpen(false);
