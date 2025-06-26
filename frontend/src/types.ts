@@ -5,10 +5,10 @@ import type {
   AuthenticationResponseJSON,
 } from '@simplewebauthn/types';
 
-export type WebAuthnRegistrationOptions = PublicKeyCredentialCreationOptionsJSON;
-export type WebAuthnAuthenticationOptions = PublicKeyCredentialRequestOptionsJSON;
+type WebAuthnRegistrationOptions = PublicKeyCredentialCreationOptionsJSON;
+type WebAuthnAuthenticationOptions = PublicKeyCredentialRequestOptionsJSON;
 export type WebAuthnRegistrationResponse = RegistrationResponseJSON;
-export type WebAuthnAuthenticationResponse = AuthenticationResponseJSON;
+type WebAuthnAuthenticationResponse = AuthenticationResponseJSON;
 
 export interface ApiResponse<T> {
   status: 'success' | 'error';
@@ -29,7 +29,7 @@ export interface PasskeyInfo {
 }
 
 // OIDC related types
-export interface OIDCConfig {
+interface OIDCConfig {
   id?: string;
   enabled: boolean;
   providerName: string;
@@ -47,7 +47,7 @@ export interface OIDCConfig {
   updatedAt?: string;
 }
 
-export interface OIDCConfigResponse {
+interface OIDCConfigResponse {
   config: OIDCConfig | null;
   isInitialized: boolean;
   clientSecret?: string | null;

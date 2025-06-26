@@ -32,7 +32,7 @@ import {
   TURN_SERVER_CREDENTIAL,
 } from '../config';
 
-export interface RoomViewProps {
+interface RoomViewProps {
   isPasswordProtected?: boolean;
   isPresenter?: boolean;
 }
