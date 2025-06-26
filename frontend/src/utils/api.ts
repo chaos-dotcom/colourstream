@@ -213,68 +213,6 @@ export const stopOBSStream = async (): Promise<void> => {
 };
 
 export const registerPasskey = async (): Promise<ApiResponse<WebAuthnRegistrationResponse>> => {
-    if (!response.data) {
-      throw new Error('No registration options received from server');
-    }
-
-    // Check if the options are nested in an 'options' property
-    const registrationOptions = response.data.options || response.data;
-
-    // Log the registration options for debugging
-    console.log('Server registration options:', response.data);
-
-    // Validate that we have the expected WebAuthn options structure
-    if (!registrationOptions.challenge || !registrationOptions.rp) {
-      console.log('Invalid options received from server:', response.data);
-      throw new Error('Server returned invalid registration options');
-    }
-
-    // Step 2: Start the registration process in the browser
-    try {
-      const credential = await startRegistration(registrationOptions);
-
-      // Step 3: Send the credential back to the server for verification
-      const verificationResponse = await api.post('/auth/webauthn/first-time-setup/verify', credential);
-
-      // Step 4: Store the authentication token
-      const result = verificationResponse.data;
-      console.log('Verification response received:', JSON.stringify(result, null, 2));
-
-      // Check if the token is in the expected location in the response
-      if (result.data && result.data.token) {
-        localStorage.setItem('adminToken', result.data.token);
-        localStorage.setItem('isAdminAuthenticated', 'true');
-
-        return {
-          status: 'success',
-          data: {
-            token: result.data.token,
-            verified: true
-          }
-        };
-      } else if (result.token) {
-        // Alternative location - directly in the result
-        localStorage.setItem('adminToken', result.token);
-        localStorage.setItem('isAdminAuthenticated', 'true');
-
-        return {
-          status: 'success',
-          data: {
-            token: result.token,
-            verified: true
-          }
-        };
-      } else {
-        console.error('Token not found in response:', result);
-        throw new Error('Registration successful but no token received');
-      }
-    } catch (error: any) {
-      console.error('WebAuthn registration error:', error);
-      throw new Error('Failed to register passkey');
-    }
-  } catch (error: any) {
-    console.error('Passkey setup error:', error);
-    throw new Error('Failed to set up passkey');
   try {
     // Step 1: Get registration options from the server
     const response = await api.post('/auth/webauthn/register');
