@@ -31,7 +31,6 @@ import {
   adminLogout, 
   generateMirotalkToken, 
   TokenGenerationRequest,
-  stopOBSStream, // Removed duplicate and added comma
   // Removed getAuthHeaders import
 } from '../utils/api';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
