@@ -23,14 +23,10 @@ import AwsS3 from '@uppy/aws-s3'; // Re-add AwsS3
 import Dropbox from '@uppy/dropbox';
 import GoogleDrivePicker from '@uppy/google-drive-picker';
 import type { UppyFile } from '@uppy/core';
-// Re-add AwsS3 specific types
-import type { AwsS3Part } from '@uppy/aws-s3'; // Use type from aws-s3
-// Base Uppy types (Meta, Body) removed as direct import caused issues
-import { v4 as uuidv4 } from 'uuid'; 
+
 import '@uppy/core/dist/style.min.css';
 import '@uppy/dashboard/dist/style.min.css';
 import { getUploadLink } from '../services/uploadService';
-import { ApiResponse } from '../types';
 import {
   UPLOAD_ENDPOINT_URL,
   API_URL,

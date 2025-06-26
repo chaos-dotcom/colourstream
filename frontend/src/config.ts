@@ -13,10 +13,6 @@ interface RuntimeConfig {
   // TURN server credentials
   TURN_SERVER_USERNAME?: string;
   TURN_SERVER_CREDENTIAL?: string;
-  // S3 configuration
-  S3_PUBLIC_ENDPOINT: string;
-  S3_REGION: string;
-  S3_BUCKET: string;
   // Companion configuration
   COMPANION_URL: string; // URL for Companion (used by Dropbox, Google Drive, etc.)
   // COMPANION_AWS_ENDPOINT: string; // Removed - Not used by @uppy/aws-s3 with backend signing
