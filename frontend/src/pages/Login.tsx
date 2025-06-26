@@ -4,7 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import PasskeyLogin from '../components/PasskeyLogin';
 import FirstTimeSetup from '../components/FirstTimeSetup';
 import { checkSetupRequired, getOIDCConfig, loginWithOIDC, handleOIDCCallback } from '../utils/api';
-import { Button, WarningText, InsetText, PageHeading } from '../components/GovUkComponents';
+import { Button, InsetText, PageHeading } from '../components/GovUkComponents';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
