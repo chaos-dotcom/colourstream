@@ -5,7 +5,7 @@
 Contact: mailto:security@johnrogerscolour.co.uk
 Contact: https://live.colourstream.johnrogerscolour.co.uk/security-contact
 
-# Expiration date (1 year from today)
+# Expiration date
 Expires: 2025-02-27T23:59:59+00:00
 
 # Preferred languages
@@ -19,9 +19,3 @@ Acknowledgments: https://live.colourstream.johnrogerscolour.co.uk/security-ackno
 
 # Canonical URL
 Canonical: https://live.colourstream.johnrogerscolour.co.uk/.well-known/security.txt
-
-# Encryption key (if available)
-# Encryption: https://live.colourstream.johnrogerscolour.co.uk/pgp-key.txt
-
-# Hiring information (optional)
-# Hiring: https://live.colourstream.johnrogerscolour.co.uk/jobs 
