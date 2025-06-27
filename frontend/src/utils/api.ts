@@ -40,15 +40,15 @@ api.interceptors.response.use(
   }
 );
 
-export interface RoomsResponse {
+interface RoomsResponse {
   rooms: Room[];
 }
 
-export interface CleanupResponse {
+interface CleanupResponse {
   deletedCount: number;
 }
 
-export interface CreateRoomData {
+interface CreateRoomData {
   name: string;
   password: string;
   expiryDays: number;
@@ -56,7 +56,7 @@ export interface CreateRoomData {
   mirotalkPassword?: string;
 }
 
-export interface Room {
+interface Room {
   id: string;
   name: string;
   link: string;
