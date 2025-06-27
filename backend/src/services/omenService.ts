@@ -1,5 +1,4 @@
 import axios, { AxiosError } from 'axios';
-import { logger } from '../utils/logger';
 
 interface OvenStatistics {
     connections: {
@@ -32,6 +31,7 @@ export class OvenMediaEngineService {
     private baseURL: string;
     private accessToken: string;
     private isInitialized = false;
+    private logger: any;
 
     constructor() {
         this.baseURL = process.env.OME_API_URL || 'http://origin:8081';
@@ -43,15 +43,18 @@ export class OvenMediaEngineService {
             return;
         }
         
-        logger.info(`Initialized OvenMediaEngine Service with URL: ${this.baseURL}`);
-        logger.info(`Using API access token: ${this.accessToken ? '********' : 'default token'}`);
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        this.logger = require('../utils/logger').logger;
+
+        this.logger.info(`Initialized OvenMediaEngine Service with URL: ${this.baseURL}`);
+        this.logger.info(`Using API access token: ${this.accessToken ? '********' : 'default token'}`);
         
         if (!this.baseURL) {
-            logger.error('OvenMediaEngine API URL is not configured! Set OME_API_URL environment variable.');
+            this.logger.error('OvenMediaEngine API URL is not configured! Set OME_API_URL environment variable.');
         }
         
         if (!this.accessToken) {
-            logger.error('OvenMediaEngine API access token is not configured! Set OME_API_ACCESS_TOKEN environment variable.');
+            this.logger.error('OvenMediaEngine API access token is not configured! Set OME_API_ACCESS_TOKEN environment variable.');
         }
         this.isInitialized = true;
     }
@@ -69,7 +72,7 @@ export class OvenMediaEngineService {
             // Create Basic auth header
             const basicAuthHeader = 'Basic ' + Buffer.from(`${this.accessToken}:`).toString('base64');
             
-            logger.debug('Making OvenMediaEngine API request:', {
+            this.logger.debug('Making OvenMediaEngine API request:', {
                 method,
                 url: `${this.baseURL}${path}`,
                 headers: {
@@ -90,7 +93,7 @@ export class OvenMediaEngineService {
 
             return response.data;
         } catch (error) {
-            logger.error('OvenMediaEngine API error:', {
+            this.logger.error('OvenMediaEngine API error:', {
                 error,
                 path,
                 method,
