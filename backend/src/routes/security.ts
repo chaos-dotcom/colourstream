@@ -70,7 +70,10 @@ router.post('/block-ip',
             }
 
             const { ip, reason, duration } = req.body;
-            await blockedIPService.blockIP(ip, reason, duration);
+
+            // Convert duration from hours to milliseconds if provided
+            const durationInMs = duration ? Number(duration) * 60 * 60 * 1000 : undefined;
+            await blockedIPService.blockIP(ip, reason, durationInMs);
 
             res.json({
                 status: 'success',
