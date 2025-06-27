@@ -35,8 +35,25 @@ router.post('/admission', async (req: Request, res: Response) => {
     ) {
       const request = body.request;
       const url = new URL(request.url);
-      const pathParts = url.pathname.split('/');
-      const streamKey = pathParts[pathParts.length - 1];
+      const protocolLower = request.protocol?.toLowerCase() || '';
+      let streamKey: string | undefined | null;
+
+      if (protocolLower === 'srt') {
+        const streamId = url.searchParams.get('streamid');
+        if (streamId) {
+          const streamIdParts = streamId.split('/');
+          streamKey = streamIdParts[streamIdParts.length - 1];
+        }
+      } else {
+        // Default behavior for RTMP, WebRTC
+        const pathParts = url.pathname.split('/');
+        streamKey = pathParts[pathParts.length - 1];
+      }
+
+      if (!streamKey) {
+        logger.warn('Could not extract stream key from admission request', { url: request.url });
+        return res.json({ allowed: false, reason: 'Stream key could not be determined from request URL' });
+      }
       
       logger.info('Processing stream key', { 
         streamKey,
@@ -78,9 +95,6 @@ router.post('/admission', async (req: Request, res: Response) => {
       logger.info('Valid stream key for room', { roomId: room.id, streamKey });
       
       // Format response based on protocol to ensure proper WebRTC signaling
-      // Convert protocol to lowercase for case-insensitive comparison
-      const protocolLower = request.protocol?.toLowerCase() || '';
-      
       if (protocolLower === 'webrtc') {
         logger.info('Handling WebRTC connection', { 
           originalUrl: request.url,
