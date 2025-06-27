@@ -28,20 +28,22 @@ interface ApiResponse<T> {
 }
 
 export class OvenMediaEngineService {
-    private baseURL: string;
-    private accessToken: string;
+    private baseURL!: string;
+    private accessToken!: string;
     private isInitialized = false;
     private logger: any;
 
     constructor() {
-        this.baseURL = process.env.OME_API_URL || 'http://origin:8081';
-        this.accessToken = process.env.OME_API_ACCESS_TOKEN || '0fc62ea62790ad7c';
+        // Defer initialization to the initialize method
     }
 
     private initialize() {
         if (this.isInitialized) {
             return;
         }
+
+        this.baseURL = process.env.OME_API_URL || 'http://origin:8081';
+        this.accessToken = process.env.OME_API_ACCESS_TOKEN || '0fc62ea62790ad7c';
         
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         this.logger = require('../utils/logger').logger;
