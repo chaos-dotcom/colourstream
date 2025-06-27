@@ -1,7 +1,6 @@
 import express from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { omenService } from '../services/omenService';
-import { logger } from '../utils/logger';
 
 const router = express.Router();
 
@@ -14,7 +13,6 @@ router.get('/vhosts', authenticateToken, async (_req, res, next) => {
             data: { vhosts }
         });
     } catch (error) {
-        logger.error('Error fetching virtual hosts:', error);
         next(error);
     }
 });
@@ -28,7 +26,6 @@ router.get('/vhosts/:vhost/apps', authenticateToken, async (req, res, next) => {
             data: { applications }
         });
     } catch (error) {
-        logger.error(`Error fetching applications for vhost ${req.params.vhost}:`, error);
         next(error);
     }
 });
@@ -42,7 +39,6 @@ router.get('/vhosts/:vhost/stats', authenticateToken, async (req, res, next) => 
             data: { stats }
         });
     } catch (error) {
-        logger.error(`Error fetching stats for vhost ${req.params.vhost}:`, error);
         next(error);
     }
 });
@@ -56,7 +52,6 @@ router.get('/vhosts/:vhost/apps/:app/stats', authenticateToken, async (req, res,
             data: { stats }
         });
     } catch (error) {
-        logger.error(`Error fetching stats for app ${req.params.app}:`, error);
         next(error);
     }
 });
@@ -74,7 +69,6 @@ router.get('/vhosts/:vhost/apps/:app/streams/:stream/stats', authenticateToken, 
             data: { stats }
         });
     } catch (error) {
-        logger.error(`Error fetching stats for stream ${req.params.stream}:`, error);
         next(error);
     }
 });
