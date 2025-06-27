@@ -10,10 +10,7 @@ export interface ApiResponse<T> {
   message?: string;
 }
 
-export interface AuthResponse {
-  token: string;
-  verified?: boolean;
-}
+
 
 export interface PasskeyInfo {
   id: string;
