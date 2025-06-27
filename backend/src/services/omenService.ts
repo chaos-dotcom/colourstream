@@ -31,10 +31,17 @@ interface ApiResponse<T> {
 export class OvenMediaEngineService {
     private baseURL: string;
     private accessToken: string;
+    private isInitialized = false;
 
     constructor() {
         this.baseURL = process.env.OME_API_URL || 'http://origin:8081';
         this.accessToken = process.env.OME_API_ACCESS_TOKEN || '0fc62ea62790ad7c';
+    }
+
+    private initialize() {
+        if (this.isInitialized) {
+            return;
+        }
         
         logger.info(`Initialized OvenMediaEngine Service with URL: ${this.baseURL}`);
         logger.info(`Using API access token: ${this.accessToken ? '********' : 'default token'}`);
@@ -46,6 +53,7 @@ export class OvenMediaEngineService {
         if (!this.accessToken) {
             logger.error('OvenMediaEngine API access token is not configured! Set OME_API_ACCESS_TOKEN environment variable.');
         }
+        this.isInitialized = true;
     }
 
     private validateParameters(...params: string[]) {
@@ -56,6 +64,7 @@ export class OvenMediaEngineService {
     }
 
     private async makeRequest<T>(method: string, path: string, data?: any): Promise<ApiResponse<T>> {
+        this.initialize();
         try {
             // Create Basic auth header
             const basicAuthHeader = 'Basic ' + Buffer.from(`${this.accessToken}:`).toString('base64');
