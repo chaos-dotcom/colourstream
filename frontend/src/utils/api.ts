@@ -75,7 +75,7 @@ export interface RoomConfig {
   isPresenter?: boolean;
 }
 
-interface OBSSettings {
+export interface OBSSettings {
   host: string;
   port: number;
   password?: string;
@@ -85,7 +85,7 @@ interface OBSSettings {
   protocol?: 'rtmp' | 'srt';
 }
 
-interface OBSConnectionStatus {
+export interface OBSConnectionStatus {
   status: 'disconnected' | 'connected' | 'connecting' | 'error';
   error?: string;
 }
@@ -97,7 +97,7 @@ export interface TokenGenerationRequest {
   expireTime?: string;
 }
 
-interface TokenGenerationResponse {
+export interface TokenGenerationResponse {
   url: string;
   token: string;
   expiresIn: number;
