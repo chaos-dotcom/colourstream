@@ -56,6 +56,16 @@
     "ts-prune": "^0.10.3",
     "typescript": "^5.8.3"
   },
+  "knip": {
+    "entry": [
+      "src/index.ts",
+      "scripts/migrate-sqlite-to-postgres.js"
+    ],
+    "project": [
+      "src/**/*.ts",
+      "scripts/**/*.js"
+    ]
+  },
   "keywords": [],
   "author": "",
   "license": "ISC"
