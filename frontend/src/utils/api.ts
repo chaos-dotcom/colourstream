@@ -121,12 +121,12 @@ export interface OIDCConfig {
   updatedAt: Date;
 }
 
-export interface OIDCConfigResponse {
+ interface OIDCConfigResponse {
   config: OIDCConfig | null;
   isInitialized: boolean;
 }
 
-export interface AuthResult {
+ interface AuthResult {
   success: boolean;
   token?: string;
   error?: string;
