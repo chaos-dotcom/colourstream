@@ -1,4 +1,5 @@
 import axios, { AxiosError } from 'axios';
+import { logger } from '../utils/logger';
 
 interface OvenStatistics {
     connections: {
@@ -28,37 +29,23 @@ interface ApiResponse<T> {
 }
 
 export class OvenMediaEngineService {
-    private baseURL!: string;
-    private accessToken!: string;
-    private isInitialized = false;
-    private logger: any;
+    private baseURL: string;
+    private accessToken: string;
 
     constructor() {
-        // Defer initialization to the initialize method
-    }
-
-    private initialize() {
-        if (this.isInitialized) {
-            return;
-        }
-
         this.baseURL = process.env.OME_API_URL || 'http://origin:8081';
         this.accessToken = process.env.OME_API_ACCESS_TOKEN || '0fc62ea62790ad7c';
         
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        this.logger = require('../utils/logger').logger;
-
-        this.logger.info(`Initialized OvenMediaEngine Service with URL: ${this.baseURL}`);
-        this.logger.info(`Using API access token: ${this.accessToken ? '********' : 'default token'}`);
+        logger.info(`Initialized OvenMediaEngine Service with URL: ${this.baseURL}`);
+        logger.info(`Using API access token: ${this.accessToken ? '********' : 'default token'}`);
         
         if (!this.baseURL) {
-            this.logger.error('OvenMediaEngine API URL is not configured! Set OME_API_URL environment variable.');
+            logger.error('OvenMediaEngine API URL is not configured! Set OME_API_URL environment variable.');
         }
         
         if (!this.accessToken) {
-            this.logger.error('OvenMediaEngine API access token is not configured! Set OME_API_ACCESS_TOKEN environment variable.');
+            logger.error('OvenMediaEngine API access token is not configured! Set OME_API_ACCESS_TOKEN environment variable.');
         }
-        this.isInitialized = true;
     }
 
     private validateParameters(...params: string[]) {
@@ -69,12 +56,11 @@ export class OvenMediaEngineService {
     }
 
     private async makeRequest<T>(method: string, path: string, data?: any): Promise<ApiResponse<T>> {
-        this.initialize();
         try {
             // Create Basic auth header
-            const basicAuthHeader = 'Basic ' + Buffer.from(`${this.accessToken}:`).toString('base64');
+            const basicAuthHeader = 'Basic ' + Buffer.from(this.accessToken).toString('base64');
             
-            this.logger.debug('Making OvenMediaEngine API request:', {
+            logger.debug('Making OvenMediaEngine API request:', {
                 method,
                 url: `${this.baseURL}${path}`,
                 headers: {
@@ -95,7 +81,7 @@ export class OvenMediaEngineService {
 
             return response.data;
         } catch (error) {
-            this.logger.error('OvenMediaEngine API error:', {
+            logger.error('OvenMediaEngine API error:', {
                 error,
                 path,
                 method,
@@ -152,4 +138,4 @@ export class OvenMediaEngineService {
 }
 
 // Create singleton instance for the service
-export const omenService = new OvenMediaEngineService();
+export const omenService = new OvenMediaEngineService(); 
