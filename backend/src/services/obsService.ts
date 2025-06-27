@@ -20,7 +20,7 @@ interface OBSSettings {
   localNetworkPort: number;
 }
 
-export class OBSService {
+class OBSService {
   private obsWebSocket: OBSWebSocketService;
   private obs: OBSWebSocket;
   private rtmpServer: string;
