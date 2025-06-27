@@ -85,19 +85,19 @@ interface OBSSettings {
   protocol?: 'rtmp' | 'srt';
 }
 
-export interface OBSConnectionStatus {
+interface OBSConnectionStatus {
   status: 'disconnected' | 'connected' | 'connecting' | 'error';
   error?: string;
 }
 
-export interface TokenGenerationRequest {
+ interface TokenGenerationRequest {
   roomId: string;
   name: string;
   isPresenter: boolean;
   expireTime?: string;
 }
 
-export interface TokenGenerationResponse {
+interface TokenGenerationResponse {
   url: string;
   token: string;
   expiresIn: number;
