@@ -26,7 +26,7 @@ export const generalLimiter = rateLimit({
     }
 });
 // Stricter rate limiter for login attempts
-const loginLimiter = rateLimit({
+export const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 10, // Increased from 5 to 10 login attempts per windowMs
     message: 'Too many login attempts from this IP, please try again later',
@@ -35,7 +35,7 @@ const loginLimiter = rateLimit({
 });
 
 // Middleware to check if IP is blocked
-const ipBlocker = async (req: Request, res: Response, next: NextFunction) => {
+export const ipBlocker = async (req: Request, res: Response, next: NextFunction) => {
     try {
         // Skip IP blocking for authentication and OBS routes
         if (req.path.endsWith('/auth/login') ||
@@ -61,7 +61,7 @@ const ipBlocker = async (req: Request, res: Response, next: NextFunction) => {
     }
 };
 // Middleware to track failed login attempts and block IPs if necessary
-const trackLoginAttempts = async (req: Request, res: Response, next: NextFunction) => {
+export const trackLoginAttempts = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const clientIP = req.ip || req.socket.remoteAddress || 'unknown';
 
