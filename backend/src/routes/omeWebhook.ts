@@ -95,9 +95,6 @@ router.post('/admission', async (req: Request, res: Response) => {
       logger.info('Valid stream key for room', { roomId: room.id, streamKey });
       
       // Format response based on protocol to ensure proper WebRTC signaling
-      // Convert protocol to lowercase for case-insensitive comparison
-      const protocolLower = request.protocol?.toLowerCase() || '';
-      
       if (protocolLower === 'webrtc') {
         logger.info('Handling WebRTC connection', { 
           originalUrl: request.url,
