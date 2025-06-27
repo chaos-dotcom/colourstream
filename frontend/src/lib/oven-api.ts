@@ -16,7 +16,7 @@ export interface OvenStatistics {
     lastThroughputOut: number;
 }
 
-interface Application {
+export interface Application {
     name: string;
     type: string;
 }
