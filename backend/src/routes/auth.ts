@@ -1,6 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { AppError } from '../middleware/errorHandler';
+import { loginLimiter, trackLoginAttempts } from '../middleware/security';
 import { authenticateToken } from '../middleware/auth';
 import { logger } from '../utils/logger';
 import prisma from '../lib/prisma';
@@ -193,7 +194,7 @@ router.post('/oidc/fix-token-url-public', async (_req: Request, res: Response, n
 });
 
 // OIDC token exchange endpoint - exchanges authorization code for token
-router.post('/oidc/token-exchange', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/oidc/token-exchange', loginLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { code, redirectUri } = req.body;
     
@@ -390,7 +391,8 @@ router.post('/oidc/token-exchange', async (req: Request, res: Response, next: Ne
       error: error.message,
       stack: error.stack
     });
-    next(error);
+    // Track failed login attempt
+    await trackLoginAttempts(req, res, () => next(error));
   }
 });
 
@@ -564,7 +566,7 @@ router.post('/webauthn/register/verify', async (req: Request, res: Response, nex
 });
 
 // WebAuthn authentication endpoint
-router.post('/webauthn/authenticate', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/webauthn/authenticate', loginLimiter, async (req: Request, res: Response, next: NextFunction) => {
     try {
         logger.info('Starting WebAuthn authentication process', {
             userAgent: req.headers['user-agent'],
@@ -628,7 +630,7 @@ router.post('/webauthn/authenticate', async (req: Request, res: Response, next: 
 });
 
 // WebAuthn authentication verification endpoint
-router.post('/webauthn/authenticate/verify', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/webauthn/authenticate/verify', loginLimiter, async (req: Request, res: Response, next: NextFunction) => {
     try {
         logger.info('Starting WebAuthn authentication verification', {
             userAgent: req.headers['user-agent'],
@@ -762,7 +764,8 @@ router.post('/webauthn/authenticate/verify', async (req: Request, res: Response,
     } catch (error) {
         // Clear the challenge on any error
         currentChallenge = undefined;
-        next(error);
+        // Track failed login attempt
+        await trackLoginAttempts(req, res, () => next(error));
     }
 });
 

@@ -1,0 +1,19 @@
+name: test
+on: [pull_request, push, workflow_dispatch]
+jobs:
+    test:
+        name: Backend Tests
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v3
+              with:
+                fetch-depth: 0
+            - name: Set up Node.js
+              uses: actions/setup-node@v3
+              with:
+                node-version: '20'
+            - name: Install backend dependencies
+              run: npm install --prefix backend
+            - name: Run backend tests
+              run: npm run test:backend
+              

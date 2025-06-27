@@ -1,0 +1,27 @@
+name: knip
+on: [pull_request, push, workflow_dispatch]
+jobs:
+    knip:
+        name: npm knip
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v3
+              with:
+                fetch-depth: 0
+            - name: Set up Node.js
+              uses: actions/setup-node@v3
+              with:
+                node-version: '20'
+            - name: Install backend dependencies
+              run: npm install
+              working-directory: ./backend
+            - name: Run backend knip
+              run: npm run knip
+              working-directory: ./backend
+            - name: Install frontend dependencies
+              run: npm install
+              working-directory: ./frontend
+            - name: Run frontend knip
+              run: npm run knip
+              working-directory: ./frontend
+              
