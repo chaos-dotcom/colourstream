@@ -98,14 +98,14 @@ const getConfig = (key: keyof RuntimeConfig): string => {
 
 // Export configuration values
 export const API_URL = getConfig('API_URL');
-export const OIDC_AUTH_ENDPOINT = getConfig('OIDC_AUTH_ENDPOINT');
+const OIDC_AUTH_ENDPOINT = getConfig('OIDC_AUTH_ENDPOINT');
 export const WEBRTC_WS_HOST = getConfig('WEBRTC_WS_HOST');
 export const WEBRTC_WS_PORT = getConfig('WEBRTC_WS_PORT');
 export const WEBRTC_WS_PROTOCOL = getConfig('WEBRTC_WS_PROTOCOL');
 export const WEBRTC_APP_PATH = getConfig('WEBRTC_APP_PATH');
 export const VIDEO_URL = getConfig('VIDEO_URL');
 export const OVENPLAYER_SCRIPT_URL = getConfig('OVENPLAYER_SCRIPT_URL');
-export const UPLOAD_ENDPOINT_URL = getConfig('UPLOAD_ENDPOINT_URL');
+const UPLOAD_ENDPOINT_URL = getConfig('UPLOAD_ENDPOINT_URL');
 export const NAMEFORUPLOADCOMPLETION = getConfig('NAMEFORUPLOADCOMPLETION');
 // Export TURN server credentials
 export const TURN_SERVER_USERNAME = getConfig('TURN_SERVER_USERNAME');
@@ -113,7 +113,7 @@ export const TURN_SERVER_CREDENTIAL = getConfig('TURN_SERVER_CREDENTIAL');
 // Export Companion configuration
 export const COMPANION_URL = getConfig('COMPANION_URL'); // URL for Companion (used by Dropbox, Google Drive, etc.)
 // export const COMPANION_AWS_ENDPOINT = getConfig('COMPANION_AWS_ENDPOINT'); // Removed
-export const USE_COMPANION = getConfig('USE_COMPANION') === 'true'; // Still relevant for providers like Dropbox/Google Drive
+const USE_COMPANION = getConfig('USE_COMPANION') === 'true'; // Still relevant for providers like Dropbox/Google Drive
 // Export Provider configuration
 export const ENABLE_DROPBOX = getConfig('ENABLE_DROPBOX') === 'true';
 export const ENABLE_GOOGLE_DRIVE = getConfig('ENABLE_GOOGLE_DRIVE') === 'true';
@@ -147,26 +147,3 @@ if (typeof window !== 'undefined') {
     source: window.RUNTIME_CONFIG ? 'runtime' : 'build-time'
   });
 }
-
-export default {
-  API_URL,
-  OIDC_AUTH_ENDPOINT,
-  WEBRTC_WS_HOST,
-  WEBRTC_WS_PORT,
-  WEBRTC_WS_PROTOCOL,
-  WEBRTC_APP_PATH,
-  VIDEO_URL,
-  OVENPLAYER_SCRIPT_URL,
-  UPLOAD_ENDPOINT_URL,
-  NAMEFORUPLOADCOMPLETION,
-  TURN_SERVER_USERNAME,
-  TURN_SERVER_CREDENTIAL,
-  COMPANION_URL,
-  // COMPANION_AWS_ENDPOINT, // Removed
-  USE_COMPANION,
-  ENABLE_DROPBOX,
-  ENABLE_GOOGLE_DRIVE,
-  GOOGLE_DRIVE_CLIENT_ID,
-  GOOGLE_DRIVE_API_KEY,
-  GOOGLE_DRIVE_APP_ID
-}; 
