@@ -90,7 +90,7 @@ interface OBSConnectionStatus {
   error?: string;
 }
 
- interface TokenGenerationRequest {
+export interface TokenGenerationRequest {
   roomId: string;
   name: string;
   isPresenter: boolean;
