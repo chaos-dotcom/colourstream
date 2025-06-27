@@ -58,7 +58,7 @@ export class OvenMediaEngineService {
     private async makeRequest<T>(method: string, path: string, data?: any): Promise<ApiResponse<T>> {
         try {
             // Create Basic auth header
-            const basicAuthHeader = 'Basic ' + Buffer.from(this.accessToken).toString('base64');
+            const basicAuthHeader = 'Basic ' + Buffer.from(`${this.accessToken}:`).toString('base64');
             
             logger.debug('Making OvenMediaEngine API request:', {
                 method,
