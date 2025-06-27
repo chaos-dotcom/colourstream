@@ -16,7 +16,7 @@ export interface OvenStatistics {
     lastThroughputOut: number;
 }
 
-export interface Application {
+interface Application { // Represents an application in OvenMediaEngine
     name: string;
     type: string;
 }
