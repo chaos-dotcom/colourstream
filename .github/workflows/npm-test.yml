@@ -2,7 +2,7 @@ name: test
 on: [pull_request, push, workflow_dispatch]
 jobs:
     test:
-        name: npm test
+        name: Backend Tests
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v3
@@ -12,10 +12,8 @@ jobs:
               uses: actions/setup-node@v3
               with:
                 node-version: '20'
-            - name: Install dependencies
-              run: npm install
-            - name: install jest 
-              run: npm install --save-dev jest
-            - name: Run tests
-              run: npm test
+            - name: Install backend dependencies
+              run: npm install --prefix backend
+            - name: Run backend tests
+              run: npm run test:backend
               
