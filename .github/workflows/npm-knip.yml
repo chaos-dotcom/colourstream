@@ -12,8 +12,16 @@ jobs:
               uses: actions/setup-node@v3
               with:
                 node-version: '20'
-            - name: Install dependencies
+            - name: Install backend dependencies
               run: npm install
-            - name: Run knips
+              working-directory: ./backend
+            - name: Run backend knip
               run: npm run knip
+              working-directory: ./backend
+            - name: Install frontend dependencies
+              run: npm install
+              working-directory: ./frontend
+            - name: Run frontend knip
+              run: npm run knip
+              working-directory: ./frontend
               
