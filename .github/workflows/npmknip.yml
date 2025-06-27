@@ -1,9 +1,9 @@
-name: test
+name: knip
 on: [pull_request, push, workflow_dispatch]
 jobs:
-    test:
-        name: npm test
-        runs-on: ubuntu-latest
+    knip:
+        name: npm knip
+        runs-on: ubuntu-laknip
         steps:
             - uses: actions/checkout@v3
               with:
@@ -14,6 +14,6 @@ jobs:
                 node-version: '20'
             - name: Install dependencies
               run: npm install
-            - name: Run tests
-              run: npm test
+            - name: Run knips
+              run: npm run knip
               
