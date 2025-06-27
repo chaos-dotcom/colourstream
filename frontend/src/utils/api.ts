@@ -40,11 +40,11 @@ api.interceptors.response.use(
   }
 );
 
-interface RoomsResponse {
+export interface RoomsResponse {
   rooms: Room[];
 }
 
-interface CleanupResponse {
+ export interface CleanupResponse {
   deletedCount: number;
 }
 
@@ -56,7 +56,7 @@ interface CreateRoomData {
   mirotalkPassword?: string;
 }
 
-interface Room {
+export interface Room {
   id: string;
   name: string;
   link: string;
@@ -75,7 +75,7 @@ export interface RoomConfig {
   isPresenter?: boolean;
 }
 
-interface OBSSettings {
+export interface OBSSettings {
   host: string;
   port: number;
   password?: string;
@@ -85,7 +85,7 @@ interface OBSSettings {
   protocol?: 'rtmp' | 'srt';
 }
 
-interface OBSConnectionStatus {
+export interface OBSConnectionStatus {
   status: 'disconnected' | 'connected' | 'connecting' | 'error';
   error?: string;
 }
@@ -97,7 +97,7 @@ export interface TokenGenerationRequest {
   expireTime?: string;
 }
 
-interface TokenGenerationResponse {
+export interface TokenGenerationResponse {
   url: string;
   token: string;
   expiresIn: number;
@@ -121,12 +121,12 @@ export interface OIDCConfig {
   updatedAt: Date;
 }
 
-interface OIDCConfigResponse {
+export interface OIDCConfigResponse {
   config: OIDCConfig | null;
   isInitialized: boolean;
 }
 
-interface AuthResult {
+export interface AuthResult {
   success: boolean;
   token?: string;
   error?: string;
