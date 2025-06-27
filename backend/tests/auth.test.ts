@@ -1,6 +1,16 @@
 import request from 'supertest';
 import express from 'express';
 import jwt from 'jsonwebtoken';
+
+// Mock PrismaClient before it's used in uploadRoutes to prevent DB connection errors.
+jest.mock('@prisma/client', () => ({
+  PrismaClient: jest.fn(() => ({
+    client: {
+      findMany: jest.fn().mockRejectedValue(new Error('Simulated DB Error')),
+    },
+  })),
+}));
+
 import uploadRoutes from '../src/routes/upload';
 
 let app: express.Application;
@@ -49,14 +59,20 @@ describe('Authentication on protected routes', () => {
   // which is not available in this test setup. A 500 error from the route handler
   // indicates that the request successfully passed the authentication middleware.
   it('should pass authentication with a valid token and proceed to the route handler', async () => {
+    // Suppress console.error for this test since we expect an error to be logged.
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
     const token = jwt.sign({ userId: '12alicesmith', type: 'admin' }, process.env.ADMIN_AUTH_SECRET!, { expiresIn: '1h' });
     const res = await request(app)
       .get(protectedRoute)
       .set('Authorization', `Bearer ${token}`);
     
-    // We expect a 500 error because the Prisma client in the route handler is not connected to a database.
+    // We expect a 500 error because the Prisma client is mocked to throw an error.
     // This proves authentication was successful and the request was passed to the handler.
     expect(res.status).toBe(500);
     expect(res.body.message).toBe('Failed to fetch clients');
+
+    // Restore console.error
+    consoleErrorSpy.mockRestore();
   });
 });
