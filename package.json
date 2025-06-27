@@ -7,7 +7,9 @@
     "audit:frontend": "cd frontend && npm audit",
     "audit:backend": "cd backend && npm audit",
     "audit:fix": "npm audit fix && cd frontend && npm audit fix && cd ../backend && npm audit fix",
-    "audit:report": "node scripts/npm-audit-report.js"
+    "audit:report": "node scripts/npm-audit-report.js",
+    "test": "npm run test:backend",
+    "test:backend": "cd backend && npm test"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
