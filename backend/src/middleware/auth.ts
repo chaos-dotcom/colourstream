@@ -58,19 +58,3 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
     return res.status(403).json({ status: 'error', message: 'Invalid or expired token' });
   }
 }
-
-export function isAdmin(req: Request, res: Response, next: NextFunction) {
-  if (!req.user || req.user.type !== 'admin') {
-    logger.warn('Authorization failed: Admin access required', { user: req.user });
-    return res.status(403).json({ status: 'error', message: 'Admin access required' });
-  }
-  next();
-}
-
-export function isOIDCAuthenticated(req: Request, res: Response, next: NextFunction) {
-  if (!req.oidc || !req.oidc.isAuthenticated || !req.oidc.isAuthenticated()) {
-    logger.warn('OIDC Authentication failed: User not authenticated');
-    return res.status(401).json({ status: 'error', message: 'OIDC authentication required' });
-  }
-  next();
-} 

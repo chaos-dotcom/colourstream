@@ -227,5 +227,3 @@ export class OBSWebSocketService {
     logger.info('OBS WebSocket service cleaned up');
   }
 }
-
-export default OBSWebSocketService; 

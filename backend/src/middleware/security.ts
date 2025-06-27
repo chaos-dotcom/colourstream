@@ -26,15 +26,6 @@ export const generalLimiter = rateLimit({
     }
 });
 
-// Stricter rate limiter for login attempts
-export const loginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 10, // Increased from 5 to 10 login attempts per windowMs
-    message: 'Too many login attempts from this IP, please try again later',
-    standardHeaders: true,
-    legacyHeaders: false,
-});
-
 // Middleware to check if IP is blocked
 export const ipBlocker = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -58,34 +49,6 @@ export const ipBlocker = async (req: Request, res: Response, next: NextFunction)
         next();
     } catch (error) {
         logger.error('Error in IP blocker middleware:', error);
-        next(error);
-    }
-};
-
-// Middleware to track failed login attempts and block IPs if necessary
-export const trackLoginAttempts = async (req: Request, res: Response, next: NextFunction) => {
-    try {
-        const clientIP = req.ip || req.socket.remoteAddress || 'unknown';
-        
-        // Check if already blocked
-        if (await blockedIPService.isBlocked(clientIP)) {
-            return res.status(403).json({ error: 'IP is blocked due to too many failed attempts' });
-        }
-
-        // Increment failed attempts
-        const attempts = await blockedIPService.incrementFailedAttempts(clientIP, 'Failed login attempt');
-        
-        // Block after 20 failed attempts (increased from 10)
-        if (attempts >= 20) {
-            // Block for 1 hour instead of 24 hours
-            await blockedIPService.blockIP(clientIP, 'Too many failed login attempts', 60 * 60 * 1000);
-            logger.warn(`IP ${clientIP} blocked due to too many failed login attempts`);
-            return res.status(403).json({ error: 'IP has been blocked due to too many failed login attempts. Try again in 1 hour.' });
-        }
-
-        next();
-    } catch (error) {
-        logger.error('Error in login attempts tracking middleware:', error);
         next(error);
     }
 };

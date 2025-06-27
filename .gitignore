@@ -93,3 +93,7 @@ scripts/template_checker/reports/
 
 # Temporary Files
 /tus-data
+backend/knip2
+backend/knip3
+frontend/knip2
+frontend/knip3
