@@ -138,4 +138,4 @@ export class OvenMediaEngineService {
 }
 
 // Create singleton instance for the service
-export const omenService = new OvenMediaEngineService(); 
+export default new OvenMediaEngineService();
