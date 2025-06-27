@@ -126,7 +126,7 @@ interface OIDCConfigResponse {
   isInitialized: boolean;
 }
 
-interface AuthResult {
+export interface AuthResult {
   success: boolean;
   token?: string;
   error?: string;
