@@ -48,7 +48,7 @@ export interface RoomsResponse {
   deletedCount: number;
 }
 
-interface CreateRoomData {
+export interface CreateRoomData {
   name: string;
   password: string;
   expiryDays: number;
