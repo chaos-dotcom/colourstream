@@ -75,7 +75,7 @@ export interface RoomConfig {
   isPresenter?: boolean;
 }
 
-export interface OBSSettings {
+interface OBSSettings {
   host: string;
   port: number;
   password?: string;
