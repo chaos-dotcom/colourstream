@@ -18,7 +18,7 @@
     "@mui/icons-material": "^6.4.5",
     "@mui/material": "^6.4.5",
     "@simplewebauthn/browser": "^13.1.2",
-    "@simplewebauthn/server": "^13.1.1",
+    "@simplewebauthn/server": "^13.1.2",
     "@types/js-cookie": "^3.0.6",
     "@uppy/tus": "^4.2.2",
     "axios": "^1.10.0",
