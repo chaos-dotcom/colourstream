@@ -30,7 +30,7 @@
     "express-rate-limit": "^7.5.0",
     "express-validator": "^7.0.1",
     "jsonwebtoken": "^9.0.2",
-    "multer": "^2.0.1",
+    "multer": "^2.0.2",
     "obs-websocket-js": "^5.0.6",
     "socket.io": "^4.8.1",
     "uuid": "^11.1.0",
