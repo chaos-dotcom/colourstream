@@ -212,8 +212,8 @@ const UploadPortal: React.FC = () => {
             allowMultipleUploadBatches: true,
             debug: true, // Enable debug for troubleshooting
             restrictions: {
-              maxFileSize: 640000000000, // 640GB (ProRes files can be very large)
-              maxNumberOfFiles: 1000,
+              maxFileSize: 6400000000000, // 640GB (ProRes files can be very large)
+              maxNumberOfFiles: 100000,
               // Allow all file types - this service is for all files
             },
             // Set global metadata using clientCode
