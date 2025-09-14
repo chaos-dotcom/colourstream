@@ -16,6 +16,15 @@ const PasskeySetupPage: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    const isAuthenticated = localStorage.getItem('isAdminAuthenticated') === 'true';
+    const needsSetup = localStorage.getItem('needsPasskeySetup');
+
+    // If user is authenticated and doesn't need to set up a passkey, redirect them.
+    if (isAuthenticated && !needsSetup) {
+      navigate('/admin/dashboard');
+      return;
+    }
+
     // Check if browser supports passkeys
     const checkPasskeySupport = async () => {
       try {
@@ -37,7 +46,7 @@ const PasskeySetupPage: React.FC = () => {
     };
 
     checkPasskeySupport();
-  }, []);
+  }, [navigate]);
 
   const handleRegisterPasskey = async () => {
     setError(null);
