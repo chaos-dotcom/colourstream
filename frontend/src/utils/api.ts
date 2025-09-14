@@ -445,6 +445,18 @@ export const handleOIDCCallback = async (): Promise<AuthResult> => {
 };
 
 
+export const isSetupRequired = async (): Promise<{ setupRequired: boolean }> => {
+  try {
+    const response = await api.get('/auth/setup-required');
+    return response.data.data;
+  } catch (error) {
+    console.error('Error checking if setup is required:', error);
+    // Default to assuming setup is not required to avoid locking users out
+    return { setupRequired: false };
+  }
+};
+
+
 // Helper function to get Authorization header
 export const getAuthHeaders = (): { [key: string]: string } => {
   const token = localStorage.getItem('adminToken');

@@ -397,22 +397,37 @@ router.post('/oidc/token-exchange', loginLimiter, async (req: Request, res: Resp
 });
 
 // WebAuthn registration endpoint
-// Removed authenticateToken middleware to allow registration initiation without prior login
-// (e.g., when redirected from login because no passkey exists)
+// This endpoint handles both first-time setup and adding new passkeys.
+// It's unauthenticated, but we perform a check to see if passkeys already exist.
+// If they do, we only allow registration if a valid JWT is present (i.e., user is logged in).
 router.post('/webauthn/register', async (req: Request, res: Response, next: NextFunction) => {
     try {
-        // Identify the user - assuming 'admin' for now in this flow
-        // In a multi-user system, you might need a different way to identify the user
-        // if they aren't authenticated yet.
-        const userId = 'admin'; 
+        const userId = 'admin';
+
+        const existingCredentials = await prisma.webAuthnCredential.findMany({
+            where: { userId: userId }
+        });
+
+        // If passkeys exist, we must ensure the user is authenticated to add another one.
+        if (existingCredentials.length > 0) {
+            const authHeader = req.headers.authorization;
+            if (!authHeader || !authHeader.startsWith('Bearer ')) {
+                // No token, but passkeys exist. This is the "setup already done" case.
+                throw new AppError(400, 'Passkey already registered');
+            }
+            const token = authHeader.split(' ')[1];
+            try {
+                jwt.verify(token, process.env.ADMIN_AUTH_SECRET!);
+                // Token is valid, proceed.
+            } catch (error) {
+                // Invalid token.
+                throw new AppError(401, 'Invalid or expired token.');
+            }
+        }
         
         logger.info(`Starting passkey registration process for user: ${userId}`, {
             userAgent: req.headers['user-agent'],
             ip: req.ip
-        });
-
-        const existingCredentials = await prisma.webAuthnCredential.findMany({
-            where: { userId: userId }
         });
 
         logger.info(`Checking existing passkeys for user: ${userId}`, {

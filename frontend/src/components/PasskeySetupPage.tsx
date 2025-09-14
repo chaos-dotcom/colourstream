@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Typography, Container, Paper, CircularProgress, Alert } from '@mui/material';
-import { registerPasskey } from '../utils/api'; // Use the standard registration function
+import { registerPasskey, isSetupRequired } from '../utils/api'; // Use the standard registration function
 import KeyIcon from '@mui/icons-material/Key';
 import { Button } from '@mui/material';
 import { PageHeading } from './GovUkComponents';
@@ -16,18 +16,19 @@ const PasskeySetupPage: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const isAuthenticated = localStorage.getItem('isAdminAuthenticated') === 'true';
-    const needsSetup = localStorage.getItem('needsPasskeySetup');
-
-    // If user is authenticated and doesn't need to set up a passkey, redirect them.
-    if (isAuthenticated && !needsSetup) {
-      navigate('/admin/dashboard');
-      return;
-    }
-
-    // Check if browser supports passkeys
-    const checkPasskeySupport = async () => {
+    const checkStatus = async () => {
+      setLoading(true);
       try {
+        const { setupRequired } = await isSetupRequired();
+        const isAuthenticated = localStorage.getItem('isAdminAuthenticated') === 'true';
+
+        // If setup is done and user is not logged in, they shouldn't be on the setup page.
+        if (!setupRequired && !isAuthenticated) {
+          navigate('/admin/login');
+          return;
+        }
+
+        // Check if browser supports passkeys
         const supported = window.PublicKeyCredential !== undefined &&
           typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === 'function';
         
@@ -45,7 +46,7 @@ const PasskeySetupPage: React.FC = () => {
       }
     };
 
-    checkPasskeySupport();
+    checkStatus();
   }, [navigate]);
 
   const handleRegisterPasskey = async () => {
