@@ -69,7 +69,6 @@ download_templates() {
     "frontend/.env.template"
     "mirotalk/.env.template"
     "companion/.env.template"
-    "coturn/turnserver.conf.template"
   )
   
   # Download each template
@@ -87,17 +86,6 @@ download_templates() {
     echo "Downloading $template..."
     if ! curl -s -o "$TEMPLATES_DIR/$template" "$REPO_URL/$template"; then
       echo "⚠️ Failed to download $template"
-      # If the file fails to download and it's the turnserver.conf.template,
-      # try copying from local path as fallback
-      if [ "$template" = "coturn/turnserver.conf.template" ] && [ -f "coturn/turnserver.conf.template" ]; then
-        echo "Using local turnserver.conf.template instead..."
-        mkdir -p "$TEMPLATES_DIR/coturn"
-        cp "coturn/turnserver.conf.template" "$TEMPLATES_DIR/coturn/turnserver.conf.template"
-        if [ $? -eq 0 ]; then
-          echo "✅ Successfully copied local turnserver.conf.template"
-          continue
-        fi
-      fi
       return 1
     fi
   done

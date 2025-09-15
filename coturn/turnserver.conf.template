@@ -7,16 +7,16 @@ max-port=20000
 fingerprint
 lt-cred-mech
 
-user=YOUR.USERNAME:YOUR.PASSWORD
+user=colourstream:your_turn_credential_here
 
-server-name=YOUR.DOMAIN.NAME
-realm=YOUR.DOMAIN.NAME
+server-name=${DOMAIN}
+realm=${DOMAIN}
 
 total-quota=100
 stale-nonce=600
 
-cert=/etc/letsencrypt/live/YOUR.DOMAIN.NAME/fullchain.pem
-pkey=/etc/letsencrypt/live/YOUR.DOMAIN.NAME/privkey.pem
+cert=/etc/certs/fullchain.pem
+pkey=/etc/certs/privkey.pem
 
 cipher-list="ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA384"
 
