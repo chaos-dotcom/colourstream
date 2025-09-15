@@ -1,6 +1,6 @@
 services:
   frontend:
-    image: ghcr.io/johnr24/colourstream-frontend:latest
+    image: ghcr.io/chaos-dotcom/colourstream-frontend:latest
     # build:
     #   context: ./frontend
     #   dockerfile: Dockerfile
@@ -110,7 +110,7 @@ services:
       - "traefik.enable=false"
 
   backend:
-    image: ghcr.io/johnr24/colourstream-backend:latest
+    image: ghcr.io/chaos-dotcom/colourstream-backend:latest
     # build:
     #   context: ./backend
     #   dockerfile: Dockerfile

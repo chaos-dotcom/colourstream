@@ -2,16 +2,16 @@
 
 This project uses GitHub Container Registry to publish Docker images. The published images are:
 
-- `ghcr.io/johnr24/colourstream-frontend:latest`
-- `ghcr.io/johnr24/colourstream-backend:latest`
-- `ghcr.io/johnr24/colourstream-ovenmediaengine:latest`
+- `ghcr.io/chaos-dotcom/colourstream-frontend:latest`
+- `ghcr.io/chaos-dotcom/colourstream-backend:latest`
+- `ghcr.io/chaos-dotcom/colourstream-ovenmediaengine:latest`
 
 ## Quick Setup
 
 The easiest way to deploy ColourStream is using our setup script:
 
 ```bash
-curl -s https://raw.githubusercontent.com/johnr24/colourstream/main/setup-ghcr.sh | bash
+curl -s https://raw.githubusercontent.com/chaos-dotcom/colourstream/main/setup-ghcr.sh | bash
 ```
 
 This script will:
@@ -32,14 +32,14 @@ If you prefer to set up manually:
 
 1. Pull the images:
    ```bash
-   docker pull ghcr.io/johnr24/colourstream-frontend:latest
-   docker pull ghcr.io/johnr24/colourstream-backend:latest
-   docker pull ghcr.io/johnr24/colourstream-ovenmediaengine:latest
+   docker pull ghcr.io/chaos-dotcom/colourstream-frontend:latest
+   docker pull ghcr.io/chaos-dotcom/colourstream-backend:latest
+   docker pull ghcr.io/chaos-dotcom/colourstream-ovenmediaengine:latest
    ```
 
 2. Download the docker-compose template:
    ```bash
-   curl -s https://raw.githubusercontent.com/johnr24/colourstream/main/docker-compose.template.yml > docker-compose.yml
+   curl -s https://raw.githubusercontent.com/chaos-dotcom/colourstream/main/docker-compose.template.yml > docker-compose.yml
    ```
 
 3. Configure your environment files and directories

@@ -4,7 +4,7 @@
 # Automatically generates configuration from templates with secure secrets
 
 # Constants
-REPO_URL="https://raw.githubusercontent.com/johnr24/colourstream/main"
+REPO_URL="https://raw.githubusercontent.com/chaos-dotcom/colourstream/main"
 TEMPLATES_DIR="templates"
 
 # Function to check required dependencies

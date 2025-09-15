@@ -9,7 +9,7 @@ Powered by OvenMediaEngine and Mirotalk (AGPL), ColourStream provides potential 
 
 ColourStream Uploader streamlines file transfers by eliminating the need for multiple transfer applications. The workflow is simple: create a client profile, set up a project, and generate a secure, time-limited upload link. This unique hashed link allows clients to easily and safely transfer files directly to your system. 
 
-We reccomend our sister application "TurboSort https://github.com/johnr24/TurboSort" which works in tandem to link Colourstream Uploaders File Structure with your existing Project File Structure
+We reccomend our sister application "TurboSort https://github.com/chaos-dotcom/TurboSort" which works in tandem to link Colourstream Uploaders File Structure with your existing Project File Structure
 
 💡 **Built by A Colourist, for Colorists** - with features specifically designed for the unique needs of colour grading professionals. Unlike grading over Zoom, Teams or another video meeting app, ColourStream is a purpose-built application designed from the ground up with colour grading in mind, leveraging OvenMediaEngine to ensure a fully accurate Colour Pipeline Workflow
 
@@ -209,7 +209,7 @@ rather than setting separate records for each subdomain.
 
 ```bash
 # Clone the repository
-git clone https://github.com/johnr24/colourstream.git
+git clone https://github.com/chaos-dotcom/colourstream.git
 cd colourstream
 
 # Setup firewall rules
