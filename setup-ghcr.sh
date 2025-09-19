@@ -36,6 +36,12 @@ create_directories() {
            ovenmediaengine/origin_conf ovenmediaengine/edge_conf coturn mirotalk frontend \
            companion-data minio-data $TEMPLATES_DIR
   
+  echo "Creating placeholder SSL files for mirotalk"
+  mkdir -p mirotalk/app/ssl
+  touch mirotalk/app/ssl/key.pem mirotalk/app/ssl/cert.pem
+
+
+  
   # Initialize Traefik ACME file with proper permissions
   touch traefik/acme.json
   chmod 600 traefik/acme.json
