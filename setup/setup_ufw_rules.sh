@@ -31,23 +31,16 @@ ufw allow 8082/tcp  # OVT(Origin)2
 ufw allow 9000/tcp  # OVT(Origin)
 ufw allow 1935/tcp  # RTMP Provider
 ufw allow 9999/tcp  # SRT
-ufw allow 3333/tcp  # WebRTC Signaling / LLHLS
 ufw allow 3334/tcp  # TLS WebRTC Signaling / LLHLS
 ufw allow 3478/tcp  # WebRTC TURN
 # WebRTC UDP ports
-ufw allow proto udp from any to any port 10000:10004
-
-# OvenMediaEngine Edge
-ufw allow 4333/tcp  # WebRTC Signaling / LLHLS
-ufw allow 3479/tcp  # WebRTC TURN
-# WebRTC UDP ports
-ufw allow proto udp from any to any port 10005:10009
+ufw allow proto udp from any to any port 10000:10009
 
 # Coturn TURN server
 ufw allow 3480/tcp
 ufw allow 3480/udp
-ufw allow 5350/tcp
-ufw allow 5350/udp
+ufw allow 5349/tcp #see coturn config.template
+ufw allow 5349/udp #see coturn config.template
 # TURN UDP port range
 ufw allow proto udp from any to any port 30000:31000
 
