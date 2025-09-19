@@ -16,6 +16,8 @@ ufw allow ssh
 # HTTP/HTTPS for Traefik
 ufw allow 80/tcp
 ufw allow 443/tcp
+ufw allow 443/udp #HTTP/3
+
 
 # Traefik Dashboard
 ufw allow 8090/tcp
