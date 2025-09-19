@@ -469,8 +469,8 @@ services:
     restart: unless-stopped
     volumes:
       - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
-      - ./certs/certs/video.colourstream..${DOMAIN}.crt:/etc/turnserver.pem
-      - ./certs/private/video.colourstream..${DOMAIN}.key:/etc/turnserver.key
+      - ./certs/certs/video.colourstream.${DOMAIN}.crt:/etc/turnserver.pem
+      - ./certs/private/video.colourstream.${DOMAIN}.key:/etc/turnserver.key
 volumes:
   postgres_data:
     name: colourstream_postgres_data
