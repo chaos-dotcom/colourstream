@@ -196,3 +196,4 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+setup/renew_certificates.sh
