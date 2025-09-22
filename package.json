@@ -22,7 +22,7 @@
     "@types/js-cookie": "^3.0.6",
     "@uppy/tus": "^5.0.0",
     "axios": "^1.12.2",
-    "fs-extra": "^11.3.1",
+    "fs-extra": "^11.3.2",
     "js-cookie": "^3.0.5",
     "sqlite3": "^5.1.7",
     "ws": "^8.18.3",
