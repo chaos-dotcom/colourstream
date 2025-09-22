@@ -20,7 +20,7 @@
     "@simplewebauthn/browser": "^13.1.2",
     "@simplewebauthn/server": "^13.1.2",
     "@types/js-cookie": "^3.0.6",
-    "@uppy/tus": "^5.0.0",
+    "@uppy/tus": "^5.0.1",
     "axios": "^1.12.2",
     "fs-extra": "^11.3.1",
     "js-cookie": "^3.0.5",
