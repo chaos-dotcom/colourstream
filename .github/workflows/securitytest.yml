@@ -19,4 +19,4 @@ jobs:
           STRIX_LLM: ${{ secrets.STRIX_LLM }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
 
-        run: strix -n -t https://oimate.shed.gay/
+        run: strix -n -t ./
