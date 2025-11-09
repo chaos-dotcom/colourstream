@@ -1,0 +1,22 @@
+name: strix-penetration-test
+
+on:
+    workflow_dispatch:
+
+jobs:
+  security-scan:
+    environment:
+      name: default
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Strix
+        run: pipx install strix-agent
+
+      - name: Run Strix
+        env:
+          STRIX_LLM: ${{ secrets.STRIX_LLM }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+
+        run: strix -n -t https://oimate.shed.gay/
