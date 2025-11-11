@@ -35,8 +35,8 @@ ColourStream uses a modern, secure authentication system that prioritizes passke
 ### WebAuthn Configuration
 ```env
 # WebAuthn Configuration in .env
-WEBAUTHN_RP_ID=live.colourstream.johnrogerscolour.co.uk
-WEBAUTHN_ORIGIN=https://live.colourstream.johnrogerscolour.co.uk
+WEBAUTHN_RP_ID=live.colourstream.colourbyrogers.co.uk
+WEBAUTHN_ORIGIN=https://live.colourstream.colourbyrogers.co.uk
 ```
 
 ## Setup Process

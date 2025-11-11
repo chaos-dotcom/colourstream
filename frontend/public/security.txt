@@ -2,8 +2,8 @@
 # Following RFC 9116 (https://www.rfc-editor.org/rfc/rfc9116.html)
 
 # Contact information
-Contact: mailto:security@johnrogerscolour.co.uk
-Contact: https://live.colourstream.johnrogerscolour.co.uk/security-contact
+Contact: mailto:security@colourbyrogers.co.uk
+Contact: https://live.colourstream.colourbyrogers.co.uk/security-contact
 
 # Expiration date (1 year from today)
 Expires: 2025-02-27T23:59:59+00:00
@@ -12,16 +12,16 @@ Expires: 2025-02-27T23:59:59+00:00
 Preferred-Languages: en
 
 # Security policy
-Policy: https://live.colourstream.johnrogerscolour.co.uk/security-policy
+Policy: https://live.colourstream.colourbyrogers.co.uk/security-policy
 
 # Acknowledgments page
-Acknowledgments: https://live.colourstream.johnrogerscolour.co.uk/security-acknowledgments
+Acknowledgments: https://live.colourstream.colourbyrogers.co.uk/security-acknowledgments
 
 # Canonical URL
-Canonical: https://live.colourstream.johnrogerscolour.co.uk/.well-known/security.txt
+Canonical: https://live.colourstream.colourbyrogers.co.uk/.well-known/security.txt
 
 # Encryption key (if available)
-# Encryption: https://live.colourstream.johnrogerscolour.co.uk/pgp-key.txt
+# Encryption: https://live.colourstream.colourbyrogers.co.uk/pgp-key.txt
 
 # Hiring information (optional)
-# Hiring: https://live.colourstream.johnrogerscolour.co.uk/jobs 
+# Hiring: https://live.colourstream.colourbyrogers.co.uk/jobs 

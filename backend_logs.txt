@@ -26,15 +26,15 @@ backend-1  | Starting the application...
 backend-1  | [32minfo[39m: Connecting to database... {"timestamp":"2025-03-15T16:37:43.525Z"}
 backend-1  | [32minfo[39m: WebSocket server initialized without path restriction to handle all WebSocket connections {"timestamp":"2025-03-15T16:37:44.189Z"}
 backend-1  | [32minfo[39m: OBS WebSocket service initialized {"timestamp":"2025-03-15T16:37:44.190Z"}
-backend-1  | [32minfo[39m: Initialized service with OME RTMP endpoint: rtmp://live.colourstream.johnrogerscolour.co.uk:1935/app {"timestamp":"2025-03-15T16:37:44.190Z"}
-backend-1  | [32minfo[39m: Initialized service with OME SRT endpoint: srt://live.colourstream.johnrogerscolour.co.uk:9999 {"timestamp":"2025-03-15T16:37:44.190Z"}
+backend-1  | [32minfo[39m: Initialized service with OME RTMP endpoint: rtmp://live.colourstream.colourbyrogers.co.uk:1935/app {"timestamp":"2025-03-15T16:37:44.190Z"}
+backend-1  | [32minfo[39m: Initialized service with OME SRT endpoint: srt://live.colourstream.colourbyrogers.co.uk:9999 {"timestamp":"2025-03-15T16:37:44.190Z"}
 backend-1  | [32minfo[39m: Using SRT latency: 2000000 microseconds {"timestamp":"2025-03-15T16:37:44.191Z"}
 backend-1  | [32minfo[39m: Initialized OvenMediaEngine Service with URL: http://origin:8081 {"timestamp":"2025-03-15T16:37:44.227Z"}
 backend-1  | [32minfo[39m: Using API access token: ******** {"timestamp":"2025-03-15T16:37:44.227Z"}
 backend-1  | [32minfo[39m: WebSocket server initialized without path restriction to handle all WebSocket connections {"timestamp":"2025-03-15T16:37:44.454Z"}
 backend-1  | [32minfo[39m: OBS WebSocket service initialized {"timestamp":"2025-03-15T16:37:44.454Z"}
-backend-1  | [32minfo[39m: Initialized service with OME RTMP endpoint: rtmp://live.colourstream.johnrogerscolour.co.uk:1935/app {"timestamp":"2025-03-15T16:37:44.454Z"}
-backend-1  | [32minfo[39m: Initialized service with OME SRT endpoint: srt://live.colourstream.johnrogerscolour.co.uk:9999 {"timestamp":"2025-03-15T16:37:44.454Z"}
+backend-1  | [32minfo[39m: Initialized service with OME RTMP endpoint: rtmp://live.colourstream.colourbyrogers.co.uk:1935/app {"timestamp":"2025-03-15T16:37:44.454Z"}
+backend-1  | [32minfo[39m: Initialized service with OME SRT endpoint: srt://live.colourstream.colourbyrogers.co.uk:9999 {"timestamp":"2025-03-15T16:37:44.454Z"}
 backend-1  | [32minfo[39m: Using SRT latency: 2000000 microseconds {"timestamp":"2025-03-15T16:37:44.455Z"}
 backend-1  | [32minfo[39m: Initializing authentication system {"timestamp":"2025-03-15T16:37:44.456Z"}
 backend-1  | [32minfo[39m: Authentication system initialized successfully {"envVars":{"NODE_ENV":"production","hasJwtSecret":true,"hasWebAuthnConfig":true},"timestamp":"2025-03-15T16:37:44.456Z"}

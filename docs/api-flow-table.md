@@ -22,7 +22,7 @@ This document shows the flow of API requests from the frontend through our backe
 
 ### Frontend → Backend
 ```http
-GET https://live.colourstream.johnrogerscolour.co.uk/api/omen/vhosts
+GET https://live.colourstream.colourbyrogers.co.uk/api/omen/vhosts
 Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
 Content-Type: application/json
 ```
@@ -43,7 +43,7 @@ OME_API_URL=http://origin:8081
 OME_API_ACCESS_TOKEN=0fc62ea62790ad7c
 
 # Frontend Environment
-VITE_API_URL=https://live.colourstream.johnrogerscolour.co.uk/api
+VITE_API_URL=https://live.colourstream.colourbyrogers.co.uk/api
 ```
 
 ## Notes

@@ -161,7 +161,7 @@ This rule ensures consistent naming conventions across the ColourStream codebase
       "filePattern": "docker-compose.y*ml",
       "severity": "warning",
       "examples": {
-        "incorrect": "MINIO_DOMAIN: ${S3_DOMAIN:-s3.colourstream.johnrogerscolour.co.uk}",
+        "incorrect": "MINIO_DOMAIN: ${S3_DOMAIN:-s3.colourstream.colourbyrogers.co.uk}",
         "correct": "MINIO_DOMAIN: ${S3_DOMAIN}"
       },
       "fixInstructions": "1. Remove default values from docker-compose.yml\n2. Add these values to your .env file instead\n3. This maintains DRY principle and centralizes configuration"

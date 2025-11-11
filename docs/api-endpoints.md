@@ -1,6 +1,6 @@
 # API Endpoints Documentation
 
-Base URL: `https://live.colourstream.johnrogerscolour.co.uk/api`
+Base URL: `https://live.colourstream.colourbyrogers.co.uk/api`
 
 All endpoints require JWT authentication via Bearer token in the Authorization header:
 ```

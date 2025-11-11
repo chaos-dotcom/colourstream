@@ -22,7 +22,7 @@ const router = express.Router();
 
 // WebAuthn configuration
 const rpName = 'ColourStream Admin';
-const rpID = process.env.WEBAUTHN_RP_ID || 'live.colourstream.johnrogerscolour.co.uk';
+const rpID = process.env.WEBAUTHN_RP_ID || 'live.colourstream.colourbyrogers.co.uk';
 const origin = process.env.WEBAUTHN_ORIGIN || `https://${rpID}`;
 
 // Store challenge temporarily (in production, use Redis or similar)
@@ -269,8 +269,8 @@ router.post('/oidc/token-exchange', loginLimiter, async (req: Request, res: Resp
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Origin': process.env.PUBLIC_URL || 'https://live.colourstream.johnrogerscolour.co.uk',
-        'Referer': process.env.PUBLIC_URL || 'https://live.colourstream.johnrogerscolour.co.uk',
+        'Origin': process.env.PUBLIC_URL || 'https://live.colourstream.colourbyrogers.co.uk',
+        'Referer': process.env.PUBLIC_URL || 'https://live.colourstream.colourbyrogers.co.uk',
         'Accept': 'application/json',
         'X-Requested-With': 'XMLHttpRequest'
       },

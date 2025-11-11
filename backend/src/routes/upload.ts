@@ -417,7 +417,7 @@ router.post('/projects/:projectId/upload-links', authenticateToken, async (req: 
     });
 
     // Generate the full upload URL
-    const uploadUrl = `https://upload.colourstream.johnrogerscolour.co.uk/${uploadLink.token}`;
+    const uploadUrl = `https://upload.colourstream.colourbyrogers.co.uk/${uploadLink.token}`;
     
     res.json({
       status: 'success',
@@ -1010,7 +1010,7 @@ router.put('/upload-links/:linkId', authenticateToken, async (req: Request, res:
     });
     
     // Generate the full upload URL
-    const uploadUrl = `https://upload.colourstream.johnrogerscolour.co.uk/${updatedLink.token}`;
+    const uploadUrl = `https://upload.colourstream.colourbyrogers.co.uk/${updatedLink.token}`;
     
     res.json({
       status: 'success',

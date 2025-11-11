@@ -16,8 +16,8 @@ The OBS integration supports one primary connection modes:
 ## Environment Variables
 
 ### Required Variables
-- `RTMP_SERVER_URL`: RTMP server endpoint (default: 'rtmp://live.johnrogerscolour.co.uk/live')
-- `SRT_SERVER_URL`: Base SRT server URL (default: 'srt://live.colourstream.johnrogerscolour.co.uk:9999')
+- `RTMP_SERVER_URL`: RTMP server endpoint (default: 'rtmp://live.colourbyrogers.co.uk/live')
+- `SRT_SERVER_URL`: Base SRT server URL (default: 'srt://live.colourstream.colourbyrogers.co.uk:9999')
 
 ### Optional Variables
 - `SRT_LATENCY`: SRT stream latency in microseconds (default: 2000000)

@@ -90,7 +90,7 @@ OME_API_URL=http://origin:8081
 OME_API_ACCESS_TOKEN=0fc62ea62790ad7c
 
 # Frontend Environment Variables
-VITE_API_URL=https://live.colourstream.johnrogerscolour.co.uk/api
+VITE_API_URL=https://live.colourstream.colourbyrogers.co.uk/api
 ```
 
 ## Security Notes
