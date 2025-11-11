@@ -3,9 +3,9 @@ import http from 'http';
 import { logger } from '../utils/logger';
 // Define allowed origins for Socket.IO CORS, mirroring index.ts
 const allowedOrigins = [
-  process.env.FRONTEND_URL || 'https://live.colourstream.johnrogerscolour.co.uk',
+  process.env.FRONTEND_URL || 'https://live.colourstream.colourbyrogers.co.uk',
   'http://localhost:8000', // Allow local dev frontend
-  'https://upload.colourstream.johnrogerscolour.co.uk' // Allow upload portal origin
+  'https://upload.colourstream.colourbyrogers.co.uk' // Allow upload portal origin
 ];
 
 let io: SocketIOServer | null = null;

@@ -211,7 +211,7 @@ const ProjectDetails: React.FC = () => {
   const handleCopyLink = async (link: string) => {
     try {
       await navigator.clipboard.writeText(
-        `https://upload.colourstream.johnrogerscolour.co.uk/portal/${link}`
+        `https://upload.colourstream.colourbyrogers.co.uk/portal/${link}`
       );
       setCopySuccess(link);
       setTimeout(() => setCopySuccess(null), 2000);
@@ -243,7 +243,7 @@ const ProjectDetails: React.FC = () => {
   };
 
   const openClientUploadPage = (link: UploadLink) => {
-    const uploadUrl = `https://upload.colourstream.johnrogerscolour.co.uk/portal/${link.token}`;
+    const uploadUrl = `https://upload.colourstream.colourbyrogers.co.uk/portal/${link.token}`;
     window.open(uploadUrl, '_blank');
   };
 

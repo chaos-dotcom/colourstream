@@ -66,7 +66,7 @@ const getConfig = (key: keyof RuntimeConfig): string => {
     case 'OVENPLAYER_SCRIPT_URL':
       return envValue || 'https://cdn.jsdelivr.net/npm/ovenplayer/dist/ovenplayer.js';
     case 'UPLOAD_ENDPOINT_URL':
-      return envValue || 'https://upload.colourstream.johnrogerscolour.co.uk/';
+      return envValue || 'https://upload.colourstream.colourbyrogers.co.uk/';
     case 'NAMEFORUPLOADCOMPLETION':
       return envValue || 'John';
     // Companion configuration defaults

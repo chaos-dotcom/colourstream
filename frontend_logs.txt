@@ -1,14 +1,14 @@
 colourstream-frontend  | Generated runtime configuration:
 colourstream-frontend  | window.RUNTIME_CONFIG = {
-colourstream-frontend  |   API_URL: "https://live.colourstream.johnrogerscolour.co.uk/api",
-colourstream-frontend  |   OIDC_AUTH_ENDPOINT: "https://sso.johnrogerscolour.co.uk/authorize",
-colourstream-frontend  |   WEBRTC_WS_HOST: "live.colourstream.johnrogerscolour.co.uk",
+colourstream-frontend  |   API_URL: "https://live.colourstream.colourbyrogers.co.uk/api",
+colourstream-frontend  |   OIDC_AUTH_ENDPOINT: "https://sso.colourbyrogers.co.uk/authorize",
+colourstream-frontend  |   WEBRTC_WS_HOST: "live.colourstream.colourbyrogers.co.uk",
 colourstream-frontend  |   WEBRTC_WS_PORT: "3334",
 colourstream-frontend  |   WEBRTC_WS_PROTOCOL: "wss",
 colourstream-frontend  |   WEBRTC_APP_PATH: "app",
-colourstream-frontend  |   VIDEO_URL: "https://video.colourstream.johnrogerscolour.co.uk/join",
+colourstream-frontend  |   VIDEO_URL: "https://video.colourstream.colourbyrogers.co.uk/join",
 colourstream-frontend  |   OVENPLAYER_SCRIPT_URL: "https://cdn.jsdelivr.net/npm/ovenplayer/dist/ovenplayer.js",
-colourstream-frontend  |   UPLOAD_ENDPOINT_URL: "https://upload.colourstream.johnrogerscolour.co.uk/files/",
+colourstream-frontend  |   UPLOAD_ENDPOINT_URL: "https://upload.colourstream.colourbyrogers.co.uk/files/",
 colourstream-frontend  |   NAMEFORUPLOADCOMPLETION: "John"
 colourstream-frontend  | };
 colourstream-frontend  | console.log("Runtime configuration loaded:", window.RUNTIME_CONFIG);

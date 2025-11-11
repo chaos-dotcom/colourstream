@@ -8,7 +8,7 @@
 set -e  # Exit on error
 
 # Configuration variables with relative paths
-ACME_JSON="../traefik/acme.json"
+ACME_JSON="mnt/SSDPool/homes/john/traefik/traefik/sslcerts/acme.json"
 CERT_DIR="../certs"
 
 # Create certificate directories if they don't exist
@@ -75,15 +75,15 @@ cd ..
 
 # 1. Update Origin service
 echo "Updating Origin service..."
-docker-compose stop origin
-docker-compose up -d origin
+docker compose stop origin
+docker compose up -d origin
 echo "Origin service updated."
 
 # 2. Update Edge service (if it exists)
 if docker-compose ps | grep -q "edge"; then
   echo "Updating Edge service..."
-  docker-compose stop edge
-  docker-compose up -d edge
+  docker compose stop edge
+  docker compose up -d edge
   echo "Edge service updated."
 else
   echo "Edge service not found, skipping..."
@@ -92,18 +92,18 @@ fi
 # 3. Update Mirotalk service (if it exists)
 if docker-compose ps | grep -q "mirotalk"; then
   echo "Updating Mirotalk service..."
-  docker-compose stop mirotalk
-  docker-compose up -d mirotalk
+  docker compose stop mirotalk
+  docker compose up -d mirotalk
   echo "Mirotalk service updated."
 else
   echo "Mirotalk service not found, skipping..."
 fi
 
 # 4. Update Coturn service (if it exists)
-if docker-compose ps | grep -q "coturn"; then
+if docker compose ps | grep -q "coturn"; then
   echo "Updating Coturn service..."
-  docker-compose stop coturn
-  docker-compose up -d coturn
+  docker compose stop coturn
+  docker compose up -d coturn
   echo "Coturn service updated."
 else
   echo "Coturn service not found, skipping..."

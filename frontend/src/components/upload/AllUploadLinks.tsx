@@ -192,7 +192,7 @@ const AllUploadLinks: React.FC = () => {
   
   // Copy upload link to clipboard
   const handleCopyLink = (token: string) => {
-    const url = `https://upload.colourstream.johnrogerscolour.co.uk/portal/${token}`;
+    const url = `https://upload.colourstream.colourbyrogers.co.uk/portal/${token}`;
     navigator.clipboard.writeText(url);
     enqueueSnackbar('Upload link copied to clipboard', { variant: 'success' });
   };
@@ -315,7 +315,7 @@ const AllUploadLinks: React.FC = () => {
   
   // Visit upload link
   const handleVisitLink = (token: string) => {
-    window.open(`https://upload.colourstream.johnrogerscolour.co.uk/portal/${token}`, '_blank');
+    window.open(`https://upload.colourstream.colourbyrogers.co.uk/portal/${token}`, '_blank');
   };
   
   return (

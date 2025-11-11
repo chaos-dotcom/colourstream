@@ -42,9 +42,9 @@ app.set('trust proxy', 1);
 const corsOptions = {
   origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
     const allowedOrigins = [
-      process.env.FRONTEND_URL || 'https://live.colourstream.johnrogerscolour.co.uk', 
+      process.env.FRONTEND_URL || 'https://live.colourstream.colourbyrogers.co.uk', 
       'http://localhost:8000',
-      'https://upload.colourstream.johnrogerscolour.co.uk'
+      'https://upload.colourstream.colourbyrogers.co.uk'
     ];
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);

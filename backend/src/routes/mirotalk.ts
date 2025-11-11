@@ -164,7 +164,7 @@ router.post('/join', authenticateToken, async (req: Request<{}, {}, MiroTalkJoin
     );
 
     // Construct MiroTalk URL
-    const mirotalkUrl = new URL('https://video.colourstream.johnrogerscolour.co.uk/join');
+    const mirotalkUrl = new URL('https://video.colourstream.colourbyrogers.co.uk/join');
     mirotalkUrl.searchParams.append('room', room);
     mirotalkUrl.searchParams.append('name', name);
     mirotalkUrl.searchParams.append('audio', audio);
@@ -329,7 +329,7 @@ router.post('/generate-token', authenticateToken, async (req: Request<{}, {}, Ge
     );
 
     // Construct MiroTalk URL
-    const mirotalkUrl = new URL('https://video.colourstream.johnrogerscolour.co.uk/join');
+    const mirotalkUrl = new URL('https://video.colourstream.colourbyrogers.co.uk/join');
     mirotalkUrl.searchParams.append('room', roomId);
     mirotalkUrl.searchParams.append('name', name);
     mirotalkUrl.searchParams.append('audio', 'true');

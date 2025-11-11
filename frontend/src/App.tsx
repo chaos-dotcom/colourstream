@@ -147,7 +147,7 @@ function App() {
               path="/files/:token" 
               element={
                 <Navigate 
-                  to={`https://upload.colourstream.johnrogerscolour.co.uk/portal/${window.location.pathname.split('/files/')[1]}`} 
+                  to={`https://upload.colourstream.colourbyrogers.co.uk/portal/${window.location.pathname.split('/files/')[1]}`} 
                   replace 
                 />
               } 

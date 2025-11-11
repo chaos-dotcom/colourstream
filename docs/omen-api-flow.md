@@ -61,7 +61,7 @@
    - Health checks and load balancing
 
 3. **Frontend to Backend**
-   - Base URL: `https://live.colourstream.johnrogerscolour.co.uk/api`
+   - Base URL: `https://live.colourstream.colourbyrogers.co.uk/api`
    - All OvenMediaEngine requests go through `/api/omen/*` endpoints
    - Authentication: JWT Token
    - Protocol: HTTPS/TLS
@@ -92,11 +92,11 @@
 
 ```
 # Traefik Configuration
-TRAEFIK_DOMAIN=live.colourstream.johnrogerscolour.co.uk
+TRAEFIK_DOMAIN=live.colourstream.colourbyrogers.co.uk
 TRAEFIK_ACME_EMAIL=your-email@example.com
 
 # Frontend Configuration
-VITE_API_URL=https://live.colourstream.johnrogerscolour.co.uk/api
+VITE_API_URL=https://live.colourstream.colourbyrogers.co.uk/api
 
 # Backend Configuration
 OME_API_URL=http://origin:8081

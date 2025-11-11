@@ -34,13 +34,13 @@ const About: React.FC = () => {
                 colourists.
               </p>
               <p className="govuk-body">
-                We are proud signatories of the <a href="https://live.colourstream.johnrogerscolour.co.uk/license" target="_blank" rel="noopener noreferrer" className="govuk-link">Pride Flag Covenant</a>, affirming our commitment to creating inclusive
+                We are proud signatories of the <a href="https://live.colourstream.colourbyrogers.co.uk/license" target="_blank" rel="noopener noreferrer" className="govuk-link">Pride Flag Covenant</a>, affirming our commitment to creating inclusive
                 technology that respects and supports all members of our community. We believe that diversity
                 strengthens our tools and ensures they serve everyone in the colour grading industry, regardless
                 of background or identity. You can read our full <a href="/license" className="govuk-link">license</a> for more details and view our <a href="/privacy" className="govuk-link">privacy policy</a>.
               </p>
               <p className="govuk-body">
-                ColourStream was written by <a href="https://johnrogerscolour.co.uk" target="_blank" rel="noopener noreferrer" className="govuk-link">John Rogers</a>, 
+                ColourStream was written by <a href="https://colourbyrogers.co.uk" target="_blank" rel="noopener noreferrer" className="govuk-link">John Rogers</a>, 
                 a professional colourist with extensive experience in the industry.
               </p>
             </div>

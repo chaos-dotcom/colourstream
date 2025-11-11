@@ -30,8 +30,8 @@ class OBSService {
   constructor(wsService: any) { // Use any type to avoid circular reference issues
     this.obsWebSocket = new OBSWebSocketService(wsService);
     this.obs = this.obsWebSocket.getObs(); // Get the OBSWebSocket instance
-    this.rtmpServer = process.env.RTMP_SERVER_URL || 'rtmp://live.colourstream.johnrogerscolour.co.uk:1935/app';
-    this.srtServer = process.env.SRT_SERVER_URL || 'srt://live.colourstream.johnrogerscolour.co.uk:9999';
+    this.rtmpServer = process.env.RTMP_SERVER_URL || 'rtmp://live.colourstream.colourbyrogers.co.uk:1935/app';
+    this.srtServer = process.env.SRT_SERVER_URL || 'srt://live.colourstream.colourbyrogers.co.uk:9999';
     this.srtLatency = parseInt(process.env.SRT_LATENCY || '2000000', 10);
     
     logger.info(`Initialized service with OME RTMP endpoint: ${this.rtmpServer}`);

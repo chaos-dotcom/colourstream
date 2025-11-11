@@ -12,8 +12,8 @@ Create or modify your `.env` file with these required variables:
 ADMIN_PASSWORD=admin
 
 # WebAuthn Configuration
-WEBAUTHN_RP_ID=live.colourstream.johnrogerscolour.co.uk
-WEBAUTHN_ORIGIN=https://live.colourstream.johnrogerscolour.co.uk
+WEBAUTHN_RP_ID=live.colourstream.colourbyrogers.co.uk
+WEBAUTHN_ORIGIN=https://live.colourstream.colourbyrogers.co.uk
 ```
 
 ### 2. Database Configuration
